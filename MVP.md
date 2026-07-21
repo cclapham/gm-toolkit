@@ -32,13 +32,13 @@ If a feature isn't needed for that sentence, it isn't in the MVP.
 - Runs entirely offline, deterministic given a seed (so it's testable)
 
 ### 5. Platforms
-- Windows and Android
-- iOS/macOS should compile but are not tested or supported for the MVP
+- Windows, Linux (desktop and Raspberry Pi 4 / ARM64), and Android, built from a single .NET solution with a shared Avalonia UI
+- The Raspberry Pi 4 target is a real constraint, not a stretch goal — it rules out heavyweight or webview-based UI runtimes up front
 
 ### 6. Non-functional
-- Cold start under 2 seconds on a mid-range machine
-- All data local in SQLite; no network calls at all
-- Core domain + generator logic covered by unit tests
+- Cold start under 2 seconds on a mid-range machine (Raspberry Pi 4 included)
+- All data local in SQLite (via sqlite-net-pcl); no network calls at all
+- Core domain + generator logic covered by unit tests (xUnit)
 
 ## Explicitly out of scope for MVP
 
@@ -55,13 +55,12 @@ Written down so they can be said "no" to quickly:
 - Custom generator tables editable in-app (JSON files are edit-by-hand in the fork for now)
 - Portrait/image generation or attachment
 - Localisation
-- iOS/macOS support
 - Theming beyond light/dark
 
 ## Definition of done for the MVP
 
 - [ ] Every issue in milestones M0–M4 is closed
-- [ ] `dotnet test` green; CI green on Windows
-- [ ] A signed-off manual QA pass against the one-sentence test above, on Windows and on a real Android device
+- [ ] `dotnet test` (xUnit) green; CI green
+- [ ] A signed-off manual QA pass against the one-sentence test above, on each of Windows, Ubuntu Linux, Raspberry Pi 4 and Android
 - [ ] README screenshots replaced with real ones
-- [ ] Tagged `v0.1.0` with release notes and a Windows build attached
+- [ ] Tagged `v0.1.0` with release notes and build artifacts for Windows, Linux x64, Linux ARM64 and Android attached

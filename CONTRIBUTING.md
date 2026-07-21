@@ -4,7 +4,7 @@ Thanks for considering it. This project is small and the bar is "does it work an
 
 ## Before you write code
 
-- **Check the [project board](https://github.com/users/cclapham/projects/1)** — anything in *Todo* is fair game.
+- **Check the [project board](https://github.com/users/cclapham/projects/6)** — anything in *Todo* is fair game.
 - **New to the repo?** Filter for [`good first issue`](https://github.com/cclapham/gm-toolkit/labels/good%20first%20issue).
 - **Got an idea?** Open an issue first. For anything beyond a small fix, please don't open a surprise PR — the [MVP scope](docs/MVP.md) says no to a lot of good ideas on purpose, and I'd rather tell you that in an issue than after you've spent a weekend on it.
 - **Comment on the issue** to claim it, so two people don't do the same work.
@@ -19,22 +19,23 @@ Thanks for considering it. This project is small and the bar is "does it work an
 ## What a PR needs
 
 - [ ] Linked issue
-- [ ] Green CI (`dotnet build` + `dotnet test`)
+- [ ] Green CI (`dotnet test`)
 - [ ] Tests for new logic in `Core` or `Data` — UI changes don't need tests, business logic does
-- [ ] No new compiler warnings (warnings are errors in this repo)
+- [ ] No new compiler warnings
 - [ ] Scoped to one thing; unrelated cleanup goes in its own PR
 
 ## Code conventions
 
-- `.editorconfig` is authoritative. Run `dotnet format` before pushing.
+- `.editorconfig` is authoritative.
 - Nullable reference types are on. Don't `!` your way out — fix the nullability.
-- **Keep `GmToolkit.Core` clean.** No EF Core, no Razor, no MAUI, no `HttpClient`. Domain models, interfaces and pure logic only. This is what makes the project forkable and testable, and it's the rule most likely to be broken by accident.
-- Put business logic in `Core`, not in `.razor` files. If a component has an `if` worth testing, that `if` belongs in a service.
-- Async all the way down for anything touching the database. No `.Result`, no `.Wait()`.
+- **Keep `GmToolkit.Core` clean.** No Avalonia types, no SQLite. Domain models, interfaces and pure logic only, in a plain C# class library. This is what makes the project forkable and testable, and it's the rule most likely to be broken by accident.
+- Put business logic in `Core`, not in Avalonia views or view models. If a branch of logic is worth testing, it belongs in a service.
+- Avoid framework lifecycle types (Avalonia `Window`/`UserControl` code-behind, Android `Activity`) outside `Desktop`/`Android`/`UI` — `Core` and `Data` types should be constructible and testable without a UI runtime.
+- Async all the way down for anything touching the database. No blocking waits on async calls.
 
 ## Generator tables
 
-Table data lives in `src/GmToolkit.Core/Generation/Tables/*.json`. Adding entries to an existing table is a welcome, zero-risk contribution and doesn't need an issue first — just keep entries generic and setting-neutral, and **don't paste content from published RPG books**. Names, traits and quirks you wrote yourself, or that come from a public-domain or CC-licensed source with attribution, only.
+Table data lives in `Resources/GeneratorTables/*.json`, embedded and loaded at startup. Adding entries to an existing table is a welcome, zero-risk contribution and doesn't need an issue first — just keep entries generic and setting-neutral, and **don't paste content from published RPG books**. Names, traits and quirks you wrote yourself, or that come from a public-domain or CC-licensed source with attribution, only.
 
 ## Reporting bugs
 

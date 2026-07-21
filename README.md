@@ -4,9 +4,10 @@
 
 [![Build](https://github.com/cclapham/gm-toolkit/actions/workflows/build.yml/badge.svg)](https://github.com/cclapham/gm-toolkit/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![Avalonia](https://img.shields.io/badge/UI-Avalonia-blueviolet)](https://avaloniaui.net/)
 
-**Status:** pre-alpha — working towards the [MVP](docs/MVP.md). Expect breaking changes.
+**Status:** pre-alpha — working towards the [MVP](MVP.md). Expect breaking changes.
 
 ---
 
@@ -29,38 +30,38 @@ Most GM tools are either web-only (useless at a table with no wifi), locked to o
 
 ## Screenshots
 
-_Coming once the MVP UI lands. See [docs/ROADMAP.md](docs/ROADMAP.md)._
+_Coming once the MVP UI lands. See [ROADMAP.md](ROADMAP.md)._
 
 ---
 
 ## Tech stack
 
-- **.NET 10** (LTS)
-- **.NET MAUI Blazor Hybrid** — native shell, Razor component UI
-- **Razor Class Library** for all UI, so the same components can later run in a Blazor Web App without a rewrite
-- **EF Core + SQLite** for local persistence
-- **xUnit** for tests
-- **GitHub Actions** for CI
+- **.NET 10** — runtime and cross-platform build pipeline
+- **Avalonia UI** (AXAML + MVVM) for all screens — a native, non-webview cross-platform UI framework with genuine Linux desktop support, ARM included
+- **sqlite-net-pcl** for local persistence (SQLite, no server, no ORM ceremony)
+- **xUnit** for Core/Data unit tests
+- **GitHub Actions** for CI builds and tests — plain `dotnet build`/`dotnet test`, no game-engine-specific CI needed
 
-### Solution layout
+### Project layout
 
 ```
-gm-toolkit.sln
+gm-toolkit/
+├── GmToolkit.slnx
 ├── src/
-│   ├── GmToolkit.App/          # MAUI Blazor Hybrid host (Android, iOS, macOS, Windows)
-│   ├── GmToolkit.UI/           # Razor Class Library — all pages & components
-│   ├── GmToolkit.Core/         # Domain models, generator engine, services (no UI, no EF)
-│   └── GmToolkit.Data/         # EF Core DbContext, migrations, repositories
+│   ├── GmToolkit.Core/          # domain models, generator engine — plain C#, no Avalonia or SQLite references
+│   ├── GmToolkit.Data/           # sqlite-net-pcl repositories, references Core
+│   ├── GmToolkit.UI/             # Avalonia views and view models (MVVM), references Core
+│   ├── GmToolkit.Desktop/        # Windows/Linux desktop head, references UI + Data + Core
+│   └── GmToolkit.Android/        # Android head, references UI + Data + Core
 ├── tests/
-│   ├── GmToolkit.Core.Tests/
-│   └── GmToolkit.Data.Tests/
-├── docs/
-│   ├── MVP.md
-│   └── ROADMAP.md
+│   ├── GmToolkit.Core.Tests/     # references Core, xUnit
+│   └── GmToolkit.Data.Tests/     # references Data
+├── Resources/
+│   └── GeneratorTables/          # embedded JSON tables (names, appearance, mannerism, motivation, occupation, secret)
 └── .github/workflows/
 ```
 
-The dependency rule is one-way: `App` → `UI` → `Core` ← `Data`. `Core` references nothing of ours. If you find yourself wanting `Core` to know about EF Core or Razor, that's the signal to stop and reconsider.
+The dependency rule is one-way: `Desktop`/`Android` → `UI` → `Core` ← `Data`. `Core` references nothing of ours and stays as close to plain C# as possible. If you find yourself wanting `Core` to know about SQLite or Avalonia, that's the signal to stop and reconsider.
 
 ---
 
@@ -68,17 +69,10 @@ The dependency rule is one-way: `App` → `UI` → `Core` ← `Data`. `Core` ref
 
 ### Prerequisites
 
-1. **[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)**
-2. **MAUI workload:**
-   ```bash
-   dotnet workload install maui
-   ```
-   On Linux you can only build/test `Core`, `Data` and `UI` — the MAUI heads need Windows or macOS.
-3. **Per-platform extras:**
-   - **Windows** — Windows 10 19041+, Developer Mode on, [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
-   - **Android** — JDK 17+ and the Android SDK (easiest via the Visual Studio or VS Code MAUI extension installer)
-   - **iOS / macOS** — a Mac with current Xcode
-4. **An editor** — Visual Studio 2026 with the *.NET Multi-platform App UI development* workload, or VS Code with the *C# Dev Kit* + *.NET MAUI* extensions, or Rider.
+1. **[.NET 10 SDK](https://dotnet.microsoft.com/download)**
+2. **Avalonia project templates** — only needed if you're scaffolding new projects: `dotnet new install Avalonia.Templates`
+3. **Android builds** additionally need the Android SDK — `dotnet workload install android` plus Android Studio's command-line tools (or Android Studio itself if you want the emulator)
+4. **An editor** — JetBrains Rider (first-class Avalonia previewer support), VS Code with the C# Dev Kit and Avalonia extensions, or Visual Studio
 
 ### Build and run
 
@@ -86,14 +80,16 @@ The dependency rule is one-way: `App` → `UI` → `Core` ← `Data`. `Core` ref
 git clone https://github.com/cclapham/gm-toolkit.git
 cd gm-toolkit
 dotnet restore
-
-# Windows
-dotnet build src/GmToolkit.App -f net10.0-windows10.0.19041.0
-dotnet run   --project src/GmToolkit.App -f net10.0-windows10.0.19041.0
-
-# Android (emulator or device attached)
-dotnet build src/GmToolkit.App -f net10.0-android -t:Run
 ```
+
+- **Desktop (Windows/Linux), run directly:** `dotnet run --project src/GmToolkit.Desktop`
+- **Publish a self-contained build:**
+  ```bash
+  dotnet publish src/GmToolkit.Desktop -r win-x64 --self-contained
+  dotnet publish src/GmToolkit.Desktop -r linux-x64 --self-contained
+  dotnet publish src/GmToolkit.Desktop -r linux-arm64 --self-contained   # Raspberry Pi 4
+  ```
+- **Android:** `dotnet build src/GmToolkit.Android -f net10.0-android` produces a debug APK; deploy to a device or emulator from Rider/VS, or `dotnet publish -c Release` for a signed release build.
 
 ### Tests
 
@@ -101,19 +97,19 @@ dotnet build src/GmToolkit.App -f net10.0-android -t:Run
 dotnet test
 ```
 
-`Core` and `Data` tests run on any OS and are what CI gates PRs on. Keep new logic testable by putting it in `Core`.
+`Core` and `Data` tests are what CI gates PRs on. Keep new logic testable by putting it in `Core`.
 
 ### Where does my data live?
 
-SQLite file at `FileSystem.AppDataDirectory/gmtoolkit.db`:
+SQLite file at a per-platform app-data path, `gmtoolkit.db`:
 
 | Platform | Path |
 | --- | --- |
-| Windows | `%LOCALAPPDATA%\Packages\<package-id>\LocalState\` |
-| Android | `/data/data/<package-id>/files/` |
-| macOS / iOS | `~/Library/Application Support/<bundle-id>/` |
+| Windows | `%LOCALAPPDATA%\GmToolkit\` |
+| Linux (desktop and Raspberry Pi 4) | `~/.local/share/GmToolkit/` |
+| Android | app-private storage (`Context.FilesDir`) — not user-browsable without root |
 
-Delete it to reset the app to a clean state.
+Delete it to reset the app to a clean state. On Android, clearing app data from Settings does the same thing.
 
 ---
 
@@ -127,16 +123,15 @@ This repo is set up to be forked and made your own — that's an explicitly supp
 2. `git remote add upstream https://github.com/cclapham/gm-toolkit.git` so you can pull in changes later.
 3. Follow [Getting started](#getting-started). No secrets or API keys are needed — everything runs locally.
 
-**Rename it to your own thing:** the name appears in the solution/project filenames, the root namespace in `Directory.Build.props`, and the app id + display name in `src/GmToolkit.App/GmToolkit.App.csproj`. A find-and-replace of `GmToolkit` / `gm-toolkit` plus a rename of the folders covers it.
+**Rename it to your own thing:** the name appears in each `.csproj`'s `AssemblyName`/`RootNamespace`, the Android `ApplicationId` in `GmToolkit.Android.csproj`, and the app display name/window title in `GmToolkit.Desktop` and `GmToolkit.Android`. A find-and-replace of `GmToolkit` / `gm-toolkit` plus renaming the project folders and `.csproj` files covers it.
 
 **Common forks we'd expect people to want:**
 
 | You want | Start here |
 | --- | --- |
-| Your own generator tables (a sci-fi setting, your homebrew world) | `src/GmToolkit.Core/Generation/Tables/*.json` — swap the data, no code changes |
+| Your own generator tables (a sci-fi setting, your homebrew world) | `Resources/GeneratorTables/*.json` — swap the data, no code changes |
 | A new generator category (ships, taverns, factions) | Add a table + register it with `IGeneratorRegistry`; the UI picks it up |
-| System-specific character sheets | `GmToolkit.Core` models keep stats as a flexible bag — add a sheet template in `GmToolkit.UI` |
-| A web version | `GmToolkit.UI` is already an RCL — add a Blazor Web App project and reference it |
+| System-specific character sheets | `GmToolkit.Core` models keep stats as a flexible bag — add a sheet layout in `GmToolkit.UI` |
 | A different database | Swap `GmToolkit.Data`; the repository interfaces live in `Core` |
 
 **Licence:** MIT. Fork it, sell it, rename it — just keep the copyright notice. Contributions back are welcome but never expected.
@@ -147,14 +142,14 @@ This repo is set up to be forked and made your own — that's an explicitly supp
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: issues labelled [`good first issue`](https://github.com/cclapham/gm-toolkit/labels/good%20first%20issue) are the front door, branch naming is `type/short-description`, and PRs need green CI plus a linked issue.
 
-The work is tracked on the [GM Toolkit project board](https://github.com/users/cclapham/projects/1) and grouped into [milestones](docs/ROADMAP.md).
+The work is tracked on the [GM Toolkit project board](https://github.com/users/cclapham/projects/6) and grouped into [milestones](ROADMAP.md).
 
 ## Roadmap
 
-- **[MVP](docs/MVP.md)** — campaigns, PCs, NPCs, NPC generator, Windows + Android, local only
+- **[MVP](MVP.md)** — campaigns, PCs, NPCs, NPC generator, Windows, Linux (desktop and Raspberry Pi 4), and Android, local only
 - **Post-MVP** — import/export, encounter & initiative tracking, session logs, custom generator tables in-app, optional sync
 
-Full breakdown in [docs/ROADMAP.md](docs/ROADMAP.md).
+Full breakdown in [ROADMAP.md](ROADMAP.md).
 
 ## Licence
 

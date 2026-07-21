@@ -4,11 +4,11 @@ Milestones are sequential and each has an exit criterion — a thing that is eit
 
 | # | Milestone | Exit criterion |
 | --- | --- | --- |
-| M0 | Foundations | `git clone && dotnet test` works for a stranger; CI green |
+| M0 | Foundations | A fresh clone builds and tests pass for a stranger; CI green |
 | M1 | Domain & data layer | A campaign with PCs and NPCs round-trips to SQLite, proven by tests |
 | M2 | Campaign & character management | A GM can manage campaigns and a PC roster through the UI |
 | M3 | NPC generator | Generate → reroll a field → save to campaign, in under 10 seconds |
-| M4 | MVP release | `v0.1.0` tagged and installable on Windows and Android |
+| M4 | MVP release | `v0.1.0` tagged and installable on Windows, Linux (desktop and Raspberry Pi 4) and Android |
 | M5 | Import / export | A campaign survives a round-trip through a JSON file |
 | M6 | Custom tables | A GM adds their own generator table without touching source |
 | M7 | At-the-table tools | Initiative tracker and session log usable during a live game |
@@ -20,21 +20,21 @@ Milestones are sequential and each has an exit criterion — a thing that is eit
 
 Scaffolding, so that every later milestone is boring.
 
-Solution and project structure, `Directory.Build.props` with shared properties and nullable/warnings-as-errors, `.editorconfig`, `.gitignore`, MIT licence, the MAUI Blazor Hybrid host wired to the RCL, xUnit projects, and a GitHub Actions workflow that builds and tests on Windows.
+.NET solution structure (`GmToolkit.Core`, `GmToolkit.Data`, `GmToolkit.UI`, `GmToolkit.Desktop`, `GmToolkit.Android` as separate projects), shared `.editorconfig`, `.gitignore` for .NET/Avalonia, MIT licence, an Avalonia `App` bootstrapping the UI from `GmToolkit.UI`, xUnit test projects for `Core` and `Data`, and a GitHub Actions workflow that builds and tests across `win-x64`, `linux-x64`, `linux-arm64` and Android.
 
-**Exit:** a fresh clone builds and tests green in CI and locally.
+**Exit:** a fresh clone runs `dotnet restore && dotnet build`, builds, and tests pass in CI and locally.
 
 ## M1 — Domain & data layer
 
-`Campaign`, `PlayerCharacter`, `Npc` and the generator table models in `Core`. EF Core `DbContext`, initial migration, repository implementations in `Data`, DB creation on first run at the platform app-data path, and seeding of the generator tables from embedded JSON.
+`Campaign`, `PlayerCharacter`, `Npc` and the generator table models in `Core`. sqlite-net-pcl repository implementations in `Data`, DB creation on first run at the platform app-data path, and seeding of the generator tables from embedded JSON (`Resources/GeneratorTables`).
 
 No UI in this milestone. Tests are the UI.
 
-**Exit:** integration tests create a campaign, add PCs and NPCs, close and reopen the context, and read them back.
+**Exit:** integration tests create a campaign, add PCs and NPCs, close and reopen the database, and read them back.
 
 ## M2 — Campaign & character management
 
-The first milestone you can show someone. App shell and navigation, campaign list / create / edit / delete, campaign selection context, PC roster, PC create/edit form with validation, notes with markdown rendering, and empty states that tell a new user what to do.
+The first milestone you can show someone. App shell and navigation (Avalonia, MVVM), campaign list / create / edit / delete, campaign selection context, PC roster, PC create/edit form with validation, notes with markdown rendering, and empty states that tell a new user what to do.
 
 **Exit:** a GM can set up a real campaign and its party without touching the database.
 
@@ -46,7 +46,7 @@ The differentiator, so it gets its own milestone. Weighted-table generator engin
 
 ## M4 — MVP release
 
-Polish and ship. Light/dark theme pass, consistent validation and error handling, search across NPCs, performance check on cold start, Windows packaging, Android APK produced by CI, manual QA pass on a real device, README screenshots, `v0.1.0` tag and release notes.
+Polish and ship. Light/dark theme pass, consistent validation and error handling, search across NPCs, performance check on cold start (Raspberry Pi 4 included), Windows/Linux packaging (including Raspberry Pi 4 / ARM64), Android APK/AAB produced by CI, manual QA pass on real devices across Windows, Ubuntu, Raspberry Pi 4 and Android, README screenshots, `v0.1.0` tag and release notes.
 
 **Exit:** someone who isn't you installs it and runs a session with it.
 
@@ -61,4 +61,4 @@ Sequenced by what MVP users actually complain about, so treat the order below as
 - **M7 — At-the-table tools.** Initiative tracker, session log with timestamped notes, quick-reference pinning.
 - **M8 — Sync & sharing.** Optional account, cross-device sync, read-only player view. Last, because it's the only thing here that requires a server and therefore ongoing cost and a privacy policy.
 
-Other candidates with no milestone yet: relationship/faction graph, encounter builder, iOS and macOS support, localisation, plugin model for rules systems, a Blazor Web App head reusing `GmToolkit.UI`.
+Other candidates with no milestone yet: relationship/faction graph, encounter builder, localisation, plugin model for rules systems, macOS/iOS support if there's ever a reason to chase it, an Avalonia Browser (WASM) head for browser play (tradeoff: sandboxed storage is a weaker fit for local-first data).

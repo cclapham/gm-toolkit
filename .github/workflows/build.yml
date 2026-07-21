@@ -1,0 +1,63 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore (non-Android projects)
+        run: |
+          dotnet restore src/GmToolkit.Core/GmToolkit.Core.csproj
+          dotnet restore src/GmToolkit.Data/GmToolkit.Data.csproj
+          dotnet restore src/GmToolkit.UI/GmToolkit.UI.csproj
+          dotnet restore src/GmToolkit.Desktop/GmToolkit.Desktop.csproj
+          dotnet restore tests/GmToolkit.Core.Tests/GmToolkit.Core.Tests.csproj
+          dotnet restore tests/GmToolkit.Data.Tests/GmToolkit.Data.Tests.csproj
+
+      - name: Format check
+        run: |
+          dotnet format src/GmToolkit.Core/GmToolkit.Core.csproj --no-restore --verify-no-changes
+          dotnet format src/GmToolkit.Data/GmToolkit.Data.csproj --no-restore --verify-no-changes
+          dotnet format src/GmToolkit.UI/GmToolkit.UI.csproj --no-restore --verify-no-changes
+          dotnet format src/GmToolkit.Desktop/GmToolkit.Desktop.csproj --no-restore --verify-no-changes
+          dotnet format tests/GmToolkit.Core.Tests/GmToolkit.Core.Tests.csproj --no-restore --verify-no-changes
+          dotnet format tests/GmToolkit.Data.Tests/GmToolkit.Data.Tests.csproj --no-restore --verify-no-changes
+
+      - name: Build (non-Android projects)
+        run: |
+          dotnet build src/GmToolkit.Core/GmToolkit.Core.csproj --no-restore
+          dotnet build src/GmToolkit.Data/GmToolkit.Data.csproj --no-restore
+          dotnet build src/GmToolkit.UI/GmToolkit.UI.csproj --no-restore
+          dotnet build src/GmToolkit.Desktop/GmToolkit.Desktop.csproj --no-restore
+          dotnet build tests/GmToolkit.Core.Tests/GmToolkit.Core.Tests.csproj --no-restore
+          dotnet build tests/GmToolkit.Data.Tests/GmToolkit.Data.Tests.csproj --no-restore
+
+      - name: Test
+        run: |
+          dotnet test tests/GmToolkit.Core.Tests/GmToolkit.Core.Tests.csproj --no-restore
+          dotnet test tests/GmToolkit.Data.Tests/GmToolkit.Data.Tests.csproj --no-restore
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Build Android head
+        run: dotnet build src/GmToolkit.Android/GmToolkit.Android.csproj -f net10.0-android

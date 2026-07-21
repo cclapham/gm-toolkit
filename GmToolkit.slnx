@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GmToolkit.Android/GmToolkit.Android.csproj" />
+    <Project Path="src/GmToolkit.Core/GmToolkit.Core.csproj" />
+    <Project Path="src/GmToolkit.Data/GmToolkit.Data.csproj" />
+    <Project Path="src/GmToolkit.Desktop/GmToolkit.Desktop.csproj" />
+    <Project Path="src/GmToolkit.UI/GmToolkit.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GmToolkit.Core.Tests/GmToolkit.Core.Tests.csproj" />
+    <Project Path="tests/GmToolkit.Data.Tests/GmToolkit.Data.Tests.csproj" />
+  </Folder>
+</Solution>
