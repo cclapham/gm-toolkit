@@ -43,4 +43,4 @@ Include: OS and version, app version or commit, what you did, what happened, wha
 
 ## Code of conduct
 
-Be decent. Assume good faith. This is a hobby project about pretend elves — nothing here is worth being unpleasant over.
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Short version: be decent, assume good faith — this is a hobby project about pretend elves, nothing here is worth being unpleasant over.

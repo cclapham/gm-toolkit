@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in GM Toolkit is broken
+labels: ["type:bug"]
+body:
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      description: e.g. Windows 11, Ubuntu 24.04, Raspberry Pi OS (64-bit) on a Pi 4, Android 14
+      placeholder: Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App version or commit
+      description: The version from Settings, or the commit hash if you built it yourself
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      description: Steps to reproduce, in order
+      placeholder: |
+        1. Open campaign "Test"
+        2. Generate an NPC
+        3. Reroll the name field
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: What happened, and what you expected instead
+    validations:
+      required: true
+
+  - type: dropdown
+    id: db-state
+    attributes:
+      label: If this is a data bug — was the database fresh or migrated from an older version?
+      options:
+        - Not a data bug
+        - Fresh database
+        - Migrated from an older version
+        - Not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag and drop images here if they help
+    validations:
+      required: false
