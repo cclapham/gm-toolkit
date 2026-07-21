@@ -17,6 +17,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
 
       - name: Restore (non-Android projects)
         run: |
@@ -50,6 +54,14 @@ jobs:
           dotnet test tests/GmToolkit.Core.Tests/GmToolkit.Core.Tests.csproj --no-restore
           dotnet test tests/GmToolkit.Data.Tests/GmToolkit.Data.Tests.csproj --no-restore
 
+      # Build-verify only — proves each RID actually publishes, doesn't need to run per-OS.
+      - name: Publish-verify Desktop head (win-x64, linux-x64, linux-arm64)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet publish src/GmToolkit.Desktop/GmToolkit.Desktop.csproj -r win-x64 --self-contained
+          dotnet publish src/GmToolkit.Desktop/GmToolkit.Desktop.csproj -r linux-x64 --self-contained
+          dotnet publish src/GmToolkit.Desktop/GmToolkit.Desktop.csproj -r linux-arm64 --self-contained
+
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -58,9 +70,22 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
+
+      - name: Cache Android workload packs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.DOTNET_ROOT }}/packs
+            ${{ env.DOTNET_ROOT }}/sdk-manifests
+            ${{ env.DOTNET_ROOT }}/metadata
+          key: android-workload-${{ runner.os }}-v1
 
       - name: Install Android workload
         run: dotnet workload install android
 
-      - name: Build Android head
+      - name: Build Android head (debug)
         run: dotnet build src/GmToolkit.Android/GmToolkit.Android.csproj -f net10.0-android
