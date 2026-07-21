@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose something GM Toolkit doesn't do yet
+labels: ["type:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please open this **before** sending a PR for anything beyond a small fix — [MVP.md](../../MVP.md) says no to a lot of good ideas on purpose, and it's better to hear that here than after a weekend of work.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: The gap or annoyance at the table, not the solution yet.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: mvp-scope
+    attributes:
+      label: MVP-scope check
+      description: Read MVP.md's "Explicitly out of scope" list first.
+      options:
+        - label: I've checked MVP.md and this isn't already explicitly ruled out for the MVP
+          required: true
