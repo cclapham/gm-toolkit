@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 using GmToolkit.Data.Rows;
 
 using SQLite;
@@ -52,4 +54,52 @@ public sealed class GmToolkitDatabase : IAsyncDisposable
     public Task CloseAsync() => Connection.CloseAsync();
 
     public ValueTask DisposeAsync() => new(CloseAsync());
+
+    /// <summary>
+    /// Bootstraps the database at <paramref name="databasePath"/> for first run or ongoing use:
+    /// ensures the containing directory exists, then constructs and initializes a
+    /// <see cref="GmToolkitDatabase"/>. If the existing file is corrupt or otherwise unreadable
+    /// (<see cref="InitializeAsync"/> throws), the offending file is renamed aside with a
+    /// <c>.corrupt-{timestamp}</c> suffix (never deleted, in case the user wants to recover data
+    /// from it later) and a fresh database is created and initialized at the original path. If
+    /// that second attempt also throws, the exception propagates — there's nothing else
+    /// reasonable to do without an error-display UI (a later milestone).
+    /// </summary>
+    public static async Task<GmToolkitDatabase> CreateAndInitializeAsync(string databasePath)
+    {
+        LogResolvedPath(databasePath);
+
+        var directory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var database = new GmToolkitDatabase(databasePath);
+        try
+        {
+            await database.InitializeAsync();
+            return database;
+        }
+        catch
+        {
+            await database.DisposeAsync();
+
+            if (File.Exists(databasePath))
+            {
+                var corruptPath = $"{databasePath}.corrupt-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+                File.Move(databasePath, corruptPath);
+            }
+
+            var recreated = new GmToolkitDatabase(databasePath);
+            await recreated.InitializeAsync();
+            return recreated;
+        }
+    }
+
+    [Conditional("DEBUG")]
+    private static void LogResolvedPath(string databasePath)
+    {
+        Debug.WriteLine($"GmToolkitDatabase: resolved database path '{databasePath}'.");
+    }
 }
