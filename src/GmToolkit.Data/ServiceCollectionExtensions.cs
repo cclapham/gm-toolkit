@@ -8,17 +8,18 @@ namespace GmToolkit.Data;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers <see cref="GmToolkitDatabase"/> and the repository implementations.
+    /// Registers an already-initialized <see cref="GmToolkitDatabase"/> and the repository
+    /// implementations.
     /// </summary>
     /// <remarks>
-    /// The caller is still responsible for calling
-    /// <c>serviceProvider.GetRequiredService&lt;GmToolkitDatabase&gt;().InitializeAsync()</c>
-    /// once at startup before the repositories are used — resolving the platform app-data
-    /// path to pass in as <paramref name="databasePath"/> is issue #12's job, not this one.
+    /// The caller is responsible for resolving the platform app-data path and constructing
+    /// <paramref name="database"/> via <see cref="GmToolkitDatabase.CreateAndInitializeAsync"/>
+    /// before calling this method — that handles directory creation and first-run/corrupt-file
+    /// recovery (issue #12). By the time it's passed in here, it's already open and initialized.
     /// </remarks>
-    public static IServiceCollection AddGmToolkitData(this IServiceCollection services, string databasePath)
+    public static IServiceCollection AddGmToolkitData(this IServiceCollection services, GmToolkitDatabase database)
     {
-        services.AddSingleton(_ => new GmToolkitDatabase(databasePath));
+        services.AddSingleton(database);
         services.AddSingleton<ICampaignRepository, CampaignRepository>();
         services.AddSingleton<IPlayerCharacterRepository, PlayerCharacterRepository>();
         services.AddSingleton<INpcRepository, NpcRepository>();
