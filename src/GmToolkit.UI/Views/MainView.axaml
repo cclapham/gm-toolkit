@@ -12,7 +12,23 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <Border Background="{DynamicResource BgBrush}">
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="{StaticResource SpaceSM}"
+                    MaxWidth="360">
+            <TextBlock Classes="display"
+                       Foreground="{DynamicResource TextBrush}"
+                       Text="{Binding Greeting}" />
+            <TextBlock Classes="body"
+                       Foreground="{DynamicResource TextBrush}"
+                       TextWrapping="Wrap"
+                       Text="Colors, type scale and spacing come from the GM Toolkit design system — this view is just proving they're wired up correctly." />
+            <TextBlock Classes="caption"
+                       Text="GmToolkit.UI / Styles / Colors, Typography, Spacing" />
+            <Button Classes="accent"
+                    Content="Generate NPC"
+                    Margin="0,8,0,0" />
+        </StackPanel>
+    </Border>
 </UserControl>

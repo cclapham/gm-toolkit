@@ -1,0 +1,61 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    From the "Foundations" design system (claude.ai/design, project "GM Toolkit").
+    Light is a sepia/parchment tone; dark is genuinely dark, not sepia — issue #31
+    calls for a dark mode people can actually run games by in a dim room.
+  -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <Color x:Key="BgColor">#F1E5C8</Color>
+      <Color x:Key="SurfaceColor">#FAF3E3</Color>
+      <Color x:Key="SurfaceAltColor">#E8D9B0</Color>
+      <Color x:Key="BorderColor">#D6C296</Color>
+      <Color x:Key="TextColor">#1C1917</Color>
+      <Color x:Key="TextMutedColor">#6B5D42</Color>
+      <Color x:Key="AccentColor">#92400E</Color>
+      <Color x:Key="AccentHoverColor">#7C3B0F</Color>
+      <Color x:Key="AccentSoftColor">#EAD9B0</Color>
+      <Color x:Key="SuccessColor">#15803D</Color>
+      <Color x:Key="DangerColor">#B91C1C</Color>
+
+      <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+      <SolidColorBrush x:Key="SurfaceAltBrush" Color="{StaticResource SurfaceAltColor}" />
+      <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+      <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
+      <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+      <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+      <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource AccentSoftColor}" />
+      <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+      <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Dark">
+      <Color x:Key="BgColor">#171412</Color>
+      <Color x:Key="SurfaceColor">#211D19</Color>
+      <Color x:Key="SurfaceAltColor">#29241F</Color>
+      <Color x:Key="BorderColor">#322D28</Color>
+      <Color x:Key="TextColor">#F5F3F0</Color>
+      <Color x:Key="TextMutedColor">#A8A29E</Color>
+      <Color x:Key="AccentColor">#FBBF24</Color>
+      <Color x:Key="AccentHoverColor">#FCD34D</Color>
+      <Color x:Key="AccentSoftColor">#3A2A12</Color>
+      <Color x:Key="SuccessColor">#4ADE80</Color>
+      <Color x:Key="DangerColor">#F87171</Color>
+
+      <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+      <SolidColorBrush x:Key="SurfaceAltBrush" Color="{StaticResource SurfaceAltColor}" />
+      <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+      <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
+      <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+      <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+      <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource AccentSoftColor}" />
+      <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+      <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>
