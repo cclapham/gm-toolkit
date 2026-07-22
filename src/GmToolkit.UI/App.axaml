@@ -9,7 +9,23 @@
         <local:ViewLocator />
     </Application.DataTemplates>
 
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://GmToolkit.UI/Styles/Colors.axaml" />
+                <ResourceInclude Source="avares://GmToolkit.UI/Styles/Spacing.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
-        <FluentTheme />
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light" Accent="#92400E" />
+                <ColorPaletteResources x:Key="Dark" Accent="#FBBF24" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+        <StyleInclude Source="avares://GmToolkit.UI/Styles/Typography.axaml" />
+        <StyleInclude Source="avares://GmToolkit.UI/Styles/Controls.axaml" />
     </Application.Styles>
 </Application>

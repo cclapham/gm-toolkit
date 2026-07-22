@@ -1,0 +1,30 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Five-step type scale on Inter (set app-wide via .WithInterFont() in each head's composition root). -->
+  <Style Selector="TextBlock.display">
+    <Setter Property="FontSize" Value="28" />
+    <Setter Property="LineHeight" Value="34" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="TextBlock.title">
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="LineHeight" Value="26" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.subtitle">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.body">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+  </Style>
+</Styles>
