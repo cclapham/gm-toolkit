@@ -1,0 +1,7 @@
+{
+  "id": "bad-blank-value",
+  "category": "test",
+  "entries": [
+    { "value": "   " }
+  ]
+}

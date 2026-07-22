@@ -1,0 +1,7 @@
+{
+  "id": "bad-missing-value",
+  "category": "test",
+  "entries": [
+    { "weight": 1 }
+  ]
+}
