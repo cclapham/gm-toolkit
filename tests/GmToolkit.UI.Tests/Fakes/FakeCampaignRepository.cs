@@ -11,11 +11,18 @@ internal sealed class FakeCampaignRepository(params Campaign[] campaigns) : ICam
 
     public List<Campaign> UpdatedCampaigns { get; } = [];
 
+    /// <summary>When set, <see cref="GetAllAsync"/> throws this instead of returning -- for
+    /// exercising a load failure (e.g. <c>CampaignsViewModel</c>'s error state) without needing a
+    /// real broken database.</summary>
+    public Exception? ThrowOnGetAll { get; set; }
+
     public Task<Campaign?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_campaigns.FirstOrDefault(c => c.Id == id));
 
     public Task<IReadOnlyList<Campaign>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Campaign>>([.. _campaigns]);
+        ThrowOnGetAll is not null
+            ? Task.FromException<IReadOnlyList<Campaign>>(ThrowOnGetAll)
+            : Task.FromResult<IReadOnlyList<Campaign>>([.. _campaigns]);
 
     public Task AddAsync(Campaign campaign, CancellationToken cancellationToken = default)
     {
