@@ -135,20 +135,25 @@ public sealed class CampaignRoundTripTests : IAsyncLifetime
         var freshPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.db");
         Assert.False(File.Exists(freshPath));
 
-        await using var freshDatabase = new GmToolkitDatabase(freshPath);
         try
         {
-            var exception = await Record.ExceptionAsync(freshDatabase.InitializeAsync);
-            Assert.Null(exception);
+            // Scoped so the connection is fully disposed (and its file handle released) before
+            // the `finally` below deletes the file — required on Windows, which (unlike Unix)
+            // refuses to delete a file that's still open.
+            await using (var freshDatabase = new GmToolkitDatabase(freshPath))
+            {
+                var exception = await Record.ExceptionAsync(freshDatabase.InitializeAsync);
+                Assert.Null(exception);
 
-            var campaignRepository = new CampaignRepository(freshDatabase);
-            var campaign = new Campaign { Name = "Freshly Initialized Campaign" };
+                var campaignRepository = new CampaignRepository(freshDatabase);
+                var campaign = new Campaign { Name = "Freshly Initialized Campaign" };
 
-            await campaignRepository.AddAsync(campaign);
-            var fetched = await campaignRepository.GetAsync(campaign.Id);
+                await campaignRepository.AddAsync(campaign);
+                var fetched = await campaignRepository.GetAsync(campaign.Id);
 
-            Assert.NotNull(fetched);
-            Assert.Equal(campaign.Name, fetched.Name);
+                Assert.NotNull(fetched);
+                Assert.Equal(campaign.Name, fetched.Name);
+            }
         }
         finally
         {
