@@ -353,6 +353,28 @@ public class CharacterFormViewModelTests
     }
 
     [Fact]
+    public void Adding_a_blank_stat_row_and_leaving_it_empty_does_not_count_as_an_unsaved_change()
+    {
+        // BuildStats() already treats an entirely-blank row as a no-op on save (see the
+        // AddStatRowCommand_appends_a_blank_row_that_does_not_block_saving test) -- the discard
+        // guard should agree, so "+ Add stat" alone doesn't trigger a false "unsaved changes?"
+        // prompt on Cancel. Editing an existing character (rather than BeginCreate, which starts
+        // with a blank name) isolates this to the stat row specifically, not a name change.
+        var repository = new FakePlayerCharacterRepository();
+        var character = new PlayerCharacter { CampaignId = Guid.NewGuid(), CharacterName = "Arannis" };
+        var form = new CharacterFormViewModel(repository);
+        form.BeginEdit(character);
+        form.AddStatRowCommand.Execute(null);
+        var cancelledRaised = false;
+        form.Cancelled += () => cancelledRaised = true;
+
+        form.CancelCommand.Execute(null);
+
+        Assert.True(cancelledRaised);
+        Assert.False(form.IsShowingDiscardConfirmation);
+    }
+
+    [Fact]
     public void ConfirmDiscard_raises_Cancelled_and_hides_the_guard()
     {
         var form = new CharacterFormViewModel(new FakePlayerCharacterRepository());

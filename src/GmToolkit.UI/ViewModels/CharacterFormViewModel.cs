@@ -509,8 +509,11 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     /// falls back to <see cref="PlayerCharacter"/>'s own default of 1 rather than blocking save --
     /// there is no domain rule requiring a specific level (unlike <see cref="CharacterName"/>),
     /// so treating an empty level field as "unspecified, use the default" is friendlier than a
-    /// hard validation error.</summary>
-    private int BuildCharacterLevel() => (int)(Level ?? 1);
+    /// hard validation error. Also floors at 1 regardless of the raw value -- the bound
+    /// <c>NumericUpDown</c>'s <c>Minimum="1"</c> should already prevent entering anything lower,
+    /// but this keeps a cleared field (which falls back to 1 above) and an explicitly-entered 0
+    /// or negative value from producing two different, both-nonsensical results.</summary>
+    private int BuildCharacterLevel() => Math.Max(1, (int)(Level ?? 1));
 
     private bool IsDirty() =>
         CharacterName != _originalCharacterName ||
@@ -526,9 +529,14 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     /// <see cref="SetBaseline"/> -- not meant to be human-readable, just collision-resistant enough
     /// for this form's own key/value text. The separators are Unicode "record/group separator"
     /// control pictures, chosen so an ordinary stat key or value could never accidentally produce
-    /// the same fingerprint as a different set of rows.</summary>
+    /// the same fingerprint as a different set of rows. Skips entirely-blank rows (both key and
+    /// value empty) so clicking "+ Add stat" and leaving it empty doesn't mark the form dirty --
+    /// matches <see cref="BuildStats"/>'s identical treatment of the same rows on save, so what
+    /// counts as "a change" agrees between the discard guard and the actual persisted data.</summary>
     private string ComputeStatsSnapshot() =>
-        string.Join('␟', StatRows.Select(row => $"{row.Key.Trim()}␞{row.Value.Trim()}"));
+        string.Join('␟', StatRows
+            .Where(row => row.Key.Trim().Length > 0 || row.Value.Trim().Length > 0)
+            .Select(row => $"{row.Key.Trim()}␞{row.Value.Trim()}"));
 
     private void SetFields(string characterName, string playerName, string ancestry, string @class, int level, string notes, IReadOnlyDictionary<string, string> stats)
     {

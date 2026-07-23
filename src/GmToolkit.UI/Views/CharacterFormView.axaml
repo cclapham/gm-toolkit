@@ -48,7 +48,7 @@
                     <StackPanel Grid.Column="2" Spacing="{StaticResource SpaceXS}">
                         <TextBlock Classes="caption" Text="Level" />
                         <NumericUpDown Value="{Binding Level, Mode=TwoWay}"
-                                       Minimum="0"
+                                       Minimum="1"
                                        Maximum="9999"
                                        FormatString="0"
                                        Width="110"
