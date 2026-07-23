@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:views="using:GmToolkit.UI.Views"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.CharactersView"
              x:DataType="vm:CharactersViewModel">
@@ -10,15 +11,114 @@
         <vm:CharactersViewModel />
     </Design.DataContext>
 
-    <!-- Padding="24" mirrors SpaceLG, Thickness-typed properties can't bind a plain-double
-         StaticResource directly, see the note in Styles/Spacing.axaml. -->
+    <UserControl.Styles>
+        <!-- Roster row: unlike CampaignsView.axaml's row (which has two independently-clickable
+             elements - select and delete), a character row has exactly one click target
+             (click-through to edit, see CharactersViewModel.SelectCommand), so the whole row can
+             safely be one Button with no Button-in-Button ambiguity. -->
+        <Style Selector="Button.characterRow">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <!-- Padding="12" mirrors SpaceMD, see the note in Styles/Spacing.axaml. -->
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.characterRow:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Padding="24" mirrors SpaceLG, see the note in Styles/Spacing.axaml. -->
     <Border Background="{DynamicResource BgBrush}" Padding="24">
-        <StackPanel Spacing="{StaticResource SpaceSM}" MaxWidth="480" HorizontalAlignment="Left">
-            <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="Characters" />
-            <TextBlock Classes="body"
-                       Foreground="{DynamicResource TextBrush}"
-                       TextWrapping="Wrap"
-                       Text="This is where the active campaign's player-character roster will live -- the thing you actually stare at during a session." />
-        </StackPanel>
+        <Grid RowDefinitions="Auto,*" MaxWidth="720" HorizontalAlignment="Stretch">
+            <!-- List-mode header: title + Create button. Hidden for the empty state and while the
+                 form is showing - mirrors CampaignsView.axaml's identical header. WrapPanel (not
+                 a Grid) so the button drops to its own line at phone-portrait widths instead of
+                 overlapping the title. -->
+            <WrapPanel Grid.Row="0" IsVisible="{Binding IsListVisible}" Margin="0,0,0,16">
+                <TextBlock Classes="display"
+                           Foreground="{DynamicResource TextBrush}"
+                           Text="Characters"
+                           VerticalAlignment="Center"
+                           Margin="0,0,16,8" />
+                <Button Classes="accent" Content="+ Add Character" Command="{Binding ShowCreateFormCommand}" Margin="0,0,0,8" />
+            </WrapPanel>
+
+            <!-- Load-error state: mirrors CampaignsView.axaml's identical state, so a database
+                 read failure doesn't leave IsLoading stuck true with nothing shown. -->
+            <StackPanel Grid.Row="1"
+                        IsVisible="{Binding HasLoadError}"
+                        Spacing="{StaticResource SpaceMD}"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="Couldn't load this campaign's characters" />
+                <TextBlock Classes="body" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Text="{Binding LoadError}" />
+                <Button Classes="accent" Content="Try again" Command="{Binding RetryLoadCommand}" HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <!-- Empty state (#20): a campaign with no PCs yet needs a clear, single next step. -->
+            <StackPanel Grid.Row="1"
+                        IsVisible="{Binding IsEmpty}"
+                        Spacing="{StaticResource SpaceMD}"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="No characters yet" />
+                <TextBlock Classes="body"
+                           Foreground="{DynamicResource TextBrush}"
+                           TextWrapping="Wrap"
+                           Text="This is where the active campaign's player-character roster lives -- the thing you actually stare at during a session. Add your first player character to get started." />
+                <Button Classes="accent"
+                        Content="Add your first character"
+                        Command="{Binding ShowCreateFormCommand}"
+                        HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <!-- Populated roster, sorted alphabetically by character name. Each row is compact
+                 and fixed-height (StatsSummary is single-line, ellipsis-truncated - see
+                 CharacterListItemViewModel's remarks) so four PCs' worth of rows stay readable
+                 without scrolling at typical laptop resolution (#20's acceptance criterion). -->
+            <ScrollViewer Grid.Row="1" IsVisible="{Binding IsListVisible}">
+                <ItemsControl ItemsSource="{Binding Characters}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="{StaticResource SpaceSM}" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CharacterListItemViewModel">
+                            <Button Classes="characterRow"
+                                    Command="{Binding $parent[UserControl].((vm:CharactersViewModel)DataContext).SelectCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel Spacing="{StaticResource SpaceXS}">
+                                    <WrapPanel>
+                                        <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding CharacterName}" Margin="0,0,16,0" />
+                                        <TextBlock Classes="caption" Text="{Binding PlayerName, StringFormat='Played by {0}'}" Margin="0,0,16,0" />
+                                        <TextBlock Classes="caption" Text="{Binding ClassAndLevelLabel}" />
+                                    </WrapPanel>
+                                    <!-- Single line, no wrap, ellipsis-truncated: a PC with an
+                                         unusually large Stats bag truncates gracefully instead of
+                                         growing this row's height - see StatsSummary's remarks. -->
+                                    <TextBlock Classes="caption"
+                                               Text="{Binding StatsSummary}"
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- In-place create/edit form (#21), see CharactersViewModel's remarks for why this
+                 is a mode switch within this one screen rather than a separate Window/destination. -->
+            <ContentControl Grid.Row="1" IsVisible="{Binding IsFormVisible}">
+                <views:CharacterFormView DataContext="{Binding Form}" />
+            </ContentControl>
+        </Grid>
     </Border>
 </UserControl>
