@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:views="using:GmToolkit.UI.Views"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.CampaignsView"
              x:DataType="vm:CampaignsViewModel">
@@ -10,15 +11,111 @@
         <vm:CampaignsViewModel />
     </Design.DataContext>
 
-    <!-- Padding="24" mirrors SpaceLG, Thickness-typed properties can't bind a plain-double
-         StaticResource directly, see the note in Styles/Spacing.axaml. -->
+    <UserControl.Styles>
+        <!-- Campaign list row chrome, a full-width button styled as a plain row, matching
+             ShellView.axaml's Button.navItem pattern for the same "clickable row, not obviously a
+             button" look. -->
+        <Style Selector="Button.campaignRow">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <!-- Padding="12" mirrors SpaceMD, see the note in Styles/Spacing.axaml. -->
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.campaignRow:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        </Style>
+        <Style Selector="Button.campaignRow.active">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Padding="24" mirrors SpaceLG, see the note in Styles/Spacing.axaml. -->
     <Border Background="{DynamicResource BgBrush}" Padding="24">
-        <StackPanel Spacing="{StaticResource SpaceSM}" MaxWidth="480" HorizontalAlignment="Left">
-            <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="Campaigns" />
-            <TextBlock Classes="body"
-                       Foreground="{DynamicResource TextBrush}"
-                       TextWrapping="Wrap"
-                       Text="This is where you'll create, rename and delete campaigns, and pick which one is active. Issue #17 builds the real campaign list here." />
-        </StackPanel>
+        <Grid RowDefinitions="Auto,*" MaxWidth="640" HorizontalAlignment="Stretch">
+            <!-- List-mode header: title + Create button. Hidden for the empty state (which has
+                 its own heading and a more prominent Create button) and while the form is showing
+                 (which has its own "Create Campaign"/"Edit Campaign" heading). WrapPanel (not a
+                 Grid with "*,Auto" columns) so the button drops to its own line at phone-portrait
+                 widths instead of visually overlapping the title: a Grid column's child can
+                 render past its column's edge when its desired size doesn't fit, which is exactly
+                 what happened here before this fix. -->
+            <WrapPanel Grid.Row="0" IsVisible="{Binding IsListVisible}" Margin="0,0,0,16">
+                <TextBlock Classes="display"
+                           Foreground="{DynamicResource TextBrush}"
+                           Text="Campaigns"
+                           VerticalAlignment="Center"
+                           Margin="0,0,16,8" />
+                <Button Classes="accent" Content="+ Create Campaign" Command="{Binding ShowCreateFormCommand}" Margin="0,0,0,8" />
+            </WrapPanel>
+
+            <!-- Empty state (#17): a first-time user with zero campaigns needs no instructions
+                 beyond this: explain what a campaign is, and the only actionable next step is
+                 right here. -->
+            <StackPanel Grid.Row="1"
+                        IsVisible="{Binding IsEmpty}"
+                        Spacing="{StaticResource SpaceMD}"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="Welcome to GM Toolkit" />
+                <TextBlock Classes="body"
+                           Foreground="{DynamicResource TextBrush}"
+                           TextWrapping="Wrap"
+                           Text="A campaign is your game -- it holds its player characters and NPCs, and everything else you track while running it. Create your first one to get started." />
+                <Button Classes="accent"
+                        Content="Create your first campaign"
+                        Command="{Binding ShowCreateFormCommand}"
+                        HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <!-- Populated list, sorted by last opened (newest first). -->
+            <ScrollViewer Grid.Row="1" IsVisible="{Binding IsListVisible}">
+                <ItemsControl ItemsSource="{Binding Campaigns}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="{StaticResource SpaceSM}" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CampaignListItemViewModel">
+                            <!-- Stacked (not a fixed-column Grid): a Grid's "*" column can be
+                                 squeezed to zero width by sibling "Auto" columns at narrow widths,
+                                 which made the campaign's name disappear entirely on phone-portrait
+                                 (verified visually while checking this screen at 380px wide).
+                                 Stacking top-to-bottom has no such failure mode at any width. -->
+                            <Button Classes="campaignRow"
+                                    Classes.active="{Binding IsActive}"
+                                    Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).SelectCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel Spacing="{StaticResource SpaceXS}">
+                                    <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding Name}" TextWrapping="Wrap" />
+                                    <TextBlock Classes="caption" Text="{Binding GameSystem}" TextWrapping="Wrap" />
+                                    <WrapPanel>
+                                        <TextBlock Classes="caption" Text="{Binding CountsLabel}" Margin="0,0,16,0" />
+                                        <TextBlock Classes="caption" Text="{Binding LastOpenedUtc, StringFormat='Opened {0:MMM d, yyyy}'}" Margin="0,0,16,0" />
+                                        <TextBlock Classes="caption"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   FontWeight="Bold"
+                                                   Text="Active"
+                                                   IsVisible="{Binding IsActive}" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- In-place create/edit form (#18), see CampaignsViewModel's remarks for why this
+                 is a mode switch within this one screen rather than a separate Window/destination. -->
+            <ContentControl Grid.Row="1" IsVisible="{Binding IsFormVisible}">
+                <views:CampaignFormView DataContext="{Binding Form}" />
+            </ContentControl>
+        </Grid>
     </Border>
 </UserControl>
