@@ -8,5 +8,5 @@
         x:Class="GmToolkit.UI.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
         Title="GmToolkit">
-        <views:MainView />
+        <views:ShellView />
 </Window>
