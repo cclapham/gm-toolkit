@@ -140,8 +140,13 @@ public class ShellViewModelTests
     }
 
     [Fact]
-    public void Subscribing_to_the_real_ActiveCampaignChanged_event_does_not_throw_without_a_running_dispatcher()
+    public void Subscribing_to_the_real_ActiveCampaignChanged_event_does_not_throw_synchronously_without_a_running_dispatcher()
     {
+        // This only proves the subscription path itself doesn't throw before the marshaled work
+        // is even queued -- Dispatcher.UIThread.Post queues HandleActiveCampaignChanged rather
+        // than running it, and there's no message loop pumping it in a plain xUnit test, so this
+        // does NOT verify the marshaled handler's behavior. That's covered separately by calling
+        // HandleActiveCampaignChanged() directly (see the other tests in this file).
         var activeCampaignContext = new ActiveCampaignContext(new FakeCampaignRepository());
         _ = new ShellViewModel(new NavigationService(), activeCampaignContext);
         var campaign = new Campaign { Name = "Wandering Souls" };
@@ -163,5 +168,26 @@ public class ShellViewModelTests
         Assert.Equal(NavigationDestination.Settings, navigationService.CurrentDestination);
         Assert.True(shell.CampaignsNavItem.IsSelected);
         Assert.False(shell.SettingsNavItem.IsSelected);
+    }
+
+    [Fact]
+    public void Dispose_unsubscribes_from_ActiveCampaignChanged()
+    {
+        var activeCampaignContext = new ActiveCampaignContext(new FakeCampaignRepository());
+        var shell = new ShellViewModel(new NavigationService(), activeCampaignContext);
+
+        shell.Dispose();
+
+        // ActiveCampaignChanged is a plain field-like event, so its backing delegate field shares
+        // the event's name -- reflection is the only way to confirm the subscriber count without
+        // adding test-only surface to ActiveCampaignContext itself. This is what actually proves
+        // the second Dispose() unsubscription happened; the other Dispose test above only exercises
+        // the navigation-service unsubscription.
+        var backingField = typeof(ActiveCampaignContext).GetField(
+            nameof(ActiveCampaignContext.ActiveCampaignChanged),
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var subscribers = (backingField!.GetValue(activeCampaignContext) as System.Delegate)?.GetInvocationList() ?? [];
+
+        Assert.Empty(subscribers);
     }
 }
