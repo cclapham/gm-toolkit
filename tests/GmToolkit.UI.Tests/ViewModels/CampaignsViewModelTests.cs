@@ -168,6 +168,165 @@ public class CampaignsViewModelTests
     }
 
     [Fact]
+    public void DeleteConfirmationPrompt_names_the_campaign_and_states_its_PC_and_NPC_counts()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        campaign.PlayerCharacters.Add(new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Arannis" });
+        campaign.PlayerCharacters.Add(new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Borin" });
+        campaign.Npcs.Add(new Npc { CampaignId = campaign.Id, Name = "The Innkeeper" });
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+
+        Assert.Contains("Wandering Souls", item.DeleteConfirmationPrompt);
+        Assert.Contains("2 PCs", item.DeleteConfirmationPrompt);
+        Assert.Contains("1 NPC", item.DeleteConfirmationPrompt);
+    }
+
+    [Fact]
+    public void RequestDeleteCommand_shows_the_confirmation_panel_for_the_requested_row_and_ConfirmDeleteCommand_is_disabled()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+
+        vm.RequestDeleteCommand.Execute(item);
+
+        Assert.True(item.IsShowingDeleteConfirmation);
+        Assert.False(vm.CanConfirmDelete);
+        Assert.False(vm.ConfirmDeleteCommand.CanExecute(null));
+        Assert.Single(vm.Campaigns);
+    }
+
+    [Fact]
+    public async Task Typing_the_wrong_name_does_not_enable_ConfirmDeleteCommand_and_does_not_delete()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+        vm.RequestDeleteCommand.Execute(item);
+
+        vm.DeleteConfirmationInput = "wandering souls"; // wrong case -- must not match
+
+        Assert.False(vm.CanConfirmDelete);
+        Assert.False(vm.ConfirmDeleteCommand.CanExecute(null));
+
+        // Even if somehow invoked directly (bypassing the disabled button), it must be a no-op.
+        await vm.ConfirmDeleteCommand.ExecuteAsync(null);
+
+        Assert.Single(vm.Campaigns);
+        Assert.True(item.IsShowingDeleteConfirmation);
+    }
+
+    [Fact]
+    public void Typing_the_exact_campaign_name_enables_ConfirmDeleteCommand()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+        vm.RequestDeleteCommand.Execute(item);
+
+        vm.DeleteConfirmationInput = "Wandering Souls";
+
+        Assert.True(vm.CanConfirmDelete);
+        Assert.True(vm.ConfirmDeleteCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Confirming_delete_removes_the_campaign_from_the_list_and_calls_the_repository()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+        vm.RequestDeleteCommand.Execute(item);
+        vm.DeleteConfirmationInput = "Wandering Souls";
+
+        await vm.ConfirmDeleteCommand.ExecuteAsync(null);
+
+        Assert.Empty(vm.Campaigns);
+        Assert.Null(await repository.GetAsync(campaign.Id));
+    }
+
+    [Fact]
+    public async Task Deleting_the_active_campaign_clears_it_via_ActiveCampaignContext()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var activeCampaignContext = new ActiveCampaignContext(repository);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var item = Assert.Single(vm.Campaigns);
+        await vm.SelectCommand.ExecuteAsync(item);
+        Assert.NotNull(activeCampaignContext.ActiveCampaign);
+
+        vm.RequestDeleteCommand.Execute(item);
+        vm.DeleteConfirmationInput = "Wandering Souls";
+        await vm.ConfirmDeleteCommand.ExecuteAsync(null);
+
+        Assert.Null(activeCampaignContext.ActiveCampaign);
+    }
+
+    [Fact]
+    public async Task Deleting_a_non_active_campaign_leaves_the_active_campaign_untouched()
+    {
+        var active = new Campaign { Name = "Wandering Souls" };
+        var other = new Campaign { Name = "Shadows Over Blackmoor" };
+        var repository = new FakeCampaignRepository(active, other);
+        var activeCampaignContext = new ActiveCampaignContext(repository);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        await vm.SelectCommand.ExecuteAsync(vm.Campaigns.Single(c => c.Campaign.Id == active.Id));
+        var otherItem = vm.Campaigns.Single(c => c.Campaign.Id == other.Id);
+
+        vm.RequestDeleteCommand.Execute(otherItem);
+        vm.DeleteConfirmationInput = "Shadows Over Blackmoor";
+        await vm.ConfirmDeleteCommand.ExecuteAsync(null);
+
+        Assert.NotNull(activeCampaignContext.ActiveCampaign);
+        Assert.Equal(active.Id, activeCampaignContext.ActiveCampaign!.Id);
+    }
+
+    [Fact]
+    public void CancelDeleteCommand_hides_the_confirmation_panel_without_deleting_anything()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+        vm.RequestDeleteCommand.Execute(item);
+        vm.DeleteConfirmationInput = "Wandering Souls";
+
+        vm.CancelDeleteCommand.Execute(null);
+
+        Assert.False(item.IsShowingDeleteConfirmation);
+        Assert.False(vm.ConfirmDeleteCommand.CanExecute(null));
+        Assert.Single(vm.Campaigns);
+    }
+
+    [Fact]
+    public void RequestDeleteCommand_on_a_different_row_closes_the_previous_rows_confirmation()
+    {
+        var first = new Campaign { Name = "Wandering Souls" };
+        var second = new Campaign { Name = "Shadows Over Blackmoor" };
+        var repository = new FakeCampaignRepository(first, second);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var firstItem = vm.Campaigns.Single(c => c.Campaign.Id == first.Id);
+        var secondItem = vm.Campaigns.Single(c => c.Campaign.Id == second.Id);
+        vm.RequestDeleteCommand.Execute(firstItem);
+        vm.DeleteConfirmationInput = "Wandering Souls";
+        Assert.True(vm.CanConfirmDelete);
+
+        vm.RequestDeleteCommand.Execute(secondItem);
+
+        Assert.False(firstItem.IsShowingDeleteConfirmation);
+        Assert.True(secondItem.IsShowingDeleteConfirmation);
+        Assert.False(vm.CanConfirmDelete);
+        Assert.Equal(string.Empty, vm.DeleteConfirmationInput);
+    }
+
+    [Fact]
     public void Subscribing_to_the_real_ActiveCampaignChanged_event_does_not_throw_synchronously_without_a_running_dispatcher()
     {
         // Mirrors ShellViewModelTests' identical test -- proves the subscription path itself

@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
              xmlns:views="using:GmToolkit.UI.Views"
+             xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.CampaignsView"
              x:DataType="vm:CampaignsViewModel">
@@ -12,25 +13,48 @@
     </Design.DataContext>
 
     <UserControl.Styles>
-        <!-- Campaign list row chrome, a full-width button styled as a plain row, matching
-             ShellView.axaml's Button.navItem pattern for the same "clickable row, not obviously a
-             button" look. -->
-        <Style Selector="Button.campaignRow">
+        <!-- Campaign list row chrome. A plain, non-interactive Border (not a Button as before
+             #19): the row now holds two independently-clickable elements side by side - the
+             "select" button and the "delete" trigger - and Avalonia's Button-in-Button click
+             routing is unreliable (the outer button tends to swallow or fight with an inner
+             button's pointer events), so the outer container can no longer itself be a Button. -->
+        <Style Selector="Border.campaignRow">
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="Border.campaignRow.active">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+
+        <!-- The "select" click target: everything but chrome, now unstyled/transparent so it
+             reads as part of the row rather than a nested button, matching the look the single
+             Button.campaignRow used to have on its own. -->
+        <Style Selector="Button.campaignRowSelect">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
             <!-- Padding="12" mirrors SpaceMD, see the note in Styles/Spacing.axaml. -->
             <Setter Property="Padding" Value="12" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
         </Style>
-        <Style Selector="Button.campaignRow:pointerover /template/ ContentPresenter">
+        <Style Selector="Button.campaignRowSelect:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
         </Style>
-        <Style Selector="Button.campaignRow.active">
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="BorderThickness" Value="2" />
+
+        <!-- The "delete" trigger: a sibling of campaignRowSelect (not nested inside it - see
+             this style block's opening comment), so its click never also selects the campaign. -->
+        <Style Selector="Button.campaignRowDelete">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+            <!-- Padding="8,12" mirrors SpaceSM/SpaceMD, see the note in Styles/Spacing.axaml. -->
+            <Setter Property="Padding" Value="8,12" />
+        </Style>
+        <Style Selector="Button.campaignRowDelete:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
         </Style>
     </UserControl.Styles>
 
@@ -97,29 +121,96 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:CampaignListItemViewModel">
-                            <!-- Stacked (not a fixed-column Grid): a Grid's "*" column can be
-                                 squeezed to zero width by sibling "Auto" columns at narrow widths,
-                                 which made the campaign's name disappear entirely on phone-portrait
-                                 (verified visually while checking this screen at 380px wide).
-                                 Stacking top-to-bottom has no such failure mode at any width. -->
-                            <Button Classes="campaignRow"
-                                    Classes.active="{Binding IsActive}"
-                                    Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).SelectCommand}"
-                                    CommandParameter="{Binding}">
-                                <StackPanel Spacing="{StaticResource SpaceXS}">
-                                    <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding Name}" TextWrapping="Wrap" />
-                                    <TextBlock Classes="caption" Text="{Binding GameSystem}" TextWrapping="Wrap" />
-                                    <WrapPanel>
-                                        <TextBlock Classes="caption" Text="{Binding CountsLabel}" Margin="0,0,16,0" />
-                                        <TextBlock Classes="caption" Text="{Binding LastOpenedUtc, StringFormat='Opened {0:MMM d, yyyy}'}" Margin="0,0,16,0" />
-                                        <TextBlock Classes="caption"
-                                                   Foreground="{DynamicResource AccentBrush}"
-                                                   FontWeight="Bold"
-                                                   Text="Active"
-                                                   IsVisible="{Binding IsActive}" />
-                                    </WrapPanel>
+                            <!-- Non-interactive Border wraps the whole row; the "select" button
+                                 and the "delete" trigger below are siblings inside it, not nested
+                                 inside one another - see this view's Styles block for why. -->
+                            <Border Classes="campaignRow" Classes.active="{Binding IsActive}">
+                                <StackPanel>
+                                    <!-- Stacked content within the select button (not a fixed-
+                                         column Grid): a Grid's "*" column can be squeezed to zero
+                                         width by sibling "Auto" columns at narrow widths, which
+                                         made the campaign's name disappear entirely on
+                                         phone-portrait (verified visually while checking this
+                                         screen at 380px wide). Stacking top-to-bottom has no such
+                                         failure mode at any width. The row itself still needs a
+                                         "*,Auto" Grid to place the delete trigger beside it, but
+                                         that column only ever holds one fixed-size button, not
+                                         wrapping text, so it isn't at risk of the same failure. -->
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Button Grid.Column="0"
+                                                Classes="campaignRowSelect"
+                                                Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).SelectCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Spacing="{StaticResource SpaceXS}">
+                                                <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding Name}" TextWrapping="Wrap" />
+                                                <TextBlock Classes="caption" Text="{Binding GameSystem}" TextWrapping="Wrap" />
+                                                <WrapPanel>
+                                                    <TextBlock Classes="caption" Text="{Binding CountsLabel}" Margin="0,0,16,0" />
+                                                    <TextBlock Classes="caption" Text="{Binding LastOpenedUtc, StringFormat='Opened {0:MMM d, yyyy}'}" Margin="0,0,16,0" />
+                                                    <TextBlock Classes="caption"
+                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               FontWeight="Bold"
+                                                               Text="Active"
+                                                               IsVisible="{Binding IsActive}" />
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="1"
+                                                Classes="campaignRowDelete"
+                                                Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).RequestDeleteCommand}"
+                                                CommandParameter="{Binding}"
+                                                Content="Delete"
+                                                VerticalAlignment="Top" />
+                                    </Grid>
+
+                                    <!-- Inline delete-confirmation panel (issue #19): same
+                                         no-popup-dialog idiom as CampaignFormView.axaml's discard
+                                         guard (Android's single-view lifetime has no popup-Window
+                                         equivalent). Names the campaign and states the PC/NPC
+                                         counts it will destroy (DeleteConfirmationPrompt), and
+                                         requires typing the campaign's exact name into
+                                         DeleteConfirmationInput before ConfirmDeleteCommand's
+                                         CanExecute (CanConfirmDelete) allows the delete button to
+                                         actually run - see CampaignsViewModel.CanConfirmDelete's
+                                         remarks for why type-to-confirm was chosen over a second
+                                         click. -->
+                                    <Border IsVisible="{Binding IsShowingDeleteConfirmation}"
+                                            Background="{DynamicResource SurfaceAltBrush}"
+                                            BorderBrush="{DynamicResource DangerBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Margin="12,0,12,12"
+                                            Padding="16">
+                                        <StackPanel Spacing="{StaticResource SpaceSM}">
+                                            <TextBlock Classes="body"
+                                                       Foreground="{DynamicResource TextBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding DeleteConfirmationPrompt}" />
+                                            <TextBlock Classes="caption" Text="Type the campaign name to confirm:" />
+                                            <TextBox Text="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).DeleteConfirmationInput, Mode=TwoWay}"
+                                                     PlaceholderText="{Binding Name}" />
+                                            <TextBlock Classes="caption"
+                                                       Foreground="{DynamicResource DangerBrush}"
+                                                       Text="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).DeleteError}"
+                                                       IsVisible="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).DeleteError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                                            <!-- "Cancel" (the safe, non-destructive default) gets
+                                                 the accent styling; "Delete campaign" stays plain
+                                                 so the more consequential action isn't the
+                                                 visually louder one - same convention as
+                                                 CampaignFormView.axaml's discard guard. -->
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Button Classes="accent"
+                                                        Content="Cancel"
+                                                        Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).CancelDeleteCommand}" />
+                                                <Button Content="Delete campaign"
+                                                        Foreground="{DynamicResource DangerBrush}"
+                                                        Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).ConfirmDeleteCommand}"
+                                                        IsEnabled="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).CanConfirmDelete}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
-                            </Button>
+                            </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

@@ -36,9 +36,26 @@ public sealed partial class CampaignListItemViewModel(Campaign campaign) : Obser
         $"{PlayerCharacterCount} PC{(PlayerCharacterCount == 1 ? string.Empty : "s")} · " +
         $"{NpcCount} NPC{(NpcCount == 1 ? string.Empty : "s")}";
 
+    /// <summary>Copy for the inline delete-confirmation panel (issue #19): names the campaign and
+    /// states the PC/NPC counts it will destroy, per that issue's acceptance criteria. Computed
+    /// here (rather than assembled inline in <c>CampaignsView.axaml</c>) so the confirmation panel
+    /// only needs one straightforward string binding.</summary>
+    public string DeleteConfirmationPrompt =>
+        $"Permanently delete \"{Name}\"? This also destroys its {CountsLabel}. This can't be undone.";
+
     /// <summary>Whether this is <see cref="GmToolkit.Core.Services.ActiveCampaignContext.ActiveCampaign"/>
     /// -- kept as separate bindable state rather than on <see cref="Campaign"/> itself, since it's
     /// a function of app-wide selection state, not a property of the campaign.</summary>
     [ObservableProperty]
     public partial bool IsActive { get; set; }
+
+    /// <summary>Whether this row's inline delete-confirmation panel (issue #19) is showing --
+    /// toggled by <see cref="CampaignsViewModel"/>, which owns the actual confirmation state
+    /// (<c>DeleteConfirmationInput</c>, <c>ConfirmDeleteCommand</c>, etc.) since only one row can
+    /// be mid-delete at a time. Kept here (rather than e.g. a converter comparing against a
+    /// "pending delete" id on the parent view model) so <c>CampaignsView.axaml</c> can bind this
+    /// row's confirmation panel visibility directly, the same way it already binds
+    /// <see cref="IsActive"/>.</summary>
+    [ObservableProperty]
+    public partial bool IsShowingDeleteConfirmation { get; set; }
 }
