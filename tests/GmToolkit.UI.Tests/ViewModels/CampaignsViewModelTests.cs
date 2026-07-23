@@ -137,6 +137,37 @@ public class CampaignsViewModelTests
     }
 
     [Fact]
+    public void A_failed_initial_load_surfaces_an_error_instead_of_leaving_IsLoading_stuck_true()
+    {
+        var repository = new FakeCampaignRepository { ThrowOnGetAll = new InvalidOperationException("database is locked") };
+
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+
+        Assert.False(vm.IsLoading);
+        Assert.True(vm.HasLoadError);
+        Assert.Contains("database is locked", vm.LoadError);
+        Assert.False(vm.IsEmpty);
+        Assert.False(vm.IsListVisible);
+    }
+
+    [Fact]
+    public async Task RetryLoadCommand_after_a_failed_load_recovers_once_the_repository_succeeds()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign) { ThrowOnGetAll = new InvalidOperationException("database is locked") };
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        Assert.True(vm.HasLoadError);
+
+        repository.ThrowOnGetAll = null;
+        await vm.RetryLoadCommand.ExecuteAsync(null);
+
+        Assert.False(vm.HasLoadError);
+        Assert.Null(vm.LoadError);
+        Assert.True(vm.IsListVisible);
+        Assert.Single(vm.Campaigns);
+    }
+
+    [Fact]
     public void Subscribing_to_the_real_ActiveCampaignChanged_event_does_not_throw_synchronously_without_a_running_dispatcher()
     {
         // Mirrors ShellViewModelTests' identical test -- proves the subscription path itself

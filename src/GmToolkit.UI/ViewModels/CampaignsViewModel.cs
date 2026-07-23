@@ -85,18 +85,31 @@ public sealed partial class CampaignsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsListVisible))]
     public partial bool IsFormVisible { get; set; }
 
+    /// <summary>Set if loading the campaign list threw (e.g. the database file is locked or
+    /// unreadable); <c>null</c> otherwise. Surfaced instead of leaving <see cref="IsLoading"/>
+    /// stuck true forever with nothing shown, on the one screen a first-time user sees before
+    /// anything else exists.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLoadError))]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    [NotifyPropertyChangedFor(nameof(IsListVisible))]
+    public partial string? LoadError { get; set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
     [NotifyPropertyChangedFor(nameof(IsListVisible))]
     public partial ObservableCollection<CampaignListItemViewModel> Campaigns { get; set; } = [];
 
-    /// <summary>True once loading has finished and there are no campaigns and the form isn't
-    /// showing -- drives the empty-state UI (explain what a campaign is, offer Create).</summary>
-    public bool IsEmpty => !IsLoading && !IsFormVisible && Campaigns.Count == 0;
+    public bool HasLoadError => LoadError is not null;
 
-    /// <summary>True once loading has finished, there's at least one campaign, and the form isn't
-    /// showing -- drives the populated list UI.</summary>
-    public bool IsListVisible => !IsLoading && !IsFormVisible && Campaigns.Count > 0;
+    /// <summary>True once loading has finished without error and there are no campaigns and the
+    /// form isn't showing -- drives the empty-state UI (explain what a campaign is, offer
+    /// Create).</summary>
+    public bool IsEmpty => !IsLoading && !HasLoadError && !IsFormVisible && Campaigns.Count == 0;
+
+    /// <summary>True once loading has finished without error, there's at least one campaign, and
+    /// the form isn't showing -- drives the populated list UI.</summary>
+    public bool IsListVisible => !IsLoading && !HasLoadError && !IsFormVisible && Campaigns.Count > 0;
 
     /// <summary>The shared create/edit form (issue #18) -- see this class's remarks for why it's
     /// composed in-place rather than a separate destination/window.</summary>
@@ -121,18 +134,38 @@ public sealed partial class CampaignsViewModel : ViewModelBase
         RefreshActiveSelection();
     }
 
+    /// <summary>Retries a failed load -- the only way forward from <see cref="HasLoadError"/>'s
+    /// error state, since there's nothing else to interact with on this screen when it's showing.</summary>
+    [RelayCommand]
+    private Task RetryLoadAsync() => LoadAsync();
+
     private async Task LoadAsync()
     {
         IsLoading = true;
+        LoadError = null;
 
-        var campaigns = await _campaignRepository.GetAllAsync();
-        var sorted = campaigns.OrderByDescending(campaign => campaign.LastOpenedUtc);
+        try
+        {
+            var campaigns = await _campaignRepository.GetAllAsync();
+            var sorted = campaigns.OrderByDescending(campaign => campaign.LastOpenedUtc);
 
-        Campaigns = new ObservableCollection<CampaignListItemViewModel>(
-            sorted.Select(campaign => new CampaignListItemViewModel(campaign)));
+            Campaigns = new ObservableCollection<CampaignListItemViewModel>(
+                sorted.Select(campaign => new CampaignListItemViewModel(campaign)));
 
-        RefreshActiveSelection();
-        IsLoading = false;
+            RefreshActiveSelection();
+        }
+        catch (Exception ex)
+        {
+            // Constructor-time load is fire-and-forget (nothing to await it), so an unhandled
+            // exception here would otherwise be silently lost and IsLoading would stay true
+            // forever -- an infinite spinner with nothing shown, on the one screen a first-time
+            // user sees before anything else exists. Surface it and let RetryLoadAsync retry.
+            LoadError = $"Couldn't load your campaigns: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     private void RefreshActiveSelection()

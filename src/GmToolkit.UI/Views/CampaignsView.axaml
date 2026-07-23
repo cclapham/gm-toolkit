@@ -53,6 +53,20 @@
                 <Button Classes="accent" Content="+ Create Campaign" Command="{Binding ShowCreateFormCommand}" Margin="0,0,0,8" />
             </WrapPanel>
 
+            <!-- Load-error state: shown instead of the empty state or the list if loading threw,
+                 so a database read failure doesn't leave IsLoading stuck true with a spinner that
+                 never resolves and no way forward. -->
+            <StackPanel Grid.Row="1"
+                        IsVisible="{Binding HasLoadError}"
+                        Spacing="{StaticResource SpaceMD}"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="Couldn't load your campaigns" />
+                <TextBlock Classes="body" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Text="{Binding LoadError}" />
+                <Button Classes="accent" Content="Try again" Command="{Binding RetryLoadCommand}" HorizontalAlignment="Left" />
+            </StackPanel>
+
             <!-- Empty state (#17): a first-time user with zero campaigns needs no instructions
                  beyond this: explain what a campaign is, and the only actionable next step is
                  right here. -->
