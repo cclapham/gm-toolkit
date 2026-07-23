@@ -36,7 +36,10 @@ public sealed class ActiveCampaignContextRoundTripTests : IAsyncLifetime
             await writeDatabase.InitializeAsync();
             var campaignRepository = new CampaignRepository(writeDatabase);
 
-            var wanderingSouls = new Campaign { Name = "Wandering Souls" };
+            // Wandering Souls starts with a deliberately old LastOpenedUtc so the assertion below
+            // doesn't rely on wall-clock timing between this construction and the SelectCampaignAsync
+            // stamp below to land Shadows Over Blackmoor strictly later.
+            var wanderingSouls = new Campaign { Name = "Wandering Souls", LastOpenedUtc = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
             var shadowsOverBlackmoor = new Campaign { Name = "Shadows Over Blackmoor" };
             await campaignRepository.AddAsync(wanderingSouls);
             await campaignRepository.AddAsync(shadowsOverBlackmoor);

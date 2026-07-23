@@ -24,7 +24,7 @@ public partial class App : Application
     /// rather than the concrete <c>Microsoft.Extensions.DependencyInjection.ServiceProvider</c>,
     /// so <c>GmToolkit.UI</c> doesn't need a package reference just to hold this.
     /// </remarks>
-    public static IServiceProvider? Services { get; set; }
+    public static IServiceProvider? Services { get; internal set; }
 
     public override void Initialize()
     {

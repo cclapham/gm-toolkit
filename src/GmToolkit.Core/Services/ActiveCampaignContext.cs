@@ -37,6 +37,14 @@ public class ActiveCampaignContext(ICampaignRepository campaignRepository)
     /// <see cref="Campaign.LastOpenedUtc"/> with the current time and persists it via the
     /// repository, then updates in-memory state and raises <see cref="ActiveCampaignChanged"/>.
     /// </summary>
+    /// <remarks>
+    /// <paramref name="campaign"/> must already exist in the repository (i.e. have been added via
+    /// <see cref="ICampaignRepository.AddAsync"/> previously) — persistence goes through
+    /// <see cref="ICampaignRepository.UpdateAsync"/>, which SQLite executes as an <c>UPDATE ...
+    /// WHERE</c> that silently affects zero rows for an unknown Id rather than throwing. Calling
+    /// this with a not-yet-added campaign leaves the in-memory selection looking correct while the
+    /// stamp is never actually persisted.
+    /// </remarks>
     public async Task SelectCampaignAsync(Campaign campaign, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(campaign);
