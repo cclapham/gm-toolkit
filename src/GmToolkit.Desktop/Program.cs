@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 
 using Avalonia;
 
+using GmToolkit.Core.Services;
 using GmToolkit.Data;
 using GmToolkit.UI;
 
@@ -24,6 +25,11 @@ sealed class Program
         var services = new ServiceCollection();
         services.AddGmToolkitData(database);
         await using var serviceProvider = services.BuildServiceProvider();
+
+        // Make the container reachable from GmToolkit.UI (see App.Services' doc comment), and
+        // restore whichever campaign was last opened before any UI is shown.
+        App.Services = serviceProvider;
+        await serviceProvider.GetRequiredService<ActiveCampaignContext>().RestoreLastOpenedAsync();
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

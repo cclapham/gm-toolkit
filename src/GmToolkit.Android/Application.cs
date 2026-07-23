@@ -4,6 +4,7 @@ using Android.Runtime;
 using Avalonia;
 using Avalonia.Android;
 
+using GmToolkit.Core.Services;
 using GmToolkit.Data;
 using GmToolkit.UI;
 
@@ -34,6 +35,11 @@ namespace GmToolkit.Android
         // than being posted back to (and deadlocking on) the blocked main-thread
         // SynchronizationContext, per the standard "block via Task.Run" pattern for sync-over-async
         // on a UI thread.
+        //
+        // Restoring the last-opened campaign (#16) is the same story: it's one more local-SQLite
+        // read that has to finish before any UI is shown (so the restored campaign is available
+        // to the very first view model that asks for it), and OnCreate offers no clean async
+        // path either — so it's blocked on for the same reasons as the database bootstrap above.
         public override void OnCreate()
         {
             base.OnCreate();
@@ -46,6 +52,14 @@ namespace GmToolkit.Android
             var services = new ServiceCollection();
             services.AddGmToolkitData(database);
             _serviceProvider = services.BuildServiceProvider();
+
+            // Make the container reachable from GmToolkit.UI (see App.Services' doc comment), and
+            // restore whichever campaign was last opened before any UI is shown.
+            App.Services = _serviceProvider;
+            var activeCampaignContext = _serviceProvider.GetRequiredService<ActiveCampaignContext>();
+            Task.Run(() => activeCampaignContext.RestoreLastOpenedAsync())
+                .GetAwaiter()
+                .GetResult();
         }
 
         protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)

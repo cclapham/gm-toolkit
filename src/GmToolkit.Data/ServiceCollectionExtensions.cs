@@ -1,4 +1,5 @@
 using GmToolkit.Core.Repositories;
+using GmToolkit.Core.Services;
 using GmToolkit.Data.Repositories;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -8,8 +9,8 @@ namespace GmToolkit.Data;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers an already-initialized <see cref="GmToolkitDatabase"/> and the repository
-    /// implementations.
+    /// Registers an already-initialized <see cref="GmToolkitDatabase"/>, the repository
+    /// implementations, and the <see cref="ActiveCampaignContext"/> service that depends on them.
     /// </summary>
     /// <remarks>
     /// The caller is responsible for resolving the platform app-data path and constructing
@@ -23,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICampaignRepository, CampaignRepository>();
         services.AddSingleton<IPlayerCharacterRepository, PlayerCharacterRepository>();
         services.AddSingleton<INpcRepository, NpcRepository>();
+        services.AddSingleton<ActiveCampaignContext>();
         return services;
     }
 }
