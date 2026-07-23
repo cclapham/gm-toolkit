@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="GmToolkit.UI.Views.NpcsView"
+             x:DataType="vm:NpcsViewModel">
+    <Design.DataContext>
+        <vm:NpcsViewModel />
+    </Design.DataContext>
+
+    <!-- Padding="24" mirrors SpaceLG, Thickness-typed properties can't bind a plain-double
+         StaticResource directly, see the note in Styles/Spacing.axaml. -->
+    <Border Background="{DynamicResource BgBrush}" Padding="24">
+        <StackPanel Spacing="{StaticResource SpaceSM}" MaxWidth="480" HorizontalAlignment="Left">
+            <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="NPCs" />
+            <TextBlock Classes="body"
+                       Foreground="{DynamicResource TextBrush}"
+                       TextWrapping="Wrap"
+                       Text="This is where the active campaign's NPCs will live, with search and filter by faction/location." />
+        </StackPanel>
+    </Border>
+</UserControl>

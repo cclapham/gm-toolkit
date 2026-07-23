@@ -1,0 +1,117 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:services="using:GmToolkit.UI.Services"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+             x:Class="GmToolkit.UI.Views.ShellView"
+             x:DataType="vm:ShellViewModel">
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE, the real runtime
+             DataContext is set in code from a DI-resolved instance (see App.axaml.cs). See
+             ShellViewModel's parameterless constructor for why this is safe without a running DI
+             container. -->
+        <vm:ShellViewModel />
+    </Design.DataContext>
+
+    <UserControl.Styles>
+        <!-- Navigation rail button chrome. Scoped to this view since it's shell-specific chrome,
+             not a reusable app-wide control (unlike Styles/Controls.axaml). -->
+        <Style Selector="Button.navItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="8" />
+            <!-- "4" mirrors SpaceXS, Thickness-typed properties can't bind a plain-double
+                 StaticResource directly, see the note in Styles/Spacing.axaml. -->
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.navItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        </Style>
+        <Style Selector="Button.navItem.selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+        </Style>
+        <Style Selector="Button.navItem.selected TextBlock.navLabel">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style Selector="Button.navItem:disabled">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="Auto,*">
+        <!-- Navigation rail: see ShellViewModel's doc comment for the layout decision behind this
+             narrow, single (non-breakpoint-swapped) rail. -->
+        <Border Grid.Column="0"
+                Width="84"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0">
+            <!-- Margin="4" mirrors SpaceXS, see the note in Styles/Spacing.axaml. -->
+            <StackPanel Margin="4" Spacing="{StaticResource SpaceXS}">
+                <Button Classes="navItem"
+                        Classes.selected="{Binding CampaignsNavItem.IsSelected}"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="{x:Static services:NavigationDestination.Campaigns}"
+                        IsEnabled="{Binding CampaignsNavItem.IsEnabled}"
+                        ToolTip.Tip="{Binding CampaignsNavItem.GatingReason}">
+                    <TextBlock Classes="caption navLabel" Text="Campaigns" TextWrapping="Wrap" TextAlignment="Center" />
+                </Button>
+                <Button Classes="navItem"
+                        Classes.selected="{Binding CharactersNavItem.IsSelected}"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="{x:Static services:NavigationDestination.Characters}"
+                        IsEnabled="{Binding CharactersNavItem.IsEnabled}"
+                        ToolTip.Tip="{Binding CharactersNavItem.GatingReason}">
+                    <TextBlock Classes="caption navLabel" Text="Characters" TextWrapping="Wrap" TextAlignment="Center" />
+                </Button>
+                <Button Classes="navItem"
+                        Classes.selected="{Binding NpcsNavItem.IsSelected}"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="{x:Static services:NavigationDestination.Npcs}"
+                        IsEnabled="{Binding NpcsNavItem.IsEnabled}"
+                        ToolTip.Tip="{Binding NpcsNavItem.GatingReason}">
+                    <TextBlock Classes="caption navLabel" Text="NPCs" TextWrapping="Wrap" TextAlignment="Center" />
+                </Button>
+                <Button Classes="navItem"
+                        Classes.selected="{Binding GeneratorNavItem.IsSelected}"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="{x:Static services:NavigationDestination.Generator}"
+                        IsEnabled="{Binding GeneratorNavItem.IsEnabled}"
+                        ToolTip.Tip="{Binding GeneratorNavItem.GatingReason}">
+                    <TextBlock Classes="caption navLabel" Text="Generator" TextWrapping="Wrap" TextAlignment="Center" />
+                </Button>
+                <Button Classes="navItem"
+                        Classes.selected="{Binding SettingsNavItem.IsSelected}"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="{x:Static services:NavigationDestination.Settings}"
+                        IsEnabled="{Binding SettingsNavItem.IsEnabled}"
+                        ToolTip.Tip="{Binding SettingsNavItem.GatingReason}">
+                    <TextBlock Classes="caption navLabel" Text="Settings" TextWrapping="Wrap" TextAlignment="Center" />
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Content area: whichever screen navigation currently selects, resolved to a view via
+             the app-wide ViewLocator. -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*" Background="{DynamicResource BgBrush}">
+            <!-- Padding="8" mirrors SpaceSM, see the note in Styles/Spacing.axaml. -->
+            <Border Grid.Row="0"
+                    IsVisible="{Binding ShowActiveCampaignBanner}"
+                    Background="{DynamicResource AccentSoftBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="8">
+                <TextBlock Classes="caption"
+                           Foreground="{DynamicResource TextBrush}"
+                           TextWrapping="Wrap"
+                           Text="Select a campaign to unlock Characters, NPCs and the Generator." />
+            </Border>
+            <ContentControl Grid.Row="1" Content="{Binding CurrentViewModel}" />
+        </Grid>
+    </Grid>
+</UserControl>

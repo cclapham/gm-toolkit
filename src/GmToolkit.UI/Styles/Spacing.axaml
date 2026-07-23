@@ -1,6 +1,16 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <!-- 4px base scale. Use directly in Margin/Padding, e.g. Margin="{StaticResource SpaceMD}". -->
+  <!--
+    4px base scale. Use directly in properties typed as a plain double (e.g. StackPanel.Spacing,
+    Width/Height): Spacing="{StaticResource SpaceMD}".
+
+    NOT for Margin/Padding (Thickness-typed): Avalonia's compiled-XAML setters apply a
+    TypeConverter to string/literal values but not to an already-typed StaticResource value, so
+    e.g. Margin="{StaticResource SpaceMD}" throws InvalidCastException at construction time
+    (confirmed while building #15's app shell, see GmToolkit.UI/Views/ShellView.axaml and the
+    screen views for the literal-value workaround, with a comment noting which scale step each
+    literal mirrors). Use the matching literal instead, e.g. Margin="12" for SpaceMD.
+  -->
   <x:Double x:Key="SpaceXS">4</x:Double>
   <x:Double x:Key="SpaceSM">8</x:Double>
   <x:Double x:Key="SpaceMD">12</x:Double>

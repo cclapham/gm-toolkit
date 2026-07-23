@@ -24,6 +24,7 @@ sealed class Program
 
         var services = new ServiceCollection();
         services.AddGmToolkitData(database);
+        services.AddGmToolkitUi();
         await using var serviceProvider = services.BuildServiceProvider();
 
         // Make the container reachable from GmToolkit.UI (see App.Services' doc comment), and

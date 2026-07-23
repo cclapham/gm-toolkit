@@ -9,5 +9,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/GmToolkit.Core.Tests/GmToolkit.Core.Tests.csproj" />
     <Project Path="tests/GmToolkit.Data.Tests/GmToolkit.Data.Tests.csproj" />
+    <Project Path="tests/GmToolkit.UI.Tests/GmToolkit.UI.Tests.csproj" />
   </Folder>
 </Solution>
