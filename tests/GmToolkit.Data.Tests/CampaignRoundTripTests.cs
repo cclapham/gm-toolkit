@@ -45,6 +45,11 @@ public sealed class CampaignRoundTripTests : IAsyncLifetime
         var playerCharacters = BuildPlayerCharacters(campaign.Id);
         var npcs = BuildNpcs(campaign.Id);
 
+        // Pin the issue's literal "4 PCs and 6 NPCs" acceptance criterion so a future edit to
+        // the builders below can't silently drift the fixture size while staying green.
+        Assert.Equal(4, playerCharacters.Count);
+        Assert.Equal(6, npcs.Count);
+
         await using (var writeDatabase = new GmToolkitDatabase(_dbPath))
         {
             await writeDatabase.InitializeAsync();
