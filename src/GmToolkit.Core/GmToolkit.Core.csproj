@@ -6,4 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Generator table data lives at the repo-root Resources/GeneratorTables/ (see CONTRIBUTING.md),
+         not under this project, so it stays discoverable and editable without digging through src/. -->
+    <EmbeddedResource Include="..\..\Resources\GeneratorTables\*.json">
+      <LogicalName>GmToolkit.Core.GeneratorTables.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

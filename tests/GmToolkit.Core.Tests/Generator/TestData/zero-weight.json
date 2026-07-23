@@ -1,0 +1,7 @@
+{
+  "id": "bad-weight",
+  "category": "test",
+  "entries": [
+    { "value": "x", "weight": 0 }
+  ]
+}

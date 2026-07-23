@@ -22,4 +22,11 @@
     <ProjectReference Include="..\..\src\GmToolkit.Core\GmToolkit.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Deliberately malformed generator tables used to test GeneratorTableLoader's validation. -->
+    <EmbeddedResource Include="Generator\TestData\*.json">
+      <LogicalName>GmToolkit.Core.Tests.GeneratorTableTestData.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>
