@@ -1,0 +1,180 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="700"
+             x:Class="GmToolkit.UI.Views.CharacterFormView"
+             x:DataType="vm:CharacterFormViewModel">
+    <Design.DataContext>
+        <vm:CharacterFormViewModel />
+    </Design.DataContext>
+
+    <!-- Shared create/edit form (#21), see CharacterFormViewModel's remarks for the validation
+         approach, the dynamic stat rows, and the unsaved-changes/delete guards. Embedded in-place
+         inside CharactersView.axaml rather than shown as a separate Window/destination, see
+         CharactersViewModel's remarks. -->
+    <ScrollViewer>
+        <StackPanel Spacing="{StaticResource SpaceMD}" MaxWidth="560" HorizontalAlignment="Left">
+            <TextBlock Classes="title" Foreground="{DynamicResource TextBrush}" Text="{Binding FormTitle}" />
+
+            <StackPanel IsVisible="{Binding IsFieldsVisible}" Spacing="{StaticResource SpaceMD}">
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Character name" />
+                    <!-- No separate error TextBlock here: TextBox's Fluent control theme already
+                         renders INotifyDataErrorInfo errors automatically, same as CampaignFormView. -->
+                    <TextBox Text="{Binding CharacterName, Mode=TwoWay}" PlaceholderText="e.g. Arannis Windrunner" />
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Player name" />
+                    <TextBox Text="{Binding PlayerName, Mode=TwoWay}" PlaceholderText="Who's playing this character?" />
+                </StackPanel>
+
+                <!-- Ancestry/Class/Level share a row: all three are short fields, and stacking
+                     them individually would waste vertical space this form can't spare once the
+                     dynamic stat rows below are also visible (see CharactersViewModel's remarks
+                     on keeping the whole screen usable at typical laptop resolution). -->
+                <Grid ColumnDefinitions="*,*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="{StaticResource SpaceXS}" Margin="0,0,8,0">
+                        <TextBlock Classes="caption" Text="Ancestry" />
+                        <TextBox Text="{Binding Ancestry, Mode=TwoWay}" PlaceholderText="e.g. Elf" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpaceXS}" Margin="0,0,8,0">
+                        <TextBlock Classes="caption" Text="Class" />
+                        <TextBox Text="{Binding Class, Mode=TwoWay}" PlaceholderText="e.g. Ranger" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="{StaticResource SpaceXS}">
+                        <TextBlock Classes="caption" Text="Level" />
+                        <NumericUpDown Value="{Binding Level, Mode=TwoWay}"
+                                       Minimum="1"
+                                       Maximum="9999"
+                                       FormatString="0"
+                                       Width="110"
+                                       ShowButtonSpinner="True" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Notes" />
+                    <!-- Plain multi-line text - issue #22 adds markdown rendering to notes
+                         fields later, out of scope here. -->
+                    <TextBox Text="{Binding Notes, Mode=TwoWay}"
+                             PlaceholderText="Anything else worth remembering about this character."
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             Height="80" />
+                </StackPanel>
+
+                <!-- Dynamic stat key/value rows (#21): system-agnostic, so the same form works
+                     for D&amp;D's STR/DEX/HP, Call of Cthulhu's SAN/Idea/Luck, or any homebrew
+                     system's own keys - see CharacterFormViewModel's remarks on validation. -->
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Stats" />
+                    <ItemsControl ItemsSource="{Binding StatRows}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="{StaticResource SpaceXS}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:StatRowViewModel">
+                                <!-- Key/value TextBoxes and the per-row Remove button are all
+                                     siblings in one Grid row (not nested inside one another), same
+                                     Button-in-Button-avoidance idiom as CampaignsView.axaml's
+                                     delete trigger. -->
+                                <Grid ColumnDefinitions="*,*,Auto">
+                                    <TextBox Grid.Column="0" Margin="0,0,8,0" Text="{Binding Key, Mode=TwoWay}" PlaceholderText="Key (e.g. STR)" />
+                                    <TextBox Grid.Column="1" Margin="0,0,8,0" Text="{Binding Value, Mode=TwoWay}" PlaceholderText="Value (e.g. 16)" />
+                                    <Button Grid.Column="2"
+                                            Content="Remove"
+                                            Command="{Binding $parent[UserControl].((vm:CharacterFormViewModel)DataContext).RemoveStatRowCommand}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="+ Add stat" Command="{Binding AddStatRowCommand}" HorizontalAlignment="Left" />
+                    <TextBlock Classes="caption"
+                               Foreground="{DynamicResource DangerBrush}"
+                               Text="{Binding StatsError}"
+                               IsVisible="{Binding StatsError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+
+                <TextBlock Classes="caption"
+                           Foreground="{DynamicResource DangerBrush}"
+                           Text="{Binding SaveError}"
+                           IsVisible="{Binding SaveError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Spacing="8" mirrors SpaceSM, see the note in Styles/Spacing.axaml. -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="accent"
+                            Content="{Binding SaveButtonLabel}"
+                            Command="{Binding SaveCommand}"
+                            IsEnabled="{Binding CanSave}" />
+                    <Button Content="Cancel" Command="{Binding CancelCommand}" />
+                </StackPanel>
+
+                <!-- Delete (#21) - only available once there's an existing character to delete.
+                     Kept visually separated from Save/Cancel above so it doesn't read as part of
+                     the same primary action group. -->
+                <Border IsVisible="{Binding IsDeleteAvailable}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="0,12,0,0">
+                    <Button Content="Delete character"
+                            Foreground="{DynamicResource DangerBrush}"
+                            Command="{Binding RequestDeleteCommand}" />
+                </Border>
+            </StackPanel>
+
+            <!-- Inline unsaved-changes guard, no popup dialog (see CharacterFormViewModel's
+                 remarks and this app's no-popup-Windows constraint). -->
+            <Border IsVisible="{Binding IsShowingDiscardConfirmation}"
+                    Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="body" Foreground="{DynamicResource TextBrush}" Text="Discard unsaved changes?" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="accent" Content="Keep editing" Command="{Binding CancelDiscardCommand}" />
+                        <Button Content="Discard changes" Command="{Binding ConfirmDiscardCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Inline delete-confirmation guard (#21): same type-the-name-to-confirm idiom as
+                 CampaignsView.axaml's roster-row delete (issue #19) - see
+                 CharacterFormViewModel.CanConfirmDelete's remarks. -->
+            <Border IsVisible="{Binding IsShowingDeleteConfirmation}"
+                    Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource DangerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="{StaticResource SpaceSM}">
+                    <TextBlock Classes="body"
+                               Foreground="{DynamicResource TextBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding CharacterName, StringFormat='Permanently delete &quot;{0}&quot;? This cannot be undone.'}" />
+                    <TextBlock Classes="caption" Text="Type the character's name to confirm:" />
+                    <TextBox Text="{Binding DeleteConfirmationInput, Mode=TwoWay}" PlaceholderText="{Binding CharacterName}" />
+                    <TextBlock Classes="caption"
+                               Foreground="{DynamicResource DangerBrush}"
+                               Text="{Binding DeleteError}"
+                               IsVisible="{Binding DeleteError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="accent" Content="Cancel" Command="{Binding CancelDeleteCommand}" />
+                        <Button Content="Delete character"
+                                Foreground="{DynamicResource DangerBrush}"
+                                Command="{Binding ConfirmDeleteCommand}"
+                                IsEnabled="{Binding CanConfirmDelete}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
