@@ -41,23 +41,30 @@ The subagent reports that it built/formatted/tested cleanly. Independently re-ru
 - Open the PR via `mcp__github__create_pull_request` with a "Test plan" checklist section.
 - Wait for CI: `gh pr checks <n> --watch --interval 15`. All jobs must be green before moving on — don't skip ahead on a pending or partial result.
 
-## 5. Skeptical AI review — mandatory, do not skip
+## 5. Security scan — mandatory, do not skip
+
+Once CI is green and before the skeptical review, invoke the `security-scan` skill in PR mode with this PR's number (`Skill` tool, `skill: "security-scan"`, `args: "<pr-number>"`). It runs deterministic checks (dependency CVEs, secret grep, Dependabot cross-check) plus a skeptical `security-reviewer` subagent pass on a different model, scoped to this diff.
+
+- Any concrete finding from this step gets fixed the same way as a skeptical-review finding (step 6): push a new commit to the same branch, wait for CI again, before moving on. Don't let it slide because it's a separate step from the main review.
+- Fold the security-scan's findings into the summary you give the human in step 7 rather than reporting it as a disconnected side-channel.
+
+## 6. Skeptical AI review — mandatory, do not skip
 
 Once CI is green, dispatch a fresh subagent to review the PR before asking the human to look at it:
 
 - `Agent` tool, `subagent_type: "general-purpose"`, `model: "opus"` — deliberately a different/stronger model than whatever implemented the change, so the same reasoning isn't grading its own work.
 - Give it the PR number/URL, the issue(s) it claims to close, and an explicit instruction to be skeptical: look for bugs, missed edge cases, scope creep, unjustified design decisions, security issues, and whether the acceptance criteria are genuinely met rather than superficially addressed. Tell it directly not to rubber-stamp.
 - Have it report via the `ReportFindings` tool if available to it (severity-ranked, file/line/failure-scenario), otherwise a clear written list.
-- Treat any `CONFIRMED` or otherwise credible finding as something to fix — push a new commit to the same branch, wait for CI again — before moving to step 6. Don't merge over a real finding just because it's inconvenient.
+- Treat any `CONFIRMED` or otherwise credible finding as something to fix — push a new commit to the same branch, wait for CI again — before moving to step 7. Don't merge over a real finding just because it's inconvenient.
 
 For anything that feels like it needs even more scrutiny than one subagent pass (a risky migration, a security-sensitive change, a big architectural pivot), tell the user `/code-review ultra` is available as a heavier, multi-agent cloud review they can trigger themselves — don't try to replicate it yourself.
 
-## 6. Human sign-off — mandatory, do not merge without it
+## 7. Human sign-off — mandatory, do not merge without it
 
-- Summarize for the user: what the issue asked for, what was implemented, the AI reviewer's findings and what (if anything) got fixed as a result, and the PR link.
+- Summarize for the user: what the issue asked for, what was implemented, the security scan's and AI reviewer's findings and what (if anything) got fixed as a result, and the PR link.
 - Explicitly ask the user to confirm before merging. Do not merge on your own judgment alone even if everything looks clean — that's the entire point of this gate. If the user doesn't respond to confirm, don't merge; wait.
 
-## 7. Merge and close
+## 8. Merge and close
 
 - Squash-merge only after explicit user go-ahead (repo settings already default to squash).
 - Pull `main` locally, delete the local and remote feature branch.
