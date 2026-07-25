@@ -127,10 +127,25 @@ public class MarkdownRendererTests
         Assert.Contains("link", button.Classes);
         var label = Assert.IsType<TextBlock>(button.Content);
         Assert.Equal("the docs", label.Text);
+        Assert.Equal("https://example.com/docs", ToolTip.GetTip(button));
 
         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
         Assert.Equal(new Uri("https://example.com/docs"), openedUri);
+    }
+
+    [Fact]
+    public void Link_tooltip_shows_the_real_target_even_when_the_label_claims_a_different_one()
+    {
+        var renderer = new MarkdownRenderer();
+
+        var paragraph = RenderSingleParagraph(renderer, "[https://trusted.example](https://evil.example/phish)");
+        var container = FindInline<InlineUIContainer>(paragraph.Inlines!);
+
+        var button = Assert.IsType<Button>(container!.Child);
+        var label = Assert.IsType<TextBlock>(button.Content);
+        Assert.Equal("https://trusted.example", label.Text);
+        Assert.Equal("https://evil.example/phish", ToolTip.GetTip(button));
     }
 
     [Theory]

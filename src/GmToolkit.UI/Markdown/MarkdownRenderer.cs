@@ -323,7 +323,10 @@ public sealed class MarkdownRenderer
     /// Renders a link as an actually-clickable control if <paramref name="url"/>'s scheme is
     /// allowed (see <see cref="MarkdownLinkPolicy"/>), or as the label's plain, non-clickable text
     /// otherwise -- the acceptance criterion is explicit that a disallowed-scheme link must still
-    /// show its label text, not silently vanish.
+    /// show its label text, not silently vanish. The button's tooltip always shows the real
+    /// <c>uri.AbsoluteUri</c> rather than trusting the markdown label -- a link's visible text and
+    /// its target can legitimately differ (<c>[trusted-looking-label](url)</c>), so hovering before
+    /// clicking is the only way to know where it actually goes.
     /// </summary>
     private void AppendLink(InlineCollection target, string? url, string label)
     {
@@ -337,6 +340,7 @@ public sealed class MarkdownRenderer
             };
             var button = new Button { Content = linkText };
             button.Classes.Add("link");
+            ToolTip.SetTip(button, uri.AbsoluteUri);
             button.Click += (_, _) => _openLink(uri);
             target.Add(new InlineUIContainer { Child = button });
         }
