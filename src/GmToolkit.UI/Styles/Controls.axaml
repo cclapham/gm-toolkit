@@ -11,4 +11,23 @@
   <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}" />
   </Style>
+
+  <!-- Rendered markdown links (#22, GmToolkit.UI.Markdown.MarkdownRenderer): a Button styled to
+       read as inline hyperlink text (flat, underlined content, accent-colored, hand cursor) rather
+       than an actual button. Only ever constructed for links MarkdownLinkPolicy has already allowed
+       (http/https), so there's nothing scheme-specific to gate in the style itself. -->
+  <Style Selector="Button.link">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.link /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.link:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
 </Styles>
