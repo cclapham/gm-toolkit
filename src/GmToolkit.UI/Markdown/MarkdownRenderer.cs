@@ -333,7 +333,10 @@ public sealed class MarkdownRenderer
     /// show its label text, not silently vanish. The button's tooltip always shows the real
     /// <c>uri.AbsoluteUri</c> rather than trusting the markdown label -- a link's visible text and
     /// its target can legitimately differ (<c>[trusted-looking-label](url)</c>), so hovering before
-    /// clicking is the only way to know where it actually goes.
+    /// clicking reveals where it actually goes on desktop, where pointer-hover exists. Touch
+    /// platforms (Android) have no hover, so this specific mitigation doesn't reach them -- a real
+    /// touch affordance (e.g. long-press preview) is unaddressed here and left for whenever #35/#36
+    /// bring real Android device testing into scope.
     /// </summary>
     private void AppendLink(InlineCollection target, string? url, string label)
     {
