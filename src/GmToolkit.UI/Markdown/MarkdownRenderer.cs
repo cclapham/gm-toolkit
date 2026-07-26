@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 
 using Avalonia;
@@ -44,18 +43,18 @@ namespace GmToolkit.UI.Markdown;
 /// renderer for a rare case; the label text itself is never lost, just its inner emphasis.
 /// </para>
 /// <para>
-/// <b>Android AOT/trimming check (per this issue's task list):</b> the installed Markdig 1.3.2
-/// assembly was inspected directly (<c>strings</c> over the <c>net10.0</c> lib DLL) for the
-/// reflection-heavy APIs that actually break under trimming -- <c>Activator.CreateInstance</c>,
-/// <c>MakeGenericType</c>, <c>Assembly.Load</c>, <c>Reflection.Emit</c> -- and found none; the only
-/// hits are plain <c>GetType()</c> calls inside debug-display strings, which are always trim-safe
-/// since they return an already-live instance's runtime type rather than looking one up by name.
-/// Markdig's extension pipeline is built from directly-referenced, statically-typed classes (`new
-/// ParagraphBlockParser()`-style), not reflection-based type discovery, so there's no dynamic-type
-/// surface for the Android linker to strip. This is the same proportionate, no-device-available
-/// verification approach PR #46 used for the SQLite native binary (inspect the package, confirm no
-/// red flags) rather than an unreachable "actually run it on an Android device" bar -- that's #35/#36's
-/// job once real device access exists.
+/// <b>Android AOT/trimming check (per this issue's task list) -- a proxy, not a proof:</b> with no
+/// Android SDK/device available in this environment, the installed Markdig 1.3.2 assembly was
+/// inspected via <c>strings</c> over the <c>net10.0</c> lib DLL for the reflection-heavy API *names*
+/// that most commonly break under trimming (<c>Activator.CreateInstance</c>, <c>MakeGenericType</c>,
+/// <c>Assembly.Load</c>, <c>Reflection.Emit</c>) and found none; the only hits are plain
+/// <c>GetType()</c> calls inside debug-display strings, which are trim-safe. This is weak evidence,
+/// not conclusive -- a string scan can't see e.g. <c>Type.GetType(string)</c> called by name,
+/// generic <c>Activator.CreateInstance&lt;T&gt;</c>, or the same APIs invoked via other IL paths.
+/// Markdig's extension pipeline being built from directly-referenced, statically-typed classes (not
+/// reflection-based discovery) makes trim-breakage unlikely, but this is a smoke test pending real
+/// confirmation once #35/#36 have actual device/CI Android access -- same no-device caveat PR #46's
+/// SQLite check carried.
 /// </para>
 /// <para>
 /// <b>Security:</b> raw HTML (<see cref="Markdig.Syntax.HtmlBlock"/>/<see cref="HtmlInline"/>) is
@@ -74,18 +73,17 @@ public sealed class MarkdownRenderer
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().Build();
 
-    private readonly Action<Uri> _openLink;
+    private readonly Action<Uri>? _openLinkOverride;
 
     /// <param name="openLink">
     /// Invoked when the user clicks a rendered link whose scheme <see cref="MarkdownLinkPolicy"/>
-    /// allowed. Defaults to opening the URI with the OS's registered handler via
-    /// <see cref="Process.Start(ProcessStartInfo)"/> with <c>UseShellExecute = true</c> -- the
-    /// standard .NET way to open a URL in the user's default browser. Overridable so tests can
-    /// capture what would have been opened without actually launching a process.
+    /// allowed, instead of the default platform-aware launch behavior (see
+    /// <see cref="OpenLink"/>). Overridable purely so tests can capture what would have been opened
+    /// without actually launching anything.
     /// </param>
     public MarkdownRenderer(Action<Uri>? openLink = null)
     {
-        _openLink = openLink ?? DefaultOpenLink;
+        _openLinkOverride = openLink;
     }
 
     /// <summary>
@@ -229,8 +227,17 @@ public sealed class MarkdownRenderer
         return textBlock;
     }
 
+    /// <summary>
+    /// A <see cref="LeafBlock"/> that Markdig has inline-parsed (e.g. a <see cref="ParagraphBlock"/>
+    /// nested inside a block quote) has its <see cref="LeafBlock.Lines"/> cleared -- the content
+    /// lives in <see cref="LeafBlock.Inline"/> instead, and reading <c>Lines</c> for it silently
+    /// returns empty, which previously made block-quote content vanish rather than fall back to
+    /// plain text. Blocks Markdig never inline-parses (fenced code, raw HTML, thematic breaks) keep
+    /// their content in <c>Lines</c> as usual, so that's still the fallback source for them.
+    /// </summary>
     private static string GetRawText(Block block) => block switch
     {
+        LeafBlock { Inline: { } inline } => FlattenText(inline),
         LeafBlock leaf => leaf.Lines.ToString(),
         ContainerBlock container => string.Join(Environment.NewLine, container.Select(GetRawText)),
         _ => string.Empty,
@@ -341,7 +348,7 @@ public sealed class MarkdownRenderer
             var button = new Button { Content = linkText };
             button.Classes.Add("link");
             ToolTip.SetTip(button, uri.AbsoluteUri);
-            button.Click += (_, _) => _openLink(uri);
+            button.Click += (sender, _) => OpenLink(sender as Control, uri);
             target.Add(new InlineUIContainer { Child = button });
         }
         else
@@ -402,6 +409,43 @@ public sealed class MarkdownRenderer
     private static void BindThemeForeground(TextBlock textBlock) =>
         textBlock.Bind(TextBlock.ForegroundProperty, new DynamicResourceExtension("TextBrush"));
 
-    private static void DefaultOpenLink(Uri uri) =>
-        Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    /// <summary>
+    /// Opens a link the user clicked. If a test-only override was supplied to the constructor, that
+    /// runs instead of anything platform-specific. Otherwise, launches via the clicked button's own
+    /// <see cref="TopLevel.Launcher"/> -- Avalonia's cross-platform URL opener (Intent-based on
+    /// Android, the OS's registered handler on desktop) -- rather than
+    /// <see cref="System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo)"/> with
+    /// <c>UseShellExecute = true</c>, which has no Android implementation at all and throws
+    /// <see cref="PlatformNotSupportedException"/> there. Fire-and-forget, and any failure (no
+    /// <see cref="TopLevel"/> yet, no registered handler, the platform declines) is swallowed --
+    /// clicking a link must never crash the app, the same bar <see cref="Render"/> holds itself to.
+    /// </summary>
+    private void OpenLink(Control? sender, Uri uri)
+    {
+        if (_openLinkOverride is not null)
+        {
+            _openLinkOverride(uri);
+            return;
+        }
+
+        var topLevel = sender is null ? null : TopLevel.GetTopLevel(sender);
+        if (topLevel is null)
+        {
+            return;
+        }
+
+        _ = LaunchSafelyAsync(topLevel, uri);
+    }
+
+    private static async Task LaunchSafelyAsync(TopLevel topLevel, Uri uri)
+    {
+        try
+        {
+            await topLevel.Launcher.LaunchUriAsync(uri);
+        }
+        catch (Exception)
+        {
+            // See OpenLink's remarks -- a link that can't be opened is a no-op, not a crash.
+        }
+    }
 }

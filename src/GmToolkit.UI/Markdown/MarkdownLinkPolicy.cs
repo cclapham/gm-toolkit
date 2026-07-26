@@ -6,10 +6,9 @@ namespace GmToolkit.UI.Markdown;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Only <c>http</c>/<c>https</c> are allowed, deliberately.</b> A clickable link opens via the
-/// OS's default handler (<see cref="System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo)"/>
-/// with <c>UseShellExecute = true</c> -- the standard .NET way to hand a URL to the system, see
-/// <see cref="MarkdownRenderer"/>'s remarks), which is safe for ordinary web links but not for an
+/// <b>Only <c>http</c>/<c>https</c> are allowed, deliberately.</b> A clickable link opens via
+/// Avalonia's cross-platform <c>TopLevel.Launcher</c> (see <see cref="MarkdownRenderer"/>'s remarks),
+/// which is safe for ordinary web links but not for an
 /// arbitrary scheme a malicious or malformed note could contain: <c>javascript:</c> has no meaning
 /// outside a browser but costs nothing to reject; <c>file://</c> could open an arbitrary local file;
 /// a registered custom scheme (<c>mailto:</c>, a game-launcher's own protocol handler, etc.) could

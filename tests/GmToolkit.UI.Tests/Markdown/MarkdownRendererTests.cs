@@ -191,15 +191,30 @@ public class MarkdownRendererTests
     }
 
     [Theory]
-    [InlineData("```\nvar x = 1;\n```")] // fenced code block
-    [InlineData("> a quote")] // block quote
-    [InlineData("---")] // thematic break
-    [InlineData("| a | b |\n|---|---|\n| 1 | 2 |")] // pipe-table syntax -- no table extension enabled
-    public void Unsupported_block_constructs_render_without_throwing(string markdown)
+    [InlineData("```\nvar x = 1;\n```", "var x = 1;")] // fenced code block
+    [InlineData("> a quote", "a quote")] // block quote
+    [InlineData("| a | b |\n|---|---|\n| 1 | 2 |", "a")] // pipe-table syntax -- no table extension enabled
+    public void Unsupported_block_constructs_preserve_their_text_as_plain_content(string markdown, string expectedSubstring)
     {
         var renderer = new MarkdownRenderer();
 
-        var exception = Record.Exception(() => renderer.Render(markdown));
+        var root = (StackPanel)renderer.Render(markdown);
+
+        // Asserts the issue's actual "plain text, not failing" criterion directly -- not just that
+        // nothing threw, which a regression that silently drops the content (see BuildFallbackBlock
+        // returning null for an empty row) would still satisfy.
+        Assert.Contains(expectedSubstring, CollectVisibleText(root));
+    }
+
+    [Fact]
+    public void Thematic_break_renders_without_throwing()
+    {
+        var renderer = new MarkdownRenderer();
+
+        // A divider has no textual content to preserve, so unlike the constructs above this only
+        // asserts non-throwing -- rendering nothing for it is acceptable, dropping it silently isn't
+        // "losing content".
+        var exception = Record.Exception(() => renderer.Render("---"));
 
         Assert.Null(exception);
     }
@@ -258,6 +273,38 @@ public class MarkdownRendererTests
         }
 
         return null;
+    }
+
+    /// <summary>Recursively collects every rendered <see cref="TextBlock"/>'s visible text from a
+    /// control tree (a <see cref="Panel"/> of <see cref="Panel"/>s/<see cref="TextBlock"/>s, as every
+    /// block-level renderer in <see cref="MarkdownRenderer"/> produces) -- used to assert that
+    /// "falls back to plain text" genuinely preserves the source content, not just that rendering
+    /// didn't throw.</summary>
+    private static string CollectVisibleText(Control control)
+    {
+        var builder = new StringBuilder();
+        CollectVisibleText(control, builder);
+        return builder.ToString();
+    }
+
+    private static void CollectVisibleText(Control control, StringBuilder builder)
+    {
+        switch (control)
+        {
+            case TextBlock { Inlines.Count: > 0 } textBlock:
+                builder.Append(Flatten(textBlock.Inlines!)).Append(' ');
+                break;
+            case TextBlock textBlock:
+                builder.Append(textBlock.Text).Append(' ');
+                break;
+            case Panel panel:
+                foreach (var child in panel.Children)
+                {
+                    CollectVisibleText(child, builder);
+                }
+
+                break;
+        }
     }
 
     private static string Flatten(IEnumerable<Inline> inlines)
