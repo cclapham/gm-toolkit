@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:views="using:GmToolkit.UI.Views"
              xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="700"
              x:Class="GmToolkit.UI.Views.CharacterFormView"
@@ -58,13 +59,10 @@
 
                 <StackPanel Spacing="{StaticResource SpaceXS}">
                     <TextBlock Classes="caption" Text="Notes" />
-                    <!-- Plain multi-line text - issue #22 adds markdown rendering to notes
-                         fields later, out of scope here. -->
-                    <TextBox Text="{Binding Notes, Mode=TwoWay}"
-                             PlaceholderText="Anything else worth remembering about this character."
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             Height="80" />
+                    <!-- Reusable markdown edit/preview control (#22): see MarkdownNotesEditor's
+                         remarks for why it carries no PlayerCharacter-specific knowledge. -->
+                    <views:MarkdownNotesEditor Text="{Binding Notes, Mode=TwoWay}"
+                                                PlaceholderText="Anything else worth remembering about this character." />
                 </StackPanel>
 
                 <!-- Dynamic stat key/value rows (#21): system-agnostic, so the same form works

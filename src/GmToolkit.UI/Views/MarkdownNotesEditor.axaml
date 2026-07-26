@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="140"
+             x:Class="GmToolkit.UI.Views.MarkdownNotesEditor"
+             x:Name="Root">
+
+    <!-- Reusable edit/preview markdown control (#22). No PlayerCharacter/Npc-specific knowledge:
+         binds only its own Text/PlaceholderText/EditorHeight properties (see the code-behind's
+         remarks), so #25 can drop this in for Npc.Notes later with just a Text binding. -->
+    <StackPanel Spacing="4"> <!-- mirrors SpaceXS, see Styles/Spacing.axaml's note on Thickness/plain-double resources -->
+        <StackPanel Orientation="Horizontal" Spacing="8"> <!-- mirrors SpaceSM -->
+            <Button x:Name="EditButton" Classes="accent" Content="Edit" Click="OnEditClick" />
+            <Button x:Name="PreviewButton" Content="Preview" Click="OnPreviewClick" />
+        </StackPanel>
+
+        <TextBox Text="{Binding #Root.Text, Mode=TwoWay}"
+                 PlaceholderText="{Binding #Root.PlaceholderText}"
+                 IsVisible="{Binding !#Root.IsPreview}"
+                 Height="{Binding #Root.EditorHeight}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap" />
+
+        <Border IsVisible="{Binding #Root.IsPreview}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="8"
+                MinHeight="{Binding #Root.EditorHeight}">
+            <ScrollViewer MaxHeight="320">
+                <ContentControl x:Name="PreviewHost" />
+            </ScrollViewer>
+        </Border>
+    </StackPanel>
+</UserControl>
