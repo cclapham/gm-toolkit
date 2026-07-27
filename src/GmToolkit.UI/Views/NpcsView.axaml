@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.NpcsView"
              x:DataType="vm:NpcsViewModel">
@@ -10,15 +11,176 @@
         <vm:NpcsViewModel />
     </Design.DataContext>
 
-    <!-- Padding="24" mirrors SpaceLG, Thickness-typed properties can't bind a plain-double
-         StaticResource directly, see the note in Styles/Spacing.axaml. -->
+    <UserControl.Styles>
+        <!-- NPC list row chrome. Read-only (issue #24 has no click-through, unlike
+             CharactersView.axaml's characterRow), so this is a plain, non-interactive Border, not
+             a Button. -->
+        <Style Selector="Border.npcRow">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <!-- Padding="12" mirrors SpaceMD, see the note in Styles/Spacing.axaml. -->
+            <Setter Property="Padding" Value="12" />
+        </Style>
+
+        <!-- "Known to players" badge: SuccessBrush (not AccentBrush, which CampaignsView.axaml
+             already uses to mean "this is the active campaign") reads as its own distinct
+             "safe/visible" signal rather than colliding with that unrelated meaning. -->
+        <Style Selector="Border.knownToPlayersBadge">
+            <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,2" />
+        </Style>
+        <Style Selector="Border.knownToPlayersBadge TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+
+        <!-- Sort-order toggle: two plain Buttons rather than a ComboBox, since there are only two
+             options and this reads faster at a glance during a session than opening a dropdown,
+             and the active one gets the same "accent" look Button.accent already uses elsewhere
+             for "the current thing"; the inactive one stays a plain default Button. -->
+        <Style Selector="Button.sortOption.active">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- Padding="24" mirrors SpaceLG, see the note in Styles/Spacing.axaml. -->
     <Border Background="{DynamicResource BgBrush}" Padding="24">
-        <StackPanel Spacing="{StaticResource SpaceSM}" MaxWidth="480" HorizontalAlignment="Left">
-            <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="NPCs" />
-            <TextBlock Classes="body"
+        <Grid RowDefinitions="Auto,Auto,*" MaxWidth="720" HorizontalAlignment="Stretch">
+            <TextBlock Grid.Row="0"
+                       Classes="display"
                        Foreground="{DynamicResource TextBrush}"
-                       TextWrapping="Wrap"
-                       Text="This is where the active campaign's NPCs will live, with search and filter by faction/location." />
-        </StackPanel>
+                       Text="NPCs"
+                       Margin="0,0,0,16" />
+
+            <!-- Search/filter/sort bar (issue #24), only shown once there's at least one NPC to
+                 search, filter or sort; see NpcsViewModel.IsSearchBarVisible's remarks. WrapPanel
+                 (not a fixed-column Grid) so the controls drop to their own lines at narrow widths
+                 instead of overlapping, same idiom as CharactersView.axaml's header. -->
+            <WrapPanel Grid.Row="1" IsVisible="{Binding IsSearchBarVisible}" Margin="0,0,0,16">
+                <TextBox Text="{Binding SearchText, Mode=TwoWay}"
+                         PlaceholderText="Search name, role, faction, location, notes"
+                         Width="280"
+                         Margin="0,0,8,8" />
+                <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,8,8">
+                    <TextBlock Classes="caption" Text="Faction" />
+                    <ComboBox ItemsSource="{Binding FactionOptions}" SelectedItem="{Binding SelectedFaction, Mode=TwoWay}" MinWidth="140" />
+                </StackPanel>
+                <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,8,8">
+                    <TextBlock Classes="caption" Text="Location" />
+                    <ComboBox ItemsSource="{Binding LocationOptions}" SelectedItem="{Binding SelectedLocation, Mode=TwoWay}" MinWidth="140" />
+                </StackPanel>
+                <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,8,8">
+                    <TextBlock Classes="caption" Text="Sort by" />
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button Classes="sortOption" Classes.active="{Binding IsSortedByName}" Content="Name" Command="{Binding SortByNameCommand}" />
+                        <Button Classes="sortOption" Classes.active="{Binding IsSortedByRecentlyAdded}" Content="Recently added" Command="{Binding SortByRecentlyAddedCommand}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Only shown once search/faction/location is actually narrowing the list (see
+                     NpcsViewModel.HasActiveFilters's remarks). Resets all three in one action
+                     instead of the search box and both dropdowns individually. Bottom-aligned so it
+                     lines up with the button row of the captioned groups above rather than their
+                     captions. -->
+                <Button Content="Clear filters"
+                        Command="{Binding ClearFiltersCommand}"
+                        IsVisible="{Binding HasActiveFilters}"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,8" />
+            </WrapPanel>
+
+            <!-- Load-error state: mirrors CharactersView.axaml's identical state, so a database
+                 read failure doesn't leave IsLoading stuck true with nothing shown. -->
+            <StackPanel Grid.Row="2"
+                        IsVisible="{Binding HasLoadError}"
+                        Spacing="{StaticResource SpaceMD}"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="Couldn't load this campaign's NPCs" />
+                <TextBlock Classes="body" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Text="{Binding LoadError}" />
+                <Button Classes="accent" Content="Try again" Command="{Binding RetryLoadCommand}" HorizontalAlignment="Left" />
+            </StackPanel>
+
+            <!-- Empty state: the active campaign has no NPCs yet at all. No "add your first NPC"
+                 button here, unlike CharactersView.axaml/CampaignsView.axaml's empty states,
+                 since issue #24 is deliberately read-only; there's no create/edit screen to link
+                 to until issue #25 builds one. -->
+            <StackPanel Grid.Row="2"
+                        IsVisible="{Binding IsEmpty}"
+                        Spacing="{StaticResource SpaceMD}"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="No NPCs yet" />
+                <TextBlock Classes="body"
+                           Foreground="{DynamicResource TextBrush}"
+                           TextWrapping="Wrap"
+                           Text="This is where the active campaign's non-player characters will live, with search and filter by faction/location." />
+            </StackPanel>
+
+            <!-- No-search-results state, distinct from IsEmpty above: the campaign has NPCs, but
+                 none match the current search/filter. See NpcsViewModel.IsNoSearchResults's remarks. -->
+            <StackPanel Grid.Row="2"
+                        IsVisible="{Binding IsNoSearchResults}"
+                        Spacing="{StaticResource SpaceMD}"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center">
+                <TextBlock Classes="title" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="No NPCs match your search" />
+                <TextBlock Classes="body"
+                           Foreground="{DynamicResource TextBrush}"
+                           TextWrapping="Wrap"
+                           Text="Try a different search term, or reset the faction/location filter back to All." />
+            </StackPanel>
+
+            <!-- Populated list. Each row is compact and fixed-height (NotesPreview is single-line,
+                 ellipsis-truncated, see NpcListItemViewModel's remarks) so a list of 100 NPCs
+                 stays scannable rather than each row growing to fit its longest field, which
+                 matters for this issue's "find one NPC in a list of 100 in under 5 seconds"
+                 acceptance criterion just as much as the search/filter/sort themselves do. -->
+            <ScrollViewer Grid.Row="2" IsVisible="{Binding IsListVisible}">
+                <ItemsControl ItemsSource="{Binding Npcs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="{StaticResource SpaceSM}" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NpcListItemViewModel">
+                            <Border Classes="npcRow">
+                                <StackPanel Spacing="{StaticResource SpaceXS}">
+                                    <WrapPanel>
+                                        <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding Name}" Margin="0,0,16,0" />
+                                        <!-- Known-to-players badge (issue #24's own task): visible
+                                             only for NPCs the players already know about, next to
+                                             the name so it's the first thing a GM's eye catches
+                                             when scanning the row. -->
+                                        <Border Classes="knownToPlayersBadge" IsVisible="{Binding KnownToPlayers}" Margin="0,0,16,0">
+                                            <TextBlock Classes="caption" Text="Known to players" />
+                                        </Border>
+                                        <TextBlock Classes="caption" Text="{Binding Role}" Margin="0,0,16,0" IsVisible="{Binding Role, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBlock Classes="caption" Text="{Binding Faction, StringFormat='Faction: {0}'}" Margin="0,0,16,0" IsVisible="{Binding Faction, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBlock Classes="caption" Text="{Binding Location, StringFormat='Location: {0}'}" IsVisible="{Binding Location, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                                    </WrapPanel>
+                                    <!-- Single line, no wrap, ellipsis-truncated: an NPC with a
+                                         long notes field truncates gracefully instead of growing
+                                         this row's height, see NotesPreview's remarks. -->
+                                    <TextBlock Classes="caption"
+                                               Text="{Binding NotesPreview}"
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
     </Border>
 </UserControl>
