@@ -1,4 +1,5 @@
 using GmToolkit.Core.Models;
+using GmToolkit.Core.Repositories;
 using GmToolkit.UI.Tests.Fakes;
 using GmToolkit.UI.ViewModels;
 
@@ -431,5 +432,62 @@ public class NpcFormViewModelTests
 
         Assert.False(form.IsShowingDeleteConfirmation);
         Assert.False(form.ConfirmDeleteCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task A_slow_stale_suggestion_load_never_overwrites_a_newer_campaigns_suggestions()
+    {
+        // Regression guard from the skeptical review of PR #58: BeginCreate/BeginEdit kick off
+        // LoadSuggestionsAsync fire-and-forget with no ordering guarantee between overlapping
+        // calls. Simulates campaign A's load still being in flight when the form is reopened for
+        // campaign B (whose own, faster load already completed) -- A's late completion must not
+        // clobber B's already-current suggestions.
+        var campaignA = Guid.NewGuid();
+        var campaignB = Guid.NewGuid();
+        var npcInA = new Npc { CampaignId = campaignA, Name = "Alpha", Faction = "Faction A", Location = "Location A" };
+        var npcInB = new Npc { CampaignId = campaignB, Name = "Beta", Faction = "Faction B", Location = "Location B" };
+        var repository = new SlowFirstCallNpcRepository(campaignA, npcInA, npcInB);
+        var form = new NpcFormViewModel(repository);
+
+        form.BeginCreate(campaignA); // Kicks off a load for A that repository.Release() below controls.
+        form.BeginCreate(campaignB); // A's own load for B completes synchronously (not the slow one).
+
+        Assert.Equal(["Faction B"], form.FactionSuggestions);
+        Assert.Equal(["Location B"], form.LocationSuggestions);
+
+        repository.ReleaseSlowCall();
+        await Task.Yield(); // Let A's now-completing continuation run.
+
+        Assert.Equal(["Faction B"], form.FactionSuggestions);
+        Assert.Equal(["Location B"], form.LocationSuggestions);
+    }
+
+    /// <summary>Test-only <see cref="INpcRepository"/> whose <see cref="GetByCampaignAsync"/> never
+    /// completes for one designated campaign until <see cref="ReleaseSlowCall"/> is called -- every
+    /// other campaign's call completes synchronously, same as <see cref="FakeNpcRepository"/>.</summary>
+    private sealed class SlowFirstCallNpcRepository(Guid slowCampaignId, params Npc[] npcs) : INpcRepository
+    {
+        private readonly TaskCompletionSource _release = new();
+
+        public async Task<IReadOnlyList<Npc>> GetByCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default)
+        {
+            if (campaignId == slowCampaignId)
+            {
+                await _release.Task;
+            }
+
+            return [.. npcs.Where(npc => npc.CampaignId == campaignId)];
+        }
+
+        public void ReleaseSlowCall() => _release.TrySetResult();
+
+        public Task<Npc?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(npcs.FirstOrDefault(npc => npc.Id == id));
+
+        public Task AddAsync(Npc npc, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task UpdateAsync(Npc npc, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

@@ -418,16 +418,34 @@ public sealed partial class NpcFormViewModel : ObservableValidator
     /// just leaves the suggestion list empty), since autocomplete hints are a convenience, not a
     /// requirement for saving.
     /// </summary>
+    /// <remarks>
+    /// Guards its own result against <see cref="_campaignId"/> having moved on by the time the
+    /// repository call completes (e.g. the form was reopened for a different campaign before this
+    /// load finished) -- <see cref="INpcRepository"/> makes no ordering guarantee between two
+    /// overlapping calls, so without this check a slow load for an old campaign could land its
+    /// results after a newer, faster load for a different one, showing that campaign's faction/
+    /// location names as suggestions. Caught during the skeptical review of PR #58.
+    /// </remarks>
     private async Task LoadSuggestionsAsync(Guid campaignId)
     {
         try
         {
             var npcs = await _npcRepository.GetByCampaignAsync(campaignId);
+            if (campaignId != _campaignId)
+            {
+                return;
+            }
+
             FactionSuggestions = new ObservableCollection<string>(DistinctNonBlank(npcs.Select(npc => npc.Faction)));
             LocationSuggestions = new ObservableCollection<string>(DistinctNonBlank(npcs.Select(npc => npc.Location)));
         }
         catch
         {
+            if (campaignId != _campaignId)
+            {
+                return;
+            }
+
             FactionSuggestions = [];
             LocationSuggestions = [];
         }
