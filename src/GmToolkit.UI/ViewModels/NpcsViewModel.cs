@@ -14,23 +14,45 @@ using GmToolkit.UI.Design;
 namespace GmToolkit.UI.ViewModels;
 
 /// <summary>
-/// The NPCs screen (issue #24): a read-only, searchable/filterable/sortable list of every
-/// <see cref="Npc"/> in the active campaign, with a visual marker for "known to players". Only
-/// reachable when a campaign is active -- see <c>ShellViewModel</c>'s gating on
-/// <see cref="NavItemViewModel.RequiresActiveCampaign"/> -- but see <see cref="OnActiveCampaignChanged"/>
-/// for why this view model still has to cope with the active campaign changing (or disappearing)
-/// out from under it while it's showing. Mirrors <see cref="CharactersViewModel"/>'s loading/
-/// error/empty-state shape one-for-one; see that class's remarks for the parts this class doesn't
-/// repeat below.
+/// The NPCs screen (issues #24+#25): a searchable/filterable/sortable list of every <see cref="Npc"/>
+/// in the active campaign, with a visual marker for "known to players", plus an in-place create/edit
+/// form (issue #25). Only reachable when a campaign is active -- see <c>ShellViewModel</c>'s gating
+/// on <see cref="NavItemViewModel.RequiresActiveCampaign"/> -- but see
+/// <see cref="OnActiveCampaignChanged"/> for why this view model still has to cope with the active
+/// campaign changing (or disappearing) out from under it while it's showing. Mirrors
+/// <see cref="CharactersViewModel"/>'s loading/error/empty-state/form shape one-for-one; see that
+/// class's remarks for the parts this class doesn't repeat below.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Deliberately read-only: no create/edit/delete here.</b> Issue #24's own task list is "list,
-/// search, filter, sort, known-to-players marker" -- unlike issues #20+#21 (which had to be bundled
-/// because #20's task list explicitly included "click through to detail/edit"), #24 has no such
-/// item, and issue #25 (not yet built) owns create/edit. So unlike <see cref="CharactersViewModel"/>,
-/// there's no <c>Form</c>, no <c>IsFormVisible</c>, and <see cref="NpcListItemViewModel"/> rows
-/// aren't click targets.
+/// <b>Create/edit/delete is an in-place mode switch (<see cref="IsFormVisible"/>), same as
+/// <see cref="CharactersViewModel"/>'s <see cref="CharactersViewModel.IsFormVisible"/> -- but folded
+/// into <em>three</em> list states plus a search bar rather than that class's two.</b> Issue #24 (the
+/// list) shipped before this class had any form, with <see cref="IsEmpty"/>/<see cref="IsListVisible"/>/
+/// <see cref="IsNoSearchResults"/>/<see cref="IsSearchBarVisible"/> each already gated on
+/// <see cref="IsLoading"/>/<see cref="HasLoadError"/>/<see cref="AllNpcCount"/>. Issue #25 adds
+/// <c>&amp;&amp; !IsFormVisible</c> to all four rather than introducing a separate "form mode" Grid
+/// row that could show at the same time as one of them -- so opening <see cref="Form"/> (via
+/// <see cref="ShowCreateFormCommand"/> or <see cref="SelectCommand"/>) hides the search bar and
+/// whichever of the three list states was showing, exactly like closing a modal, and closing the
+/// form (<see cref="OnFormSavedAsync"/>/<see cref="OnFormCancelled"/>/<see cref="OnFormDeletedAsync"/>)
+/// re-derives which of the three to show again the same way a fresh load would.
+/// </para>
+/// <para>
+/// <b>NPC rows are now click targets (<see cref="SelectCommand"/>), same "whole row is one Button"
+/// idiom as <see cref="CharactersViewModel.SelectCommand"/>/<c>CharactersView.axaml</c>'s
+/// <c>characterRow</c> style -- see <c>NpcsView.axaml</c>'s identical remark on why the
+/// known-to-players badge inside the row stays a <c>Border</c>, not a <c>Button</c>, so this still
+/// avoids Button-in-Button ambiguity.</b>
+/// </para>
+/// <para>
+/// <b>Generator integration is out of scope for this class.</b> Issue #25's own scope note: the
+/// generator (issues #26-29) doesn't exist yet, so there is no generator save step to wire into here.
+/// Once #29 builds it, the generator will be the one reaching into <see cref="INpcRepository.AddAsync"/>
+/// (or reusing <see cref="Form"/>) to persist a generated NPC -- not the other way around -- and
+/// nothing about this class needs to change for that to work, since a generated <see cref="Npc"/> is
+/// just an <see cref="Npc"/> with <see cref="Npc.WasGenerated"/> set to <c>true</c> (see
+/// <see cref="NpcFormViewModel"/>'s remarks on why that flag is never surfaced in this form).
 /// </para>
 /// <para>
 /// <b>Search/filter/sort all run client-side over the one <see cref="INpcRepository.GetByCampaignAsync"/>
@@ -74,6 +96,11 @@ public sealed partial class NpcsViewModel : ViewModelBase
         _npcRepository = npcRepository;
         _activeCampaignContext = activeCampaignContext;
 
+        Form = new NpcFormViewModel(npcRepository);
+        Form.Saved += OnFormSavedAsync;
+        Form.Cancelled += OnFormCancelled;
+        Form.Deleted += OnFormDeletedAsync;
+
         _activeCampaignContext.ActiveCampaignChanged += OnActiveCampaignChanged;
 
         _ = LoadAsync();
@@ -104,6 +131,16 @@ public sealed partial class NpcsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsNoSearchResults))]
     [NotifyPropertyChangedFor(nameof(IsSearchBarVisible))]
     public partial string? LoadError { get; set; }
+
+    /// <summary>Whether the in-place create/edit form (issue #25) is currently showing instead of
+    /// the list -- see this class's remarks on folding this into the three list states plus the
+    /// search bar, mirroring <see cref="CharactersViewModel.IsFormVisible"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    [NotifyPropertyChangedFor(nameof(IsListVisible))]
+    [NotifyPropertyChangedFor(nameof(IsNoSearchResults))]
+    [NotifyPropertyChangedFor(nameof(IsSearchBarVisible))]
+    public partial bool IsFormVisible { get; set; }
 
     /// <summary>How many NPCs the active campaign has in total, before search/filter is applied --
     /// tracked separately from <see cref="Npcs"/>.Count so "zero NPCs in this campaign" (the real
@@ -160,24 +197,30 @@ public sealed partial class NpcsViewModel : ViewModelBase
 
     public bool HasLoadError => LoadError is not null;
 
-    /// <summary>True once loading has finished without error and the active campaign has no NPCs
-    /// at all yet -- distinct from <see cref="IsNoSearchResults"/> (NPCs exist, but none match the
-    /// current search/filter). Drives the "no NPCs yet" empty-state UI.</summary>
-    public bool IsEmpty => !IsLoading && !HasLoadError && AllNpcCount == 0;
+    /// <summary>True once loading has finished without error, the form isn't showing, and the
+    /// active campaign has no NPCs at all yet -- distinct from <see cref="IsNoSearchResults"/> (NPCs
+    /// exist, but none match the current search/filter). Drives the "no NPCs yet" empty-state UI.</summary>
+    public bool IsEmpty => !IsLoading && !HasLoadError && !IsFormVisible && AllNpcCount == 0;
 
-    /// <summary>True once loading has finished without error, the campaign has at least one NPC,
-    /// and at least one of them matches the current search/filter. Drives the populated list UI.</summary>
-    public bool IsListVisible => !IsLoading && !HasLoadError && AllNpcCount > 0 && Npcs.Count > 0;
+    /// <summary>True once loading has finished without error, the form isn't showing, the campaign
+    /// has at least one NPC, and at least one of them matches the current search/filter. Drives the
+    /// populated list UI.</summary>
+    public bool IsListVisible => !IsLoading && !HasLoadError && !IsFormVisible && AllNpcCount > 0 && Npcs.Count > 0;
 
-    /// <summary>True once loading has finished without error, the campaign has at least one NPC,
-    /// but none of them match the current search/filter -- distinct from <see cref="IsEmpty"/> so
-    /// the messaging can say "no matches" rather than "no NPCs yet".</summary>
-    public bool IsNoSearchResults => !IsLoading && !HasLoadError && AllNpcCount > 0 && Npcs.Count == 0;
+    /// <summary>True once loading has finished without error, the form isn't showing, the campaign
+    /// has at least one NPC, but none of them match the current search/filter -- distinct from
+    /// <see cref="IsEmpty"/> so the messaging can say "no matches" rather than "no NPCs yet".</summary>
+    public bool IsNoSearchResults => !IsLoading && !HasLoadError && !IsFormVisible && AllNpcCount > 0 && Npcs.Count == 0;
 
     /// <summary>Whether the search box and faction/location/sort controls should show at all --
-    /// there's nothing to search/filter/sort when the campaign has zero NPCs, so the empty state
-    /// gets the screen to itself instead of a search bar that can only ever show "no matches".</summary>
-    public bool IsSearchBarVisible => !IsLoading && !HasLoadError && AllNpcCount > 0;
+    /// there's nothing to search/filter/sort when the campaign has zero NPCs, and the form (issue
+    /// #25) takes over the whole screen while it's showing, same as
+    /// <see cref="CharactersViewModel"/>'s form hiding its roster.</summary>
+    public bool IsSearchBarVisible => !IsLoading && !HasLoadError && !IsFormVisible && AllNpcCount > 0;
+
+    /// <summary>The shared create/edit form (issue #25) -- see this class's remarks for why it's
+    /// composed in-place rather than a separate destination/window.</summary>
+    public NpcFormViewModel Form { get; }
 
     public bool IsSortedByName => SortOrder == NpcSortOrder.Name;
 
@@ -188,6 +231,37 @@ public sealed partial class NpcsViewModel : ViewModelBase
     /// button shows at all. Deliberately doesn't consider <see cref="SortOrder"/>: sorting reorders
     /// the same NPCs rather than narrowing which ones show, so it isn't a "filter" to clear.</summary>
     public bool HasActiveFilters => SearchText.Trim().Length > 0 || SelectedFaction != AllOption || SelectedLocation != AllOption;
+
+    /// <summary>Opens <see cref="Form"/> in create mode -- mirrors
+    /// <see cref="CharactersViewModel.ShowCreateFormCommand"/>.</summary>
+    [RelayCommand]
+    private void ShowCreateForm()
+    {
+        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
+        if (campaignId is null)
+        {
+            // This screen is only reachable via a nav item gated on an active campaign existing
+            // (see this class's remarks) -- defense-in-depth only, not expected in practice.
+            return;
+        }
+
+        Form.BeginCreate(campaignId.Value);
+        IsFormVisible = true;
+    }
+
+    /// <summary>Click-through to edit -- opens <see cref="Form"/> pre-populated with
+    /// <paramref name="item"/>'s NPC, in place. Mirrors <see cref="CharactersViewModel.Select"/>.</summary>
+    [RelayCommand]
+    private void Select(NpcListItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        Form.BeginEdit(item.Npc);
+        IsFormVisible = true;
+    }
 
     [RelayCommand]
     private void SortByName() => SortOrder = NpcSortOrder.Name;
@@ -333,6 +407,23 @@ public sealed partial class NpcsViewModel : ViewModelBase
 
     private static bool Matches(string value, string term) => value.Contains(term, StringComparison.OrdinalIgnoreCase);
 
+    private async Task OnFormSavedAsync(Npc npc)
+    {
+        IsFormVisible = false;
+        await LoadAsync();
+    }
+
+    private void OnFormCancelled()
+    {
+        IsFormVisible = false;
+    }
+
+    private async Task OnFormDeletedAsync()
+    {
+        IsFormVisible = false;
+        await LoadAsync();
+    }
+
     private void OnActiveCampaignChanged()
     {
         // ActiveCampaignContext.ActiveCampaignChanged can fire from a non-UI thread (Android
@@ -358,9 +449,13 @@ public sealed partial class NpcsViewModel : ViewModelBase
     /// order deliberately carry over across the switch (a GM's typing shouldn't vanish just because
     /// they tapped a different campaign in the nav), while the faction/location selections reset
     /// only if the new campaign doesn't have that value at all -- see <see cref="RebuildFilterOptions"/>.
+    /// Also closes <see cref="Form"/> since it may be mid-edit of an NPC that belongs to a campaign
+    /// that's no longer active -- mirrors <c>CharactersViewModel.HandleActiveCampaignChanged</c>'s
+    /// identical handling.
     /// </remarks>
     internal void HandleActiveCampaignChanged()
     {
+        IsFormVisible = false;
         _ = LoadAsync();
     }
 }

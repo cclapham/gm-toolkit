@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:views="using:GmToolkit.UI.Views"
              xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.NpcsView"
@@ -12,16 +13,23 @@
     </Design.DataContext>
 
     <UserControl.Styles>
-        <!-- NPC list row chrome. Read-only (issue #24 has no click-through, unlike
-             CharactersView.axaml's characterRow), so this is a plain, non-interactive Border, not
-             a Button. -->
-        <Style Selector="Border.npcRow">
+        <!-- NPC list row chrome. Now a click target (issue #25's click-through to edit, see
+             NpcsViewModel.SelectCommand), so, same "whole row is one Button" idiom as
+             CharactersView.axaml's characterRow, this is a Button, not a Border. The
+             known-to-players badge inside the row stays a Border (not a Button), so there's still
+             no Button-in-Button ambiguity. -->
+        <Style Selector="Button.npcRow">
             <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <!-- Padding="12" mirrors SpaceMD, see the note in Styles/Spacing.axaml. -->
             <Setter Property="Padding" Value="12" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.npcRow:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
         </Style>
 
         <!-- "Known to players" badge: SuccessBrush (not AccentBrush, which CampaignsView.axaml
@@ -51,11 +59,25 @@
     <!-- Padding="24" mirrors SpaceLG, see the note in Styles/Spacing.axaml. -->
     <Border Background="{DynamicResource BgBrush}" Padding="24">
         <Grid RowDefinitions="Auto,Auto,*" MaxWidth="720" HorizontalAlignment="Stretch">
-            <TextBlock Grid.Row="0"
-                       Classes="display"
-                       Foreground="{DynamicResource TextBrush}"
-                       Text="NPCs"
-                       Margin="0,0,0,16" />
+            <!-- Title + "+ Add NPC" (issue #25). The button is bound to IsSearchBarVisible rather
+                 than IsListVisible (unlike CharactersView.axaml's header button, which is only
+                 gated on its two-state IsListVisible), IsSearchBarVisible is already true for
+                 both IsListVisible and IsNoSearchResults (both show the search bar, see
+                 NpcsViewModel.IsSearchBarVisible's remarks), so this one binding covers both
+                 populated-list states without a new property, while the Empty state below keeps its
+                 own dedicated "Add your first NPC" button (same split CharactersView.axaml uses). -->
+            <WrapPanel Grid.Row="0" Margin="0,0,0,16">
+                <TextBlock Classes="display"
+                           Foreground="{DynamicResource TextBrush}"
+                           Text="NPCs"
+                           VerticalAlignment="Center"
+                           Margin="0,0,16,8" />
+                <Button Classes="accent"
+                        Content="+ Add NPC"
+                        Command="{Binding ShowCreateFormCommand}"
+                        IsVisible="{Binding IsSearchBarVisible}"
+                        Margin="0,0,0,8" />
+            </WrapPanel>
 
             <!-- Search/filter/sort bar (issue #24), only shown once there's at least one NPC to
                  search, filter or sort; see NpcsViewModel.IsSearchBarVisible's remarks. WrapPanel
@@ -107,10 +129,10 @@
                 <Button Classes="accent" Content="Try again" Command="{Binding RetryLoadCommand}" HorizontalAlignment="Left" />
             </StackPanel>
 
-            <!-- Empty state: the active campaign has no NPCs yet at all. No "add your first NPC"
-                 button here, unlike CharactersView.axaml/CampaignsView.axaml's empty states,
-                 since issue #24 is deliberately read-only; there's no create/edit screen to link
-                 to until issue #25 builds one. -->
+            <!-- Empty state: the active campaign has no NPCs yet at all. Has its own dedicated
+                 create button (issue #25); the header's "+ Add NPC" button above is bound to
+                 IsSearchBarVisible, which is false here (see that binding's remarks), so this state
+                 needs its own, same split as CharactersView.axaml/CampaignsView.axaml's empty states. -->
             <StackPanel Grid.Row="2"
                         IsVisible="{Binding IsEmpty}"
                         Spacing="{StaticResource SpaceMD}"
@@ -121,7 +143,11 @@
                 <TextBlock Classes="body"
                            Foreground="{DynamicResource TextBrush}"
                            TextWrapping="Wrap"
-                           Text="This is where the active campaign's non-player characters will live, with search and filter by faction/location." />
+                           Text="This is where the active campaign's non-player characters live, with search and filter by faction/location. Add your first NPC to get started." />
+                <Button Classes="accent"
+                        Content="Add your first NPC"
+                        Command="{Binding ShowCreateFormCommand}"
+                        HorizontalAlignment="Left" />
             </StackPanel>
 
             <!-- No-search-results state, distinct from IsEmpty above: the campaign has NPCs, but
@@ -153,14 +179,17 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:NpcListItemViewModel">
-                            <Border Classes="npcRow">
+                            <Button Classes="npcRow"
+                                    Command="{Binding $parent[UserControl].((vm:NpcsViewModel)DataContext).SelectCommand}"
+                                    CommandParameter="{Binding}">
                                 <StackPanel Spacing="{StaticResource SpaceXS}">
                                     <WrapPanel>
                                         <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding Name}" Margin="0,0,16,0" />
                                         <!-- Known-to-players badge (issue #24's own task): visible
                                              only for NPCs the players already know about, next to
                                              the name so it's the first thing a GM's eye catches
-                                             when scanning the row. -->
+                                             when scanning the row. Stays a Border, not a Button;
+                                             see UserControl.Styles' remark on Button.npcRow. -->
                                         <Border Classes="knownToPlayersBadge" IsVisible="{Binding KnownToPlayers}" Margin="0,0,16,0">
                                             <TextBlock Classes="caption" Text="Known to players" />
                                         </Border>
@@ -176,11 +205,17 @@
                                                TextWrapping="NoWrap"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                            </Border>
+                            </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+
+            <!-- In-place create/edit form (#25), see NpcsViewModel's remarks for why this is a mode
+                 switch within this one screen rather than a separate Window/destination. -->
+            <ContentControl Grid.Row="2" IsVisible="{Binding IsFormVisible}">
+                <views:NpcFormView DataContext="{Binding Form}" />
+            </ContentControl>
         </Grid>
     </Border>
 </UserControl>

@@ -1,0 +1,165 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:views="using:GmToolkit.UI.Views"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="800"
+             x:Class="GmToolkit.UI.Views.NpcFormView"
+             x:DataType="vm:NpcFormViewModel">
+    <Design.DataContext>
+        <vm:NpcFormViewModel />
+    </Design.DataContext>
+
+    <!-- Shared create/edit form (#25), see NpcFormViewModel's remarks for the validation approach,
+         the Faction/Location autocomplete suggestion lists, and the unsaved-changes/delete guards.
+         Embedded in-place inside NpcsView.axaml rather than shown as a separate Window/destination,
+         same reasoning as CharacterFormView/CharactersViewModel. -->
+    <ScrollViewer>
+        <StackPanel Spacing="{StaticResource SpaceMD}" MaxWidth="560" HorizontalAlignment="Left">
+            <TextBlock Classes="title" Foreground="{DynamicResource TextBrush}" Text="{Binding FormTitle}" />
+
+            <StackPanel IsVisible="{Binding IsFieldsVisible}" Spacing="{StaticResource SpaceMD}">
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Name" />
+                    <!-- No separate error TextBlock here: TextBox's Fluent control theme already
+                         renders INotifyDataErrorInfo errors automatically, same as CampaignFormView/
+                         CharacterFormView. -->
+                    <TextBox Text="{Binding Name, Mode=TwoWay}" PlaceholderText="e.g. Baelor the Butcher" />
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Role" />
+                    <TextBox Text="{Binding Role, Mode=TwoWay}" PlaceholderText="e.g. Blacksmith, City Guard Captain" />
+                </StackPanel>
+
+                <!-- Faction/Location: free-text AutoCompleteBox, not a constrained ComboBox: a GM
+                     can type a brand-new value that doesn't exist yet. ItemsSource is a suggestion
+                     list built from this campaign's other NPCs (see NpcFormViewModel.FactionSuggestions/
+                     LocationSuggestions' remarks for why this differs from NpcsView.axaml's
+                     All-inclusive dropdown filters), FilterMode="Contains" so typing any substring
+                     (not just a prefix) narrows the suggestions. -->
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="{StaticResource SpaceXS}" Margin="0,0,8,0">
+                        <TextBlock Classes="caption" Text="Faction" />
+                        <AutoCompleteBox Text="{Binding Faction, Mode=TwoWay}"
+                                         ItemsSource="{Binding FactionSuggestions}"
+                                         FilterMode="Contains"
+                                         PlaceholderText="e.g. The Iron Concord" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpaceXS}">
+                        <TextBlock Classes="caption" Text="Location" />
+                        <AutoCompleteBox Text="{Binding Location, Mode=TwoWay}"
+                                         ItemsSource="{Binding LocationSuggestions}"
+                                         FilterMode="Contains"
+                                         PlaceholderText="e.g. Blackmoor Docks" />
+                    </StackPanel>
+                </Grid>
+
+                <CheckBox Content="Known to players" IsChecked="{Binding KnownToPlayers, Mode=TwoWay}" />
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Appearance" />
+                    <TextBox Text="{Binding Appearance, Mode=TwoWay}" PlaceholderText="What does this NPC look like?" AcceptsReturn="True" TextWrapping="Wrap" Height="60" />
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Mannerism" />
+                    <TextBox Text="{Binding Mannerism, Mode=TwoWay}" PlaceholderText="A verbal tic, gesture, or habit." AcceptsReturn="True" TextWrapping="Wrap" Height="60" />
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Motivation" />
+                    <TextBox Text="{Binding Motivation, Mode=TwoWay}" PlaceholderText="What does this NPC want?" AcceptsReturn="True" TextWrapping="Wrap" Height="60" />
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Secret" />
+                    <TextBox Text="{Binding Secret, Mode=TwoWay}" PlaceholderText="Something the players don't know yet." AcceptsReturn="True" TextWrapping="Wrap" Height="60" />
+                </StackPanel>
+
+                <StackPanel Spacing="{StaticResource SpaceXS}">
+                    <TextBlock Classes="caption" Text="Notes" />
+                    <!-- Reusable markdown edit/preview control (#22): see MarkdownNotesEditor's
+                         remarks for why it carries no Npc-specific knowledge. -->
+                    <views:MarkdownNotesEditor Text="{Binding Notes, Mode=TwoWay}"
+                                                PlaceholderText="Anything else worth remembering about this NPC." />
+                </StackPanel>
+
+                <TextBlock Classes="caption"
+                           Foreground="{DynamicResource DangerBrush}"
+                           Text="{Binding SaveError}"
+                           IsVisible="{Binding SaveError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Spacing="8" mirrors SpaceSM, see the note in Styles/Spacing.axaml. -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="accent"
+                            Content="{Binding SaveButtonLabel}"
+                            Command="{Binding SaveCommand}"
+                            IsEnabled="{Binding CanSave}" />
+                    <Button Content="Cancel" Command="{Binding CancelCommand}" />
+                </StackPanel>
+
+                <!-- Delete (#25) - only available once there's an existing NPC to delete. Kept
+                     visually separated from Save/Cancel above so it doesn't read as part of the
+                     same primary action group. -->
+                <Border IsVisible="{Binding IsDeleteAvailable}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="0,12,0,0">
+                    <Button Content="Delete NPC"
+                            Foreground="{DynamicResource DangerBrush}"
+                            Command="{Binding RequestDeleteCommand}" />
+                </Border>
+            </StackPanel>
+
+            <!-- Inline unsaved-changes guard, no popup dialog (see NpcFormViewModel's remarks and
+                 this app's no-popup-Windows constraint). -->
+            <Border IsVisible="{Binding IsShowingDiscardConfirmation}"
+                    Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="body" Foreground="{DynamicResource TextBrush}" Text="Discard unsaved changes?" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="accent" Content="Keep editing" Command="{Binding CancelDiscardCommand}" />
+                        <Button Content="Discard changes" Command="{Binding ConfirmDiscardCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Inline delete-confirmation guard (#25): same type-the-name-to-confirm idiom as
+                 CharacterFormView.axaml's delete flow (#21); see
+                 NpcFormViewModel.CanConfirmDelete's remarks. -->
+            <Border IsVisible="{Binding IsShowingDeleteConfirmation}"
+                    Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource DangerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                <StackPanel Spacing="{StaticResource SpaceSM}">
+                    <TextBlock Classes="body"
+                               Foreground="{DynamicResource TextBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding Name, StringFormat='Permanently delete &quot;{0}&quot;? This cannot be undone.'}" />
+                    <TextBlock Classes="caption" Text="Type the NPC's name to confirm:" />
+                    <TextBox Text="{Binding DeleteConfirmationInput, Mode=TwoWay}" PlaceholderText="{Binding Name}" />
+                    <TextBlock Classes="caption"
+                               Foreground="{DynamicResource DangerBrush}"
+                               Text="{Binding DeleteError}"
+                               IsVisible="{Binding DeleteError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="accent" Content="Cancel" Command="{Binding CancelDeleteCommand}" />
+                        <Button Content="Delete NPC"
+                                Foreground="{DynamicResource DangerBrush}"
+                                Command="{Binding ConfirmDeleteCommand}"
+                                IsEnabled="{Binding CanConfirmDelete}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
