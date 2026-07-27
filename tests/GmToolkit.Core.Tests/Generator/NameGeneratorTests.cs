@@ -58,13 +58,70 @@ public class NameGeneratorTests
     }
 
     [Fact]
-    public void Generate_with_an_unrecognized_culture_throws()
+    public void Generate_with_an_unrecognized_culture_falls_back_instead_of_throwing()
+    {
+        // #27 changed this from throwing (#26's original behavior) to a sensible fallback: an
+        // unrecognized culture should never prevent a name from being generated.
+        var highland = MakeCultureTable("highland", ["Brennic"], ["Stonevale"]);
+        var generator = new NameGenerator([highland]);
+        var random = new SystemRandomSource(1);
+
+        var name = generator.Generate(random, culture: "nonexistent");
+
+        // Only one culture is registered, so the fallback has nowhere else to land.
+        Assert.Equal("Brennic Stonevale", name);
+    }
+
+    [Fact]
+    public void GenerateWithNotice_with_an_existing_culture_reports_no_fallback()
+    {
+        var highland = MakeCultureTable("highland", ["Brennic"], ["Stonevale"]);
+        var coastal = MakeCultureTable("coastal", ["Marin"], ["Wavecrest"]);
+        var generator = new NameGenerator([highland, coastal]);
+        var random = new SystemRandomSource(7);
+
+        var result = generator.GenerateWithNotice(random, culture: "coastal");
+
+        Assert.Equal("Marin Wavecrest", result.Value);
+        Assert.Null(result.FallbackNotice);
+        Assert.False(result.FellBack);
+    }
+
+    [Fact]
+    public void GenerateWithNotice_with_an_unrecognized_culture_falls_back_and_reports_a_notice()
     {
         var highland = MakeCultureTable("highland", ["Brennic"], ["Stonevale"]);
         var generator = new NameGenerator([highland]);
         var random = new SystemRandomSource(1);
 
-        Assert.Throws<ArgumentException>(() => generator.Generate(random, culture: "nonexistent"));
+        var result = generator.GenerateWithNotice(random, culture: "nonexistent");
+
+        Assert.False(string.IsNullOrWhiteSpace(result.Value));
+        Assert.Equal("Brennic Stonevale", result.Value);
+        Assert.True(result.FellBack);
+        Assert.NotNull(result.FallbackNotice);
+        Assert.Contains("nonexistent", result.FallbackNotice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Generate_with_an_explicit_culture_never_draws_from_the_other_culture_across_many_draws()
+    {
+        var highland = MakeCultureTable("highland", ["Brennic", "Torvald", "Ilsevet"], ["Stonevale", "Ironpeak", "Ashcairn"]);
+        var coastal = MakeCultureTable("coastal", ["Marin", "Talia", "Corin"], ["Wavecrest", "Saltmoor", "Driftholm"]);
+        var generator = new NameGenerator([highland, coastal]);
+        var random = new SystemRandomSource(42);
+
+        var coastalGivenNames = coastal.Entries.Where(e => e.Tags.Contains("given")).Select(e => e.Value).ToHashSet();
+        var coastalSurnames = coastal.Entries.Where(e => e.Tags.Contains("surname")).Select(e => e.Value).ToHashSet();
+
+        for (var i = 0; i < 100; i++)
+        {
+            var name = generator.Generate(random, culture: "highland");
+            var parts = name.Split(' ', 2);
+
+            Assert.DoesNotContain(parts[0], coastalGivenNames);
+            Assert.DoesNotContain(parts[1], coastalSurnames);
+        }
     }
 
     [Fact]

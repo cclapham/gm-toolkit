@@ -73,4 +73,17 @@ public sealed class GeneratorRegistry : IGeneratorRegistry
 
     public NameGenerator GetNameGenerator()
         => _nameGenerator ?? throw new KeyNotFoundException("No 'names' category tables are registered.");
+
+    public TableGenerator GetTableGenerator(string category)
+    {
+        var generator = GetGenerator(category);
+        if (generator is not TableGenerator tableGenerator)
+        {
+            throw new InvalidOperationException(
+                $"Category '{category}' is not backed by a single-table {nameof(TableGenerator)} "
+                + $"(e.g. \"names\" is a {nameof(NameGenerator)} — use {nameof(GetNameGenerator)} instead).");
+        }
+
+        return tableGenerator;
+    }
 }

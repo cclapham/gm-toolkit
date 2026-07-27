@@ -34,4 +34,16 @@ public interface IGeneratorRegistry
     /// <see cref="KeyNotFoundException"/> if no "names" category tables are registered.
     /// </summary>
     NameGenerator GetNameGenerator();
+
+    /// <summary>
+    /// Gets the registry's <see cref="TableGenerator"/> for <paramref name="category"/> directly
+    /// (rather than through the narrower <see cref="IGenerator{TResult}"/> view
+    /// <see cref="GetGenerator"/> returns), so a caller that needs the tag-aware overload — #27's
+    /// explicit required-tag filtering, e.g. occupation category — can reach it. Throws
+    /// <see cref="KeyNotFoundException"/> if no generator is registered for <paramref name="category"/>,
+    /// and <see cref="InvalidOperationException"/> if <paramref name="category"/> is "names" (backed
+    /// by a <see cref="NameGenerator"/>, not a <see cref="TableGenerator"/> — use
+    /// <see cref="GetNameGenerator"/> instead).
+    /// </summary>
+    TableGenerator GetTableGenerator(string category);
 }
