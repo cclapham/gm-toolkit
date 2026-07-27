@@ -110,6 +110,104 @@ public class NpcGeneratorTests
     }
 
     [Fact]
+    public void GenerateField_with_a_name_culture_constraint_produces_only_that_culture_across_many_draws()
+    {
+        var generator = CreateGeneratorOverRealTables();
+        var registry = GeneratorRegistry.FromEmbeddedTables();
+        var nameGenerator = registry.GetNameGenerator();
+        var highlandGiven = nameGenerator.Cultures.Contains("highland", StringComparer.OrdinalIgnoreCase);
+        Assert.True(highlandGiven, "Expected the real embedded name tables to include a 'highland' culture.");
+
+        var random = new SystemRandomSource(11);
+        var constraints = new GeneratorConstraints { NameCulture = "highland" };
+
+        for (var i = 0; i < 50; i++)
+        {
+            var result = generator.GenerateField(NpcField.Name, random, constraints);
+
+            Assert.False(string.IsNullOrWhiteSpace(result.Value));
+            Assert.False(result.FellBack);
+            Assert.Null(result.FallbackNotice);
+        }
+    }
+
+    [Fact]
+    public void GenerateField_with_an_unrecognized_name_culture_never_throws_or_returns_empty_and_reports_a_notice()
+    {
+        var generator = CreateGeneratorOverRealTables();
+        var random = new SystemRandomSource(3);
+        var constraints = new GeneratorConstraints { NameCulture = "atlantean" };
+
+        var result = generator.GenerateField(NpcField.Name, random, constraints);
+
+        Assert.False(string.IsNullOrWhiteSpace(result.Value));
+        Assert.True(result.FellBack);
+        Assert.NotNull(result.FallbackNotice);
+    }
+
+    [Fact]
+    public void GenerateField_with_an_occupation_category_constraint_produces_only_that_category_across_many_draws()
+    {
+        var generator = CreateGeneratorOverRealTables();
+        var random = new SystemRandomSource(13);
+        var constraints = new GeneratorConstraints { OccupationCategory = "criminal" };
+
+        for (var i = 0; i < 50; i++)
+        {
+            var result = generator.GenerateField(NpcField.Role, random, constraints);
+
+            Assert.False(string.IsNullOrWhiteSpace(result.Value));
+            Assert.False(result.FellBack);
+            Assert.Null(result.FallbackNotice);
+        }
+    }
+
+    [Fact]
+    public void GenerateField_with_an_unrecognized_occupation_category_never_throws_or_returns_empty_and_reports_a_notice()
+    {
+        var generator = CreateGeneratorOverRealTables();
+        var random = new SystemRandomSource(21);
+        var constraints = new GeneratorConstraints { OccupationCategory = "does-not-exist" };
+
+        var result = generator.GenerateField(NpcField.Role, random, constraints);
+
+        Assert.False(string.IsNullOrWhiteSpace(result.Value));
+        Assert.True(result.FellBack);
+        Assert.NotNull(result.FallbackNotice);
+    }
+
+    [Theory]
+    [InlineData(NpcField.Appearance)]
+    [InlineData(NpcField.Mannerism)]
+    [InlineData(NpcField.Motivation)]
+    [InlineData(NpcField.Secret)]
+    public void GenerateField_with_constraints_ignores_them_for_fields_that_have_no_defined_constraint(NpcField field)
+    {
+        var generator = CreateGeneratorOverRealTables();
+        var random = new SystemRandomSource(31);
+        var constraints = new GeneratorConstraints { NameCulture = "highland", OccupationCategory = "trade" };
+
+        var result = generator.GenerateField(field, random, constraints);
+
+        Assert.False(string.IsNullOrWhiteSpace(result.Value));
+        Assert.False(result.FellBack);
+        Assert.Null(result.FallbackNotice);
+    }
+
+    [Fact]
+    public void GenerateField_with_GeneratorConstraints_None_behaves_like_the_unconstrained_overload()
+    {
+        var generatorA = CreateGeneratorOverRealTables();
+        var generatorB = CreateGeneratorOverRealTables();
+
+        var unconstrained = generatorA.GenerateField(NpcField.Role, new SystemRandomSource(55));
+        var constrained = generatorB.GenerateField(NpcField.Role, new SystemRandomSource(55), GeneratorConstraints.None);
+
+        Assert.Equal(unconstrained, constrained.Value);
+        Assert.False(constrained.FellBack);
+    }
+
+    [Fact]
     public void Rerolling_one_field_does_not_require_regenerating_the_whole_npc()
     {
         var generator = CreateGeneratorOverRealTables();
