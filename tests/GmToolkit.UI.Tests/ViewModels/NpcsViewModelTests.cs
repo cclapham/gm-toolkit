@@ -418,4 +418,156 @@ public class NpcsViewModelTests
 
         Assert.Null(exception);
     }
+
+    // -- Issue #25: create/edit/delete folded into the list's three states plus search bar --
+
+    [Fact]
+    public void ShowCreateFormCommand_opens_the_form_in_create_mode_and_hides_the_empty_state()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var vm = new NpcsViewModel(new FakeNpcRepository(), ActiveContextFor(campaign));
+        Assert.True(vm.IsEmpty);
+
+        vm.ShowCreateFormCommand.Execute(null);
+
+        Assert.True(vm.IsFormVisible);
+        Assert.False(vm.Form.IsEditMode);
+        Assert.False(vm.IsEmpty);
+        Assert.False(vm.IsListVisible);
+        Assert.False(vm.IsNoSearchResults);
+        Assert.False(vm.IsSearchBarVisible);
+    }
+
+    [Fact]
+    public void ShowCreateFormCommand_hides_the_populated_list_and_search_bar_too()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher");
+        var vm = new NpcsViewModel(new FakeNpcRepository(npc), ActiveContextFor(campaign));
+        Assert.True(vm.IsListVisible);
+        Assert.True(vm.IsSearchBarVisible);
+
+        vm.ShowCreateFormCommand.Execute(null);
+
+        Assert.True(vm.IsFormVisible);
+        Assert.False(vm.IsListVisible);
+        Assert.False(vm.IsSearchBarVisible);
+    }
+
+    [Fact]
+    public void ShowCreateFormCommand_hides_the_no_search_results_state_too()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher");
+        var vm = new NpcsViewModel(new FakeNpcRepository(npc), ActiveContextFor(campaign));
+        vm.SearchText = "no such npc exists";
+        Assert.True(vm.IsNoSearchResults);
+
+        vm.ShowCreateFormCommand.Execute(null);
+
+        Assert.True(vm.IsFormVisible);
+        Assert.False(vm.IsNoSearchResults);
+    }
+
+    [Fact]
+    public void SelectCommand_opens_the_form_in_edit_mode_populated_with_the_chosen_npc()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher", role: "Blacksmith");
+        var vm = new NpcsViewModel(new FakeNpcRepository(npc), ActiveContextFor(campaign));
+        var item = Assert.Single(vm.Npcs);
+
+        vm.SelectCommand.Execute(item);
+
+        Assert.True(vm.IsFormVisible);
+        Assert.True(vm.Form.IsEditMode);
+        Assert.Equal("Baelor the Butcher", vm.Form.Name);
+        Assert.Equal("Blacksmith", vm.Form.Role);
+        Assert.False(vm.IsListVisible);
+    }
+
+    [Fact]
+    public async Task Saving_a_new_npc_via_the_form_closes_it_and_reloads_the_list()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeNpcRepository();
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        vm.ShowCreateFormCommand.Execute(null);
+        vm.Form.Name = "Baelor the Butcher";
+
+        await vm.Form.SaveCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsFormVisible);
+        Assert.True(vm.IsListVisible);
+        Assert.Single(vm.Npcs);
+        Assert.Equal("Baelor the Butcher", vm.Npcs.Single().Name);
+    }
+
+    [Fact]
+    public async Task Saving_an_edited_npc_via_the_form_closes_it_and_reflects_the_change_in_the_list()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor");
+        var repository = new FakeNpcRepository(npc);
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        var item = Assert.Single(vm.Npcs);
+        vm.SelectCommand.Execute(item);
+        vm.Form.Name = "Baelor the Butcher";
+
+        await vm.Form.SaveCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsFormVisible);
+        Assert.Equal("Baelor the Butcher", vm.Npcs.Single().Name);
+    }
+
+    [Fact]
+    public void Cancelling_the_form_closes_it_without_changing_the_list()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher");
+        var vm = new NpcsViewModel(new FakeNpcRepository(npc), ActiveContextFor(campaign));
+        vm.ShowCreateFormCommand.Execute(null);
+
+        vm.Form.CancelCommand.Execute(null);
+
+        Assert.False(vm.IsFormVisible);
+        Assert.True(vm.IsListVisible);
+        Assert.Single(vm.Npcs);
+    }
+
+    [Fact]
+    public async Task Deleting_the_npc_being_edited_closes_the_form_and_removes_it_from_the_list()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher");
+        var repository = new FakeNpcRepository(npc);
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        var item = Assert.Single(vm.Npcs);
+        vm.SelectCommand.Execute(item);
+        vm.Form.RequestDeleteCommand.Execute(null);
+        vm.Form.DeleteConfirmationInput = "Baelor the Butcher";
+
+        await vm.Form.ConfirmDeleteCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsFormVisible);
+        Assert.True(vm.IsEmpty);
+        Assert.Empty(vm.Npcs);
+    }
+
+    [Fact]
+    public async Task Switching_the_active_campaign_while_the_form_is_open_closes_it()
+    {
+        var firstCampaign = new Campaign { Name = "Wandering Souls" };
+        var secondCampaign = new Campaign { Name = "Shadows Over Blackmoor" };
+        var campaignRepository = new FakeCampaignRepository(firstCampaign, secondCampaign);
+        var context = ActiveContextFor(firstCampaign, campaignRepository);
+        var vm = new NpcsViewModel(new FakeNpcRepository(), context);
+        vm.ShowCreateFormCommand.Execute(null);
+        Assert.True(vm.IsFormVisible);
+
+        await context.SelectCampaignAsync(secondCampaign);
+        vm.HandleActiveCampaignChanged();
+
+        Assert.False(vm.IsFormVisible);
+    }
 }
