@@ -16,8 +16,9 @@ namespace GmToolkit.UI.Services;
 /// <see cref="ShellViewModel"/>, which owns both this service and the active-campaign
 /// subscription. It does, however, need <see cref="ICampaignRepository"/>,
 /// <see cref="IPlayerCharacterRepository"/> and <see cref="ActiveCampaignContext"/> themselves
-/// (issue #17/#18, extended by #20/#21 for <see cref="IPlayerCharacterRepository"/>) purely to
-/// construct <see cref="CampaignsViewModel"/>/<see cref="CharactersViewModel"/> — the alternative
+/// (issue #17/#18, extended by #20/#21 for <see cref="IPlayerCharacterRepository"/> and by #24 for
+/// <see cref="INpcRepository"/>) purely to
+/// construct <see cref="CampaignsViewModel"/>/<see cref="CharactersViewModel"/>/<see cref="NpcsViewModel"/> — the alternative
 /// (resolving those view models from <see cref="IServiceProvider"/> instead) would mean this
 /// service depends on the DI container itself rather than its actual dependencies, which is worse
 /// for testability.
@@ -31,13 +32,13 @@ public sealed class NavigationService : INavigationService
     // cheap to do now, and avoids having to retrofit it later.
     private readonly Dictionary<NavigationDestination, ViewModelBase> _cache = [];
 
-    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, ActiveCampaignContext activeCampaignContext)
+    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, INpcRepository npcRepository, ActiveCampaignContext activeCampaignContext)
     {
         _factories = new Dictionary<NavigationDestination, Func<ViewModelBase>>
         {
             [NavigationDestination.Campaigns] = () => new CampaignsViewModel(campaignRepository, activeCampaignContext),
             [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext),
-            [NavigationDestination.Npcs] = () => new NpcsViewModel(),
+            [NavigationDestination.Npcs] = () => new NpcsViewModel(npcRepository, activeCampaignContext),
             [NavigationDestination.Generator] = () => new GeneratorViewModel(),
             [NavigationDestination.Settings] = () => new SettingsViewModel(),
         };
@@ -49,11 +50,12 @@ public sealed class NavigationService : INavigationService
     /// <summary>Design-time/test-only constructor -- used by the XAML previewer's
     /// <c>Design.DataContext</c> (via <see cref="ShellViewModel"/>'s own parameterless
     /// constructor) and by tests that don't need a real database. Backed by the same
-    /// always-empty, no-op <see cref="DesignTimeCampaignRepository"/>/<see cref="DesignTimePlayerCharacterRepository"/>
-    /// used elsewhere for this purpose. Never used at runtime; both heads resolve the constructor
-    /// above via DI (see <c>ServiceCollectionExtensions.AddGmToolkitUi</c>).</summary>
+    /// always-empty, no-op <see cref="DesignTimeCampaignRepository"/>/<see cref="DesignTimePlayerCharacterRepository"/>/
+    /// <see cref="DesignTimeNpcRepository"/> used elsewhere for this purpose. Never used at
+    /// runtime; both heads resolve the constructor above via DI (see
+    /// <c>ServiceCollectionExtensions.AddGmToolkitUi</c>).</summary>
     public NavigationService()
-        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new ActiveCampaignContext(new DesignTimeCampaignRepository()))
+        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new DesignTimeNpcRepository(), new ActiveCampaignContext(new DesignTimeCampaignRepository()))
     {
     }
 
