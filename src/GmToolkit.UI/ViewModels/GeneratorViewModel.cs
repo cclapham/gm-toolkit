@@ -1,28 +1,83 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 
+using Avalonia.Threading;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using GmToolkit.Core.Generator;
+using GmToolkit.Core.Models;
+using GmToolkit.Core.Repositories;
+using GmToolkit.Core.Services;
+using GmToolkit.UI.Design;
+using GmToolkit.UI.Services;
 
 namespace GmToolkit.UI.ViewModels;
 
 /// <summary>
-/// The NPC Generator screen (issue #28) -- "the feature the app exists for". Generates a full
+/// The NPC Generator screen (issues #28+#29) -- "the feature the app exists for". Generates a full
 /// <see cref="GeneratedNpc"/> in one action, lets the GM reroll or lock any one of its six fields
-/// independently, edit any field's current value inline, and constrain <see cref="Role"/>/
-/// <see cref="Name"/> generation by occupation category / name culture. Only reachable when a
-/// campaign is active -- see <c>ShellViewModel</c>'s gating logic -- but this class itself has no
-/// dependency on which campaign is active: it only produces a <see cref="GeneratedNpc"/> in memory,
-/// never persists anything. Saving a generated NPC into the active campaign is #29's job, not built
-/// here -- see this class's remarks.
+/// independently, edit any field's current value inline, constrain <see cref="Role"/>/
+/// <see cref="Name"/> generation by occupation category / name culture, and (issue #29) save the
+/// result into the active campaign as a real <see cref="Npc"/> with <see cref="Npc.WasGenerated"/>
+/// set to <c>true</c>. Only reachable when a campaign is active -- see <c>ShellViewModel</c>'s
+/// gating logic -- but see this class's remarks for how it still defends against a <c>null</c>
+/// active campaign at save time, same as every other repository-backed view model in this
+/// namespace.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>No save step, on purpose.</b> Issue #28's own scope note: persisting a generated NPC into the
-/// active campaign is issue #29, not yet built. This class only ever holds its six fields in memory;
-/// there is deliberately no command here that reaches an <c>INpcRepository</c>.
+/// <b>Saving builds a brand-new <see cref="Npc"/> straight from this screen's six generated fields
+/// plus two save-time-only inputs, then resets back to the empty state.</b> <see cref="Name"/>/
+/// <see cref="Role"/>/<see cref="Appearance"/>/<see cref="Mannerism"/>/<see cref="Motivation"/>/
+/// <see cref="Secret"/> map 1:1 onto <see cref="Npc"/>'s same-named properties; <see cref="Faction"/>/
+/// <see cref="Location"/> exist only here at save time (there are no faction/location generator
+/// tables, unlike every other field) and are never touched by <see cref="GenerateCommand"/> or any
+/// reroll command. <see cref="SaveCommand"/> persists via <see cref="INpcRepository.AddAsync"/>,
+/// sets <see cref="SaveConfirmationMessage"/>, then calls <see cref="ResetGenerator"/> to clear every
+/// field/lock back to <see cref="GeneratorViewModel"/>'s own "nothing generated yet" state (issue
+/// #29's own "generator resets ready for the next one" task) -- <see cref="SaveConfirmationMessage"/>
+/// itself is deliberately *not* cleared by the reset, so the confirmation (and its
+/// <see cref="ViewSavedNpcCommand"/> link) stays visible above the now-empty screen until the GM
+/// either clicks that link (navigating away) or starts generating the next NPC, at which point
+/// <see cref="Generate"/> clears it -- see that method's own remarks.
+/// </para>
+/// <para>
+/// <b>No toast/notification infrastructure -- an inline caption plus a real navigation button,
+/// same as issue #28's fallback notices.</b> Issue #32 (a real toast component) doesn't exist yet
+/// and is out of this issue's scope, same situation #28 was already in for
+/// <see cref="NameFallbackNotice"/>/<see cref="RoleFallbackNotice"/>. <see cref="ViewSavedNpcCommand"/>
+/// calls <see cref="INavigationService.NavigateTo"/> with <see cref="NavigationDestination.Npcs"/>
+/// directly -- it doesn't attempt to deep-link to the specific saved row, since
+/// <see cref="NpcsViewModel"/> has no such concept and this issue's acceptance criterion only
+/// requires the NPC to "appear in the list", which simply landing on that screen already satisfies.
+/// </para>
+/// <para>
+/// <b>An invalid (blank) <see cref="Name"/> disables <see cref="SaveCommand"/> rather than crashing
+/// or silently no-op-ing.</b> <see cref="Name"/> is editable inline (issue #28), so a GM could clear
+/// it to blank before saving even though it was always non-blank coming out of the generator itself.
+/// <see cref="NameError"/> revalidates on every <see cref="Name"/> change by going through
+/// <see cref="Npc.Name"/>'s own setter -- exactly mirroring <see cref="NpcFormViewModel.ValidateName"/>
+/// -- and <see cref="CanSave"/> (bound to <see cref="SaveCommand"/>'s <c>CanExecute</c>) is
+/// <c>false</c> whenever <see cref="NameError"/> is non-null, so the disabled Save button itself is
+/// the feedback; <see cref="SaveAsync"/> also re-validates as its first act (defense in depth,
+/// mirroring <see cref="NpcFormViewModel.ConfirmDeleteAsync"/>'s identical re-check) since
+/// <see cref="CommunityToolkit.Mvvm.Input.IAsyncRelayCommand.ExecuteAsync"/> does not itself call
+/// <c>CanExecute</c> first.
+/// </para>
+/// <para>
+/// <b><see cref="FactionSuggestions"/>/<see cref="LocationSuggestions"/> mirror
+/// <see cref="NpcFormViewModel"/>'s free-text autocomplete pattern, not <see cref="NpcsViewModel"/>'s
+/// constrained "All plus existing values" filter dropdowns.</b> Built from every NPC currently in
+/// the active campaign (via <see cref="INpcRepository.GetByCampaignAsync"/>), same "distinct,
+/// non-blank, alphabetical" idiom as <see cref="NpcFormViewModel.LoadSuggestionsAsync"/>'s
+/// <c>DistinctNonBlank</c>. Unlike that class (which only ever needs to (re)build suggestions when
+/// its own <c>BeginCreate</c>/<c>BeginEdit</c> is called), this view model is cached for the app's
+/// whole lifetime once the Generator screen has been visited once (see this class's remarks below on
+/// <see cref="_random"/>'s identical lifetime) -- so suggestions are also rebuilt whenever
+/// <see cref="ActiveCampaignContext.ActiveCampaignChanged"/> fires (e.g. the GM switches to a
+/// different campaign and later comes back to this screen), not just once at construction time.
 /// </para>
 /// <para>
 /// <b>One shared <see cref="IRandomSource"/> for this view model's entire lifetime, not one per
@@ -107,12 +162,17 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     private const string OccupationCategory = "occupation";
 
     private readonly INpcGenerator _npcGenerator;
+    private readonly INpcRepository _npcRepository;
+    private readonly ActiveCampaignContext _activeCampaignContext;
+    private readonly INavigationService _navigationService;
 
     // Constructed once and reused for this instance's entire lifetime -- see this class's remarks.
     private readonly IRandomSource _random;
 
-    public GeneratorViewModel(IGeneratorRegistry registry, INpcGenerator npcGenerator)
-        : this(registry, npcGenerator, new SystemRandomSource())
+    private bool _canSave;
+
+    public GeneratorViewModel(IGeneratorRegistry registry, INpcGenerator npcGenerator, INpcRepository npcRepository, ActiveCampaignContext activeCampaignContext, INavigationService navigationService)
+        : this(registry, npcGenerator, npcRepository, activeCampaignContext, navigationService, new SystemRandomSource())
     {
     }
 
@@ -121,28 +181,43 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     /// <c>InternalsVisibleTo</c>) -- the public constructor above always uses real,
     /// non-deterministic randomness (see this class's remarks on why) and is what both heads
     /// actually resolve via DI.</summary>
-    internal GeneratorViewModel(IGeneratorRegistry registry, INpcGenerator npcGenerator, IRandomSource random)
+    internal GeneratorViewModel(IGeneratorRegistry registry, INpcGenerator npcGenerator, INpcRepository npcRepository, ActiveCampaignContext activeCampaignContext, INavigationService navigationService, IRandomSource random)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(npcGenerator);
+        ArgumentNullException.ThrowIfNull(npcRepository);
+        ArgumentNullException.ThrowIfNull(activeCampaignContext);
+        ArgumentNullException.ThrowIfNull(navigationService);
         ArgumentNullException.ThrowIfNull(random);
 
         _npcGenerator = npcGenerator;
+        _npcRepository = npcRepository;
+        _activeCampaignContext = activeCampaignContext;
+        _navigationService = navigationService;
         _random = random;
 
         NameCultureOptions = new ObservableCollection<string>(
             new[] { AnyOption }.Concat(registry.GetNameGenerator().Cultures.Where(c => !string.IsNullOrWhiteSpace(c))));
         OccupationCategoryOptions = new ObservableCollection<string>(
             new[] { AnyOption }.Concat(LoadOccupationCategoryOptions()));
+
+        _activeCampaignContext.ActiveCampaignChanged += OnActiveCampaignChanged;
+
+        if (_activeCampaignContext.ActiveCampaign is { } activeCampaign)
+        {
+            _ = LoadSuggestionsAsync(activeCampaign.Id);
+        }
     }
 
     /// <summary>Design-time-only constructor for the XAML previewer's <c>Design.DataContext</c> (see
     /// <c>GeneratorView.axaml</c>) -- builds a real <see cref="GeneratorRegistry"/>/<see cref="NpcGenerator"/>
     /// over the embedded tables rather than a design-time fake, since (unlike the repository-backed
     /// view models elsewhere in this namespace) neither type touches <c>GmToolkit.Data</c> or anything
-    /// else unavailable at design time. Never used at runtime; both heads resolve the constructor
-    /// above via DI (see <c>ServiceCollectionExtensions.AddGmToolkitUi</c> and
-    /// <c>Services.NavigationService</c>).</summary>
+    /// else unavailable at design time; <see cref="INpcRepository"/>/<see cref="ActiveCampaignContext"/>/
+    /// <see cref="INavigationService"/> (issue #29's new dependencies) do need design-time fakes, same
+    /// as every other repository-backed view model's design-time constructor. Never used at runtime;
+    /// both heads resolve the constructor above via DI (see
+    /// <c>ServiceCollectionExtensions.AddGmToolkitUi</c> and <c>Services.NavigationService</c>).</summary>
     public GeneratorViewModel()
         : this(GeneratorRegistry.FromEmbeddedTables())
     {
@@ -153,9 +228,16 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     {
     }
 
+    private GeneratorViewModel(IGeneratorRegistry registry, INpcGenerator npcGenerator)
+        : this(registry, npcGenerator, new DesignTimeNpcRepository(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), new DesignTimeNavigationService())
+    {
+    }
+
     /// <summary>Whether a full NPC has been generated at least once this session -- gates the
     /// "nothing generated yet" empty state versus the six-field editing view (issue #28's own "two
-    /// screen states" design). Never reset back to <c>false</c> once set.</summary>
+    /// screen states" design). Set back to <c>false</c> by <see cref="ResetGenerator"/> after a
+    /// successful save (issue #29's "generator resets ready for the next one" task) -- otherwise
+    /// stays <c>true</c> once set.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(GenerateButtonLabel))]
     public partial bool HasGenerated { get; set; }
@@ -237,6 +319,64 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     [ObservableProperty]
     public partial ObservableCollection<string> OccupationCategoryOptions { get; set; } = [];
 
+    /// <summary>Save-time-only input (issue #29) -- never produced or touched by
+    /// <see cref="GenerateCommand"/>/any reroll command, since there is no faction generator table.
+    /// See this class's remarks.</summary>
+    [ObservableProperty]
+    public partial string Faction { get; set; } = string.Empty;
+
+    /// <summary>Save-time-only input (issue #29) -- see <see cref="Faction"/>'s remarks; there is no
+    /// location generator table either.</summary>
+    [ObservableProperty]
+    public partial string Location { get; set; } = string.Empty;
+
+    /// <summary>Distinct, non-blank <see cref="Npc.Faction"/> values already present across the
+    /// active campaign's NPCs -- see this class's remarks. Rebuilt at construction time and whenever
+    /// <see cref="ActiveCampaignContext.ActiveCampaignChanged"/> fires.</summary>
+    [ObservableProperty]
+    public partial ObservableCollection<string> FactionSuggestions { get; set; } = [];
+
+    /// <summary>Distinct, non-blank <see cref="Npc.Location"/> values already present across the
+    /// active campaign's NPCs -- see this class's remarks. Rebuilt at construction time and whenever
+    /// <see cref="ActiveCampaignContext.ActiveCampaignChanged"/> fires.</summary>
+    [ObservableProperty]
+    public partial ObservableCollection<string> LocationSuggestions { get; set; } = [];
+
+    /// <summary>First validation message for <see cref="Name"/> at save time, or <c>null</c> if it's
+    /// currently valid -- mirrors <see cref="NpcFormViewModel.NameError"/>. Revalidated on every
+    /// <see cref="Name"/> change (see <see cref="OnNameChanged(string)"/>), including ones made by
+    /// generate/reroll, not just the GM's own inline edits.</summary>
+    [ObservableProperty]
+    public partial string? NameError { get; set; }
+
+    /// <summary>Set if <see cref="SaveAsync"/>'s defensive catch is ever actually hit; <c>null</c>
+    /// otherwise. Mirrors <see cref="NpcFormViewModel.SaveError"/>.</summary>
+    [ObservableProperty]
+    public partial string? SaveError { get; set; }
+
+    /// <summary>Set by <see cref="SaveAsync"/> after a successful save (e.g. "Saved 'Baelor the
+    /// Butcher' to the campaign."); <c>null</c> before the first save this session, or once
+    /// <see cref="Generate"/> clears it for the next NPC. Deliberately *not* cleared by
+    /// <see cref="ResetGenerator"/> itself -- see this class's remarks on why the confirmation
+    /// outlives the reset.</summary>
+    [ObservableProperty]
+    public partial string? SaveConfirmationMessage { get; set; }
+
+    /// <summary>Whether <see cref="SaveCommand"/> can currently execute -- <c>false</c> whenever
+    /// <see cref="NameError"/> is set. Mirrors <see cref="NpcFormViewModel.CanSave"/>'s
+    /// <c>SetProperty</c>-plus-<c>NotifyCanExecuteChanged</c> shape.</summary>
+    public bool CanSave
+    {
+        get => _canSave;
+        private set
+        {
+            if (SetProperty(ref _canSave, value))
+            {
+                SaveCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
     /// <summary>
     /// Generates a brand-new NPC, or (once <see cref="HasGenerated"/> is already <c>true</c>)
     /// regenerates every field except whichever are currently locked -- issue #28's own acceptance
@@ -247,11 +387,15 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     /// values" -- the latter would still satisfy a naive reading of the acceptance criterion while
     /// actually re-rolling every field (including locked ones) before discarding those extra rolls,
     /// which is wasteful and, if a field's generator ever gained an observable side effect, wrong.
+    /// Also clears <see cref="SaveConfirmationMessage"/> (issue #29) -- a confirmation from a
+    /// previously saved NPC would otherwise keep showing above the newly-generating one, which would
+    /// misleadingly read as if it referred to whatever is currently on screen.
     /// </summary>
     [RelayCommand]
     private void Generate()
     {
         HasGenerated = true;
+        SaveConfirmationMessage = null;
 
         if (!IsNameLocked)
         {
@@ -348,6 +492,224 @@ public sealed partial class GeneratorViewModel : ViewModelBase
         }
 
         RerollSecretField();
+    }
+
+    /// <summary>
+    /// Persists the currently-generated NPC into the active campaign (issue #29's own reason for
+    /// being) and resets the screen for the next one -- see this class's remarks for the full
+    /// design. Re-validates <see cref="Name"/> as its first act, mirroring
+    /// <see cref="NpcFormViewModel.ConfirmDeleteAsync"/>'s identical defense-in-depth re-check of its
+    /// own <c>CanExecute</c> gate, since <see cref="IAsyncRelayCommand.ExecuteAsync"/> does not itself
+    /// call <c>CanExecute</c> first.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private async Task SaveAsync()
+    {
+        RefreshNameValidation();
+        if (!CanSave)
+        {
+            return;
+        }
+
+        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
+        if (campaignId is null)
+        {
+            // This screen is only reachable via a nav item gated on an active campaign existing
+            // (see this class's own summary) -- defense-in-depth only, not expected in practice.
+            return;
+        }
+
+        SaveError = null;
+
+        try
+        {
+            var npc = new Npc
+            {
+                CampaignId = campaignId.Value,
+                Name = Name,
+                Role = Role,
+                Faction = Faction,
+                Location = Location,
+                Appearance = Appearance,
+                Mannerism = Mannerism,
+                Motivation = Motivation,
+                Secret = Secret,
+                WasGenerated = true,
+            };
+
+            await _npcRepository.AddAsync(npc);
+
+            var savedName = npc.Name;
+            ResetGenerator();
+            SaveConfirmationMessage = $"Saved '{savedName}' to the campaign.";
+
+            _ = LoadSuggestionsAsync(campaignId.Value);
+        }
+        catch (ArgumentException ex)
+        {
+            // Defensive only -- RefreshNameValidation above already exercises this same domain
+            // setter, so this should be unreachable in practice. Mirrors
+            // NpcFormViewModel.SaveAsync's identical defensive catch.
+            SaveError = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            SaveError = $"Couldn't save this NPC: {ex.Message}";
+        }
+    }
+
+    /// <summary>Navigates to the NPCs list so the GM can see the just-saved NPC there -- see this
+    /// class's remarks for why this doesn't attempt to deep-link to the specific row.</summary>
+    [RelayCommand]
+    private void ViewSavedNpc() => _navigationService.NavigateTo(NavigationDestination.Npcs);
+
+    /// <summary>
+    /// Clears every generated field, lock flag and fallback notice back to
+    /// <see cref="GeneratorViewModel"/>'s own "nothing generated yet" state (issue #29's "generator
+    /// resets ready for the next one" task) -- but deliberately leaves
+    /// <see cref="SaveConfirmationMessage"/> untouched; see this class's remarks for why.
+    /// </summary>
+    private void ResetGenerator()
+    {
+        HasGenerated = false;
+
+        Name = string.Empty;
+        IsNameLocked = false;
+        NameFallbackNotice = null;
+
+        Role = string.Empty;
+        IsRoleLocked = false;
+        RoleFallbackNotice = null;
+
+        Appearance = string.Empty;
+        IsAppearanceLocked = false;
+
+        Mannerism = string.Empty;
+        IsMannerismLocked = false;
+
+        Motivation = string.Empty;
+        IsMotivationLocked = false;
+
+        Secret = string.Empty;
+        IsSecretLocked = false;
+
+        Faction = string.Empty;
+        Location = string.Empty;
+    }
+
+    /// <summary>Revalidates <see cref="NameError"/>/<see cref="CanSave"/> against <see cref="Name"/>'s
+    /// current value -- runs on every change to <see cref="Name"/>, whether from the GM's own typing
+    /// or a generate/reroll assigning a new generated value.</summary>
+    partial void OnNameChanged(string value) => RefreshNameValidation();
+
+    private void RefreshNameValidation()
+    {
+        NameError = ValidateName(Name);
+        CanSave = NameError is null;
+    }
+
+    /// <summary>
+    /// Validates <paramref name="name"/> by actually going through <see cref="Npc.Name"/>'s own
+    /// setter and surfacing whatever message its <see cref="ArgumentException"/> carries -- exactly
+    /// mirroring <see cref="NpcFormViewModel.ValidateName"/> for the same reason (one place -- the
+    /// domain model's setter -- owns what makes a name valid).
+    /// </summary>
+    private static string? ValidateName(string name)
+    {
+        try
+        {
+            _ = new Npc { Name = name };
+            return null;
+        }
+        catch (ArgumentException ex)
+        {
+            return StripParameterSuffix(ex);
+        }
+    }
+
+    private static string StripParameterSuffix(ArgumentException ex)
+    {
+        if (ex.ParamName is null)
+        {
+            return ex.Message;
+        }
+
+        var suffix = $" (Parameter '{ex.ParamName}')";
+        return ex.Message.EndsWith(suffix, StringComparison.Ordinal)
+            ? ex.Message[..^suffix.Length]
+            : ex.Message;
+    }
+
+    /// <summary>
+    /// Rebuilds <see cref="FactionSuggestions"/>/<see cref="LocationSuggestions"/> from every NPC
+    /// currently in <paramref name="campaignId"/> -- see this class's remarks. Fire-and-forget from
+    /// the constructor/<see cref="HandleActiveCampaignChanged"/>/<see cref="SaveAsync"/>; a failure
+    /// here is not blocking (it just leaves the suggestion list as it was), since autocomplete hints
+    /// are a convenience, not a requirement for saving.
+    /// </summary>
+    /// <remarks>
+    /// Guards its own result against the active campaign having moved on by the time the repository
+    /// call completes (e.g. the GM switched to a different campaign before this load finished) --
+    /// mirrors <see cref="NpcFormViewModel.LoadSuggestionsAsync"/>'s identical guard, caught during
+    /// the skeptical review of PR #58.
+    /// </remarks>
+    private async Task LoadSuggestionsAsync(Guid campaignId)
+    {
+        try
+        {
+            var npcs = await _npcRepository.GetByCampaignAsync(campaignId);
+            if (campaignId != _activeCampaignContext.ActiveCampaign?.Id)
+            {
+                return;
+            }
+
+            FactionSuggestions = new ObservableCollection<string>(DistinctNonBlank(npcs.Select(npc => npc.Faction)));
+            LocationSuggestions = new ObservableCollection<string>(DistinctNonBlank(npcs.Select(npc => npc.Location)));
+        }
+        catch
+        {
+            if (campaignId != _activeCampaignContext.ActiveCampaign?.Id)
+            {
+                return;
+            }
+
+            FactionSuggestions = [];
+            LocationSuggestions = [];
+        }
+    }
+
+    private static IEnumerable<string> DistinctNonBlank(IEnumerable<string> values) =>
+        values.Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
+
+    private void OnActiveCampaignChanged() => Dispatcher.UIThread.Post(HandleActiveCampaignChanged);
+
+    /// <summary>
+    /// The actual work done in response to <see cref="ActiveCampaignContext.ActiveCampaignChanged"/>,
+    /// factored out of <see cref="OnActiveCampaignChanged"/> so it's callable directly (bypassing
+    /// <see cref="Dispatcher.UIThread"/>) from tests that don't run inside an Avalonia dispatcher
+    /// loop -- mirrors <c>NpcsViewModel.HandleActiveCampaignChanged</c> (see <c>InternalsVisibleTo</c>
+    /// in <c>AssemblyInfo.cs</c>). Not called directly by application code.
+    /// </summary>
+    /// <remarks>
+    /// Only rebuilds <see cref="FactionSuggestions"/>/<see cref="LocationSuggestions"/> -- unlike
+    /// <c>NpcsViewModel.HandleActiveCampaignChanged</c>, this view model has no list to reload and
+    /// deliberately does not reset any in-progress generated NPC or clear
+    /// <see cref="SaveConfirmationMessage"/> just because the GM briefly looked at a different
+    /// campaign; only <see cref="Generate"/>/<see cref="SaveAsync"/> do that.
+    /// </remarks>
+    internal void HandleActiveCampaignChanged()
+    {
+        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
+        if (campaignId is null)
+        {
+            FactionSuggestions = [];
+            LocationSuggestions = [];
+            return;
+        }
+
+        _ = LoadSuggestionsAsync(campaignId.Value);
     }
 
     private void RerollNameField()
