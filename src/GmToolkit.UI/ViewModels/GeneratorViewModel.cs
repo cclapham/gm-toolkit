@@ -381,7 +381,7 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     public partial string? SaveError { get; set; }
 
     /// <summary>Set by <see cref="SaveAsync"/> after a successful save (e.g. "Saved 'Baelor the
-    /// Butcher' to the campaign."); <c>null</c> before the first save this session, or once
+    /// Butcher' to 'Shadows Over Blackmoor'."); <c>null</c> before the first save this session, or once
     /// <see cref="Generate"/> clears it for the next NPC. Deliberately *not* cleared by
     /// <see cref="ResetGenerator"/> itself -- see this class's remarks on why the confirmation
     /// outlives the reset.</summary>
