@@ -48,9 +48,13 @@ public static class WeightedPicker
             }
         }
 
-        // Floating-point rounding can leave `roll` a hair below `totalWeight` after summing the
-        // same weights twice in slightly different order; falling through to the last entry
-        // keeps this method total instead of ever throwing on a razor-thin edge case.
+        // In exact arithmetic this line is unreachable -- both loops above sum the same weights in
+        // the same order, so `cumulative` ends up bit-identical to `totalWeight`, and
+        // NextDouble() < 1 guarantees `roll < totalWeight`. The one edge case that's not exact
+        // arithmetic: rounding `random.NextDouble() * totalWeight` can, in a vanishingly rare case,
+        // round the product up to (or past) that same `totalWeight`/`cumulative` value. Falling
+        // through to the last entry here keeps this method total instead of ever throwing on that
+        // razor-thin edge case.
         return entries[^1];
     }
 }

@@ -71,9 +71,9 @@ public class WeightedPickerTests
             counts[picked.Value]++;
         }
 
-        // Each entry should land close to the uniform 25% share; a subtle off-by-one in the
-        // cumulative-weight scan would skew one entry's share noticeably more than sampling noise
-        // alone would.
+        // Each entry should land close to the uniform 25% share; a structural bug in the
+        // cumulative-weight scan (e.g. always favoring the first or last entry) would skew one
+        // entry's share noticeably more than sampling noise alone would.
         foreach (var count in counts.Values)
         {
             var fraction = count / (double)draws;
