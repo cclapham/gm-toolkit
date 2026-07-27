@@ -27,6 +27,17 @@ namespace GmToolkit.UI.Services;
 /// <see cref="GeneratorViewModel"/> -- both are registered as singletons by
 /// <c>ServiceCollectionExtensions.AddGmToolkitUi</c>, same as every dependency above.
 /// </remarks>
+/// <remarks>
+/// <b>Issue #29's <see cref="GeneratorViewModel"/> factory passes <c>this</c> as its
+/// <see cref="INavigationService"/>.</b> Safe specifically because <see cref="_factories"/>' lambdas
+/// are stored, not invoked, at the point they're constructed below -- this constructor only ever
+/// invokes the <see cref="NavigationDestination.Campaigns"/> factory itself (via
+/// <see cref="GetOrCreate"/> for <see cref="CurrentViewModel"/>'s initial value), so by the time the
+/// Generator lambda actually runs (the first time a caller navigates there), construction of this
+/// <see cref="NavigationService"/> instance has already fully completed and <c>this</c> is a
+/// perfectly usable, fully-initialized <see cref="INavigationService"/> -- there is no partially
+/// constructed <c>this</c> escaping anywhere.
+/// </remarks>
 public sealed class NavigationService : INavigationService
 {
     private readonly IReadOnlyDictionary<NavigationDestination, Func<ViewModelBase>> _factories;
@@ -43,7 +54,7 @@ public sealed class NavigationService : INavigationService
             [NavigationDestination.Campaigns] = () => new CampaignsViewModel(campaignRepository, activeCampaignContext),
             [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext),
             [NavigationDestination.Npcs] = () => new NpcsViewModel(npcRepository, activeCampaignContext),
-            [NavigationDestination.Generator] = () => new GeneratorViewModel(generatorRegistry, npcGenerator),
+            [NavigationDestination.Generator] = () => new GeneratorViewModel(generatorRegistry, npcGenerator, npcRepository, activeCampaignContext, this),
             [NavigationDestination.Settings] = () => new SettingsViewModel(),
         };
 

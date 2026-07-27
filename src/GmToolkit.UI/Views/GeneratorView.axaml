@@ -38,6 +38,23 @@
             <StackPanel Spacing="{StaticResource SpaceMD}" MaxWidth="640" HorizontalAlignment="Left">
                 <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="Generator" />
 
+                <!-- Save confirmation (issue #29): shown above everything else, in both screen
+                     states, until the GM navigates away via the link below or starts generating the
+                     next NPC (which clears it, see GeneratorViewModel.Generate's remarks). No
+                     toast/notification infrastructure exists yet (issue #32), so this is a plain
+                     inline caption plus a real, working navigation button, same idiom as this view's
+                     own NameFallbackNotice/RoleFallbackNotice captions. -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{StaticResource SpaceSM}"
+                            IsVisible="{Binding SaveConfirmationMessage, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Classes="body"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource SuccessBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding SaveConfirmationMessage}" />
+                    <Button Content="View NPC list" Command="{Binding ViewSavedNpcCommand}" />
+                </StackPanel>
+
                 <!-- Constraint controls (issue #28's own task): shown in both screen states so a GM
                      can set a preference before the very first Generate, not just before a reroll. -->
                 <Grid ColumnDefinitions="*,*">
@@ -191,6 +208,56 @@
                                       IsChecked="{Binding IsSecretLocked, Mode=TwoWay}" />
                         </Grid>
                     </StackPanel>
+
+                    <!-- Faction/Location (issue #29): save-time-only inputs, not generated fields:
+                         there is no faction/location generator table, and neither has a reroll/lock
+                         (see GeneratorViewModel's remarks). Free-text AutoCompleteBox with
+                         suggestions from this campaign's existing NPCs, same pattern as
+                         NpcFormView.axaml's identical Faction/Location inputs. -->
+                    <Grid ColumnDefinitions="*,*">
+                        <StackPanel Grid.Column="0" Spacing="{StaticResource SpaceXS}" Margin="0,0,8,0">
+                            <TextBlock Classes="caption" Text="Faction" />
+                            <AutoCompleteBox Text="{Binding Faction, Mode=TwoWay}"
+                                             ItemsSource="{Binding FactionSuggestions}"
+                                             FilterMode="Contains"
+                                             PlaceholderText="e.g. The Iron Concord" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpaceXS}">
+                            <TextBlock Classes="caption" Text="Location" />
+                            <AutoCompleteBox Text="{Binding Location, Mode=TwoWay}"
+                                             ItemsSource="{Binding LocationSuggestions}"
+                                             FilterMode="Contains"
+                                             PlaceholderText="e.g. Blackmoor Docks" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Classes="caption"
+                               Foreground="{DynamicResource DangerBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding NameError}"
+                               IsVisible="{Binding NameError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                    <TextBlock Classes="caption"
+                               Foreground="{DynamicResource DangerBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding SaveError}"
+                               IsVisible="{Binding SaveError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                    <!-- Names which campaign Save actually targets (issue #29, added during PR #63's
+                         review): this screen is cached for the app's whole lifetime, so the GM could
+                         have switched to a different campaign elsewhere while this NPC sat
+                         generated-but-unsaved - GeneratingCampaign (captured once at Generate, not
+                         re-read from whatever's active now) is where Save actually goes, and this
+                         caption is the only place that's visible before clicking the button. -->
+                    <TextBlock Classes="caption"
+                               Foreground="{DynamicResource TextBrush}"
+                               TextWrapping="Wrap"
+                               Text="{Binding GeneratingCampaignName, StringFormat='Will save to: {0}'}"
+                               IsVisible="{Binding GeneratingCampaignName, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                    <Button Classes="accent"
+                            Content="Save to campaign"
+                            Command="{Binding SaveCommand}" />
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
