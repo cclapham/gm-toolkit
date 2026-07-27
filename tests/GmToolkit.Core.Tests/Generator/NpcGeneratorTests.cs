@@ -208,6 +208,56 @@ public class NpcGeneratorTests
     }
 
     [Fact]
+    public void GenerateField_with_both_constraints_set_applies_each_only_to_its_own_field()
+    {
+        // Both NameCulture and OccupationCategory set at once, generating a full NPC's worth of
+        // fields through the shared constraints object -- confirms Name only ever honors
+        // NameCulture and Role only ever honors OccupationCategory, with no cross-contamination
+        // (e.g. the occupation constraint leaking into name generation or vice versa).
+        var generator = CreateGeneratorOverRealTables();
+        var registry = GeneratorRegistry.FromEmbeddedTables();
+        var nameGenerator = registry.GetNameGenerator();
+        Assert.True(
+            nameGenerator.Cultures.Contains("highland", StringComparer.OrdinalIgnoreCase),
+            "Expected the real embedded name tables to include a 'highland' culture.");
+
+        var random = new SystemRandomSource(2029);
+        var constraints = new GeneratorConstraints { NameCulture = "highland", OccupationCategory = "criminal" };
+
+        var occupationTable = GeneratorTableLoader.LoadAll()
+            .Single(t => string.Equals(t.Category, "occupation", StringComparison.OrdinalIgnoreCase));
+        var criminalValues = occupationTable.Entries
+            .Where(e => e.Tags.Contains("criminal", StringComparer.OrdinalIgnoreCase))
+            .Select(e => e.Value)
+            .ToHashSet();
+        var highlandTable = GeneratorTableLoader.LoadAll()
+            .Single(t => string.Equals(t.Culture, "highland", StringComparison.OrdinalIgnoreCase));
+        var highlandGivenNames = highlandTable.Entries.Where(e => e.Tags.Contains("given", StringComparer.OrdinalIgnoreCase))
+            .Select(e => e.Value).ToHashSet();
+        var highlandSurnames = highlandTable.Entries.Where(e => e.Tags.Contains("surname", StringComparer.OrdinalIgnoreCase))
+            .Select(e => e.Value).ToHashSet();
+
+        for (var i = 0; i < 25; i++)
+        {
+            var nameResult = generator.GenerateField(NpcField.Name, random, constraints);
+            var roleResult = generator.GenerateField(NpcField.Role, random, constraints);
+            var appearance = generator.GenerateField(NpcField.Appearance, random);
+
+            Assert.False(nameResult.FellBack);
+            var parts = nameResult.Value.Split(' ', 2);
+            Assert.Equal(2, parts.Length);
+            Assert.Contains(parts[0], highlandGivenNames);
+            Assert.Contains(parts[1], highlandSurnames);
+
+            Assert.False(roleResult.FellBack);
+            Assert.Contains(roleResult.Value, criminalValues);
+
+            // Appearance has no defined constraint and is never influenced by NameCulture/OccupationCategory.
+            Assert.False(string.IsNullOrWhiteSpace(appearance));
+        }
+    }
+
+    [Fact]
     public void Rerolling_one_field_does_not_require_regenerating_the_whole_npc()
     {
         var generator = CreateGeneratorOverRealTables();

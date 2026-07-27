@@ -114,6 +114,8 @@ public class GeneratorTableLoaderTests
     [InlineData("GmToolkit.Core.Tests.GeneratorTableTestData.blank-value.json", "value")]
     [InlineData("GmToolkit.Core.Tests.GeneratorTableTestData.zero-weight.json", "weight")]
     [InlineData("GmToolkit.Core.Tests.GeneratorTableTestData.empty-entries.json", "no entries")]
+    [InlineData("GmToolkit.Core.Tests.GeneratorTableTestData.blank-id.json", "'id'")]
+    [InlineData("GmToolkit.Core.Tests.GeneratorTableTestData.blank-category.json", "'category'")]
     public void LoadResource_throws_a_clear_specific_error_for_malformed_tables(string resourceName, string expectedMessageFragment)
     {
         var testAssembly = Assembly.GetExecutingAssembly();
