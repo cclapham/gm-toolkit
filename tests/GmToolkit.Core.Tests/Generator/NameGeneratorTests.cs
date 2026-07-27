@@ -140,4 +140,36 @@ public class NameGeneratorTests
 
         Assert.Equal(namesA, namesB);
     }
+
+    [Fact]
+    public void Constructor_throws_when_given_no_culture_tables_at_all()
+    {
+        // Genuine gap caught during the skeptical review of PR #64: this explicit guard existed
+        // since #26 but had no test asserting on it.
+        var exception = Assert.Throws<ArgumentException>(() => new NameGenerator([]));
+        Assert.Contains("At least one name culture table is required", exception.Message);
+    }
+
+    [Fact]
+    public void Generate_throws_a_clear_error_when_a_culture_table_has_no_given_tagged_entries()
+    {
+        // Genuine gap caught during the skeptical review of PR #64: FilterByTag's no-match throw
+        // existed since #26 but had no test asserting on it. GeneratorTableLoader doesn't validate
+        // that a names table actually has given/surname entries (that's issue #61's separate,
+        // already-filed gap) -- this test proves what happens today if one doesn't: a clear,
+        // specific exception, not a confusing crash somewhere else.
+        var surnameOnly = new GeneratorTable
+        {
+            Id = "names-broken",
+            Category = "names",
+            Culture = "broken",
+            Entries = [new GeneratorTableEntry { Value = "Stonevale", Tags = ["surname"] }],
+        };
+        var generator = new NameGenerator([surnameOnly]);
+        var random = new SystemRandomSource(1);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => generator.Generate(random, culture: "broken"));
+        Assert.Contains("names-broken", exception.Message);
+        Assert.Contains("given", exception.Message);
+    }
 }
