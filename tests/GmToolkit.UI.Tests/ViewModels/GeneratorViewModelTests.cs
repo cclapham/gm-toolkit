@@ -462,4 +462,59 @@ public class GeneratorViewModelTests
         Assert.Equal(["The Whispering Cult"], viewModel.FactionSuggestions);
         Assert.Equal(["Blackmoor Market"], viewModel.LocationSuggestions);
     }
+
+    [Fact]
+    public async Task Saving_after_switching_campaigns_saves_to_the_campaign_the_npc_was_generated_for()
+    {
+        // Regression guard from the skeptical review of PR #63: this screen is cached for the app's
+        // whole lifetime and deliberately does not reset an in-progress NPC on a campaign switch (see
+        // HandleActiveCampaignChanged's remarks) -- so without capturing which campaign the NPC was
+        // actually generated for, Save would silently attribute it to whichever campaign happened to
+        // be active at the moment Save was clicked, not the one the GM generated and reviewed it in.
+        var firstCampaignId = Guid.NewGuid();
+        var secondCampaignId = Guid.NewGuid();
+        var repository = new FakeNpcRepository();
+        var campaignRepository = new FakeCampaignRepository();
+        var activeCampaignContext = new ActiveCampaignContext(campaignRepository);
+        var firstCampaign = new Campaign { Id = firstCampaignId, Name = "First" };
+        await activeCampaignContext.SelectCampaignAsync(firstCampaign);
+        var viewModel = CreateViewModel(42, repository, activeCampaignContext);
+
+        viewModel.GenerateCommand.Execute(null);
+        Assert.Equal("First", viewModel.GeneratingCampaignName);
+
+        var secondCampaign = new Campaign { Id = secondCampaignId, Name = "Second" };
+        await activeCampaignContext.SelectCampaignAsync(secondCampaign);
+        viewModel.HandleActiveCampaignChanged();
+        Assert.Equal("First", viewModel.GeneratingCampaignName); // unaffected by the switch
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        var saved = Assert.Single(await repository.GetByCampaignAsync(firstCampaignId));
+        Assert.Empty(await repository.GetByCampaignAsync(secondCampaignId));
+        Assert.Equal(firstCampaignId, saved.CampaignId);
+    }
+
+    [Fact]
+    public void GeneratingCampaignName_is_null_before_the_first_generate_and_after_a_reset()
+    {
+        var viewModel = CreateViewModel(43);
+        Assert.Null(viewModel.GeneratingCampaignName);
+
+        viewModel.GenerateCommand.Execute(null);
+        Assert.Equal("Test Campaign", viewModel.GeneratingCampaignName);
+    }
+
+    [Fact]
+    public async Task SaveAsync_names_the_generating_campaign_in_the_confirmation_message()
+    {
+        var viewModel = CreateViewModel(44);
+        viewModel.GenerateCommand.Execute(null);
+
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        Assert.NotNull(viewModel.SaveConfirmationMessage);
+        Assert.Contains("Test Campaign", viewModel.SaveConfirmationMessage);
+        Assert.Null(viewModel.GeneratingCampaignName); // cleared by the reset
+    }
 }

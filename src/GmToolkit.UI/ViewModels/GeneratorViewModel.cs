@@ -44,6 +44,18 @@ namespace GmToolkit.UI.ViewModels;
 /// <see cref="Generate"/> clears it -- see that method's own remarks.
 /// </para>
 /// <para>
+/// <b>Saves to <see cref="GeneratingCampaign"/> (the campaign captured once when the NPC was first
+/// generated), not necessarily whatever <see cref="ActiveCampaignContext"/> currently reports.</b>
+/// This screen is cached for the app's whole lifetime, so a GM could generate an NPC, switch to a
+/// different campaign elsewhere in the app, and come back here with the same generated-but-unsaved
+/// NPC still on screen -- without this capture, <see cref="SaveAsync"/> would silently attribute the
+/// NPC to whichever campaign happened to be active at the moment Save was clicked, not the one the GM
+/// actually generated and reviewed it under. <see cref="GeneratingCampaignName"/> shows the GM which
+/// campaign it's actually going to (see <see cref="Generate"/>'s remarks for the full reasoning, added
+/// during the skeptical review of PR #63) -- mirrors <see cref="NpcFormViewModel"/>'s identical
+/// capture-once-at-<c>BeginCreate</c> behavior.
+/// </para>
+/// <para>
 /// <b>No toast/notification infrastructure -- an inline caption plus a real navigation button,
 /// same as issue #28's fallback notices.</b> Issue #32 (a real toast component) doesn't exist yet
 /// and is out of this issue's scope, same situation #28 was already in for
@@ -242,6 +254,20 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(GenerateButtonLabel))]
     public partial bool HasGenerated { get; set; }
 
+    /// <summary>The campaign the current in-progress NPC was generated for -- captured once by
+    /// <see cref="Generate"/> the moment a brand-new NPC starts, not re-read from whatever's
+    /// currently active. <see cref="SaveAsync"/> saves to this campaign, not necessarily whatever the
+    /// rest of the app currently shows as active -- see <see cref="Generate"/>'s remarks for why.
+    /// Cleared by <see cref="ResetGenerator"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GeneratingCampaignName))]
+    public partial Campaign? GeneratingCampaign { get; set; }
+
+    /// <summary><see cref="GeneratingCampaign"/>'s name, shown near the Save button so the GM always
+    /// knows which campaign the in-progress NPC will actually be saved to -- even after switching the
+    /// active campaign elsewhere in the app while this NPC sits unsaved.</summary>
+    public string? GeneratingCampaignName => GeneratingCampaign?.Name;
+
     /// <summary>"Generate" before anything exists, "Regenerate" once a full NPC is already showing --
     /// purely cosmetic; <see cref="GenerateCommand"/>'s behavior doesn't otherwise depend on which
     /// label is showing.</summary>
@@ -391,9 +417,26 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     /// previously saved NPC would otherwise keep showing above the newly-generating one, which would
     /// misleadingly read as if it referred to whatever is currently on screen.
     /// </summary>
+    /// <remarks>
+    /// Captures <see cref="GeneratingCampaign"/> here, the first time a brand-new NPC starts (not on
+    /// every subsequent regenerate) -- caught during the skeptical review of PR #63: this screen is
+    /// cached for the app's whole lifetime and deliberately does not reset an in-progress NPC when
+    /// the active campaign changes (see <see cref="HandleActiveCampaignChanged"/>'s remarks), so
+    /// without capturing which campaign a generated-but-unsaved NPC actually belongs to,
+    /// <see cref="SaveAsync"/> would save it to whatever campaign happened to be active at the moment
+    /// Save was clicked -- possibly a different one than the GM was looking at while generating and
+    /// reviewing it. Capturing once here and using that captured campaign in <see cref="SaveAsync"/>
+    /// mirrors <see cref="NpcFormViewModel"/>'s identical "capture once at <c>BeginCreate</c>, unaffected
+    /// by a later campaign switch" behavior.
+    /// </remarks>
     [RelayCommand]
     private void Generate()
     {
+        if (!HasGenerated)
+        {
+            GeneratingCampaign = _activeCampaignContext.ActiveCampaign;
+        }
+
         HasGenerated = true;
         SaveConfirmationMessage = null;
 
@@ -511,11 +554,18 @@ public sealed partial class GeneratorViewModel : ViewModelBase
             return;
         }
 
-        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
-        if (campaignId is null)
+        // Saves to GeneratingCampaign (captured once by Generate -- see its remarks), not whatever
+        // ActiveCampaignContext currently reports: the GM could have switched to a different campaign
+        // while this NPC sat generated-but-unsaved, and this NPC belongs to the campaign it was
+        // actually generated for, not whatever the rest of the app now shows as active. Caught during
+        // the skeptical review of PR #63.
+        var savingCampaignId = GeneratingCampaign?.Id;
+        if (savingCampaignId is null)
         {
-            // This screen is only reachable via a nav item gated on an active campaign existing
-            // (see this class's own summary) -- defense-in-depth only, not expected in practice.
+            // Only reachable if Save were somehow invoked before Generate ever ran (Generate always
+            // sets GeneratingCampaign the first time HasGenerated becomes true, and the Save button
+            // is only visible once HasGenerated is true) -- defense-in-depth only, not expected in
+            // practice.
             return;
         }
 
@@ -525,7 +575,7 @@ public sealed partial class GeneratorViewModel : ViewModelBase
         {
             var npc = new Npc
             {
-                CampaignId = campaignId.Value,
+                CampaignId = savingCampaignId.Value,
                 Name = Name,
                 Role = Role,
                 Faction = Faction,
@@ -540,10 +590,20 @@ public sealed partial class GeneratorViewModel : ViewModelBase
             await _npcRepository.AddAsync(npc);
 
             var savedName = npc.Name;
+            var savedCampaignName = GeneratingCampaign?.Name;
             ResetGenerator();
-            SaveConfirmationMessage = $"Saved '{savedName}' to the campaign.";
+            SaveConfirmationMessage = string.IsNullOrWhiteSpace(savedCampaignName)
+                ? $"Saved '{savedName}' to the campaign."
+                : $"Saved '{savedName}' to '{savedCampaignName}'.";
 
-            _ = LoadSuggestionsAsync(campaignId.Value);
+            // Refreshes suggestions for whatever campaign is currently active -- which may differ
+            // from savingCampaignId above if the GM switched campaigns before saving -- since that's
+            // the campaign the next NPC (if any) will actually be generated for.
+            var currentCampaignId = _activeCampaignContext.ActiveCampaign?.Id;
+            if (currentCampaignId is not null)
+            {
+                _ = LoadSuggestionsAsync(currentCampaignId.Value);
+            }
         }
         catch (ArgumentException ex)
         {
@@ -572,6 +632,7 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     private void ResetGenerator()
     {
         HasGenerated = false;
+        GeneratingCampaign = null;
 
         Name = string.Empty;
         IsNameLocked = false;
@@ -697,7 +758,14 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     /// <c>NpcsViewModel.HandleActiveCampaignChanged</c>, this view model has no list to reload and
     /// deliberately does not reset any in-progress generated NPC or clear
     /// <see cref="SaveConfirmationMessage"/> just because the GM briefly looked at a different
-    /// campaign; only <see cref="Generate"/>/<see cref="SaveAsync"/> do that.
+    /// campaign; only <see cref="Generate"/>/<see cref="SaveAsync"/> do that. This does NOT mean a
+    /// campaign switch can misattribute an in-progress NPC to the wrong campaign at save time --
+    /// <see cref="GeneratingCampaign"/> was already captured once by <see cref="Generate"/> before any
+    /// switch could happen, and <see cref="SaveAsync"/> saves to that captured campaign regardless of
+    /// what this method (or <see cref="ActiveCampaignContext"/>) reports as active by the time Save is
+    /// actually clicked -- see <see cref="Generate"/>'s remarks for the full reasoning (added after the
+    /// skeptical review of PR #63 found the original version of this comment only addressed "don't
+    /// destroy in-progress work" and not "save to the right campaign").
     /// </remarks>
     internal void HandleActiveCampaignChanged()
     {
