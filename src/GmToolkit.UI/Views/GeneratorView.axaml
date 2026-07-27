@@ -3,22 +3,196 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="GmToolkit.UI.Views.GeneratorView"
              x:DataType="vm:GeneratorViewModel">
     <Design.DataContext>
         <vm:GeneratorViewModel />
     </Design.DataContext>
 
+    <!-- Ctrl+G generates/regenerates without needing to click, mirroring GeneratorViewModel's own
+         "fast, doesn't lose your work" mandate. Declared here (shared GmToolkit.UI code) rather than
+         in GmToolkit.Desktop: this app shares one set of views across both heads with no per-head UI
+         code, and a KeyGesture binding is simply inert without a physical keyboard, so it's harmless
+         (never fires) on Android despite issue #28 phrasing this as "(Desktop head)". KeyBindings on
+         a UserControl fire as a KeyDown bubbles up from whatever child actually has focus, so this
+         works regardless of which control inside this screen is focused. -->
+    <UserControl.KeyBindings>
+        <KeyBinding Gesture="Ctrl+G" Command="{Binding GenerateCommand}" />
+    </UserControl.KeyBindings>
+
+    <UserControl.Styles>
+        <!-- Lock toggle chrome: a plain CheckBox reads as "lock this field" well enough without a
+             new icon asset (this app has no icon-font convention yet, see Assets/), scoped to this
+             view since it's specific to this one screen's fields, not a reusable app-wide control. -->
+        <Style Selector="StackPanel.fieldRow">
+            <Setter Property="Spacing" Value="{StaticResource SpaceXS}" />
+        </Style>
+    </UserControl.Styles>
+
     <!-- Padding="24" mirrors SpaceLG, Thickness-typed properties can't bind a plain-double
          StaticResource directly, see the note in Styles/Spacing.axaml. -->
     <Border Background="{DynamicResource BgBrush}" Padding="24">
-        <StackPanel Spacing="{StaticResource SpaceSM}" MaxWidth="480" HorizontalAlignment="Left">
-            <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="Generator" />
-            <TextBlock Classes="body"
-                       Foreground="{DynamicResource TextBrush}"
-                       TextWrapping="Wrap"
-                       Text="This is where you'll roll a complete NPC in one action, reroll individual fields, and save it into the active campaign." />
-        </StackPanel>
+        <ScrollViewer>
+            <StackPanel Spacing="{StaticResource SpaceMD}" MaxWidth="640" HorizontalAlignment="Left">
+                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="Generator" />
+
+                <!-- Constraint controls (issue #28's own task): shown in both screen states so a GM
+                     can set a preference before the very first Generate, not just before a reroll. -->
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="{StaticResource SpaceXS}" Margin="0,0,8,0">
+                        <TextBlock Classes="caption" Text="Name culture" />
+                        <ComboBox ItemsSource="{Binding NameCultureOptions}"
+                                  SelectedItem="{Binding SelectedNameCulture, Mode=TwoWay}"
+                                  HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpaceXS}">
+                        <TextBlock Classes="caption" Text="Occupation category" />
+                        <ComboBox ItemsSource="{Binding OccupationCategoryOptions}"
+                                  SelectedItem="{Binding SelectedOccupationCategory, Mode=TwoWay}"
+                                  HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpaceSM}">
+                    <Button Classes="accent"
+                            Content="{Binding GenerateButtonLabel}"
+                            Command="{Binding GenerateCommand}"
+                            ToolTip.Tip="Ctrl+G" />
+                    <TextBlock Classes="caption"
+                               VerticalAlignment="Center"
+                               Text="Ctrl+G" />
+                </StackPanel>
+
+                <!-- Empty state (issue #28's "two screen states"): nothing generated yet. -->
+                <StackPanel IsVisible="{Binding !HasGenerated}" Spacing="{StaticResource SpaceSM}">
+                    <TextBlock Classes="body"
+                               Foreground="{DynamicResource TextBrush}"
+                               TextWrapping="Wrap"
+                               Text="Roll a complete NPC in one click. Once generated, you can reroll or lock any single field, edit anything inline, and reroll individual fields without losing the rest." />
+                </StackPanel>
+
+                <!-- Generated state: all six fields, each with its current (editable) value, a
+                     reroll button, and a lock toggle. Regenerating (Generate again) redraws every
+                     unlocked field and leaves every locked field's value untouched, see
+                     GeneratorViewModel.Generate's remarks. -->
+                <StackPanel IsVisible="{Binding HasGenerated}" Spacing="{StaticResource SpaceMD}">
+                    <StackPanel Classes="fieldRow">
+                        <TextBlock Classes="caption" Text="Name" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding Name, Mode=TwoWay}" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    Content="Reroll"
+                                    Command="{Binding RerollNameCommand}"
+                                    IsEnabled="{Binding !IsNameLocked}" />
+                            <CheckBox Grid.Column="2"
+                                      Margin="8,0,0,0"
+                                      Content="Lock"
+                                      IsChecked="{Binding IsNameLocked, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="caption"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding NameFallbackNotice}"
+                                   IsVisible="{Binding NameFallbackNotice, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <StackPanel Classes="fieldRow">
+                        <TextBlock Classes="caption" Text="Role" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding Role, Mode=TwoWay}" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    Content="Reroll"
+                                    Command="{Binding RerollRoleCommand}"
+                                    IsEnabled="{Binding !IsRoleLocked}" />
+                            <CheckBox Grid.Column="2"
+                                      Margin="8,0,0,0"
+                                      Content="Lock"
+                                      IsChecked="{Binding IsRoleLocked, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock Classes="caption"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding RoleFallbackNotice}"
+                                   IsVisible="{Binding RoleFallbackNotice, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <StackPanel Classes="fieldRow">
+                        <TextBlock Classes="caption" Text="Appearance" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding Appearance, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalAlignment="Top" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Top"
+                                    Content="Reroll"
+                                    Command="{Binding RerollAppearanceCommand}"
+                                    IsEnabled="{Binding !IsAppearanceLocked}" />
+                            <CheckBox Grid.Column="2"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Top"
+                                      Content="Lock"
+                                      IsChecked="{Binding IsAppearanceLocked, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Classes="fieldRow">
+                        <TextBlock Classes="caption" Text="Mannerism" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding Mannerism, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalAlignment="Top" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Top"
+                                    Content="Reroll"
+                                    Command="{Binding RerollMannerismCommand}"
+                                    IsEnabled="{Binding !IsMannerismLocked}" />
+                            <CheckBox Grid.Column="2"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Top"
+                                      Content="Lock"
+                                      IsChecked="{Binding IsMannerismLocked, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Classes="fieldRow">
+                        <TextBlock Classes="caption" Text="Motivation" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding Motivation, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalAlignment="Top" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Top"
+                                    Content="Reroll"
+                                    Command="{Binding RerollMotivationCommand}"
+                                    IsEnabled="{Binding !IsMotivationLocked}" />
+                            <CheckBox Grid.Column="2"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Top"
+                                      Content="Lock"
+                                      IsChecked="{Binding IsMotivationLocked, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Classes="fieldRow">
+                        <TextBlock Classes="caption" Text="Secret" />
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding Secret, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" Height="60" VerticalAlignment="Top" />
+                            <Button Grid.Column="1"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Top"
+                                    Content="Reroll"
+                                    Command="{Binding RerollSecretCommand}"
+                                    IsEnabled="{Binding !IsSecretLocked}" />
+                            <CheckBox Grid.Column="2"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Top"
+                                      Content="Lock"
+                                      IsChecked="{Binding IsSecretLocked, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Border>
 </UserControl>
