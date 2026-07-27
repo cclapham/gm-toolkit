@@ -33,11 +33,13 @@ public sealed partial class NpcListItemViewModel(Npc npc) : ObservableObject
     public DateTime CreatedUtc => Npc.CreatedUtc;
 
     /// <summary>
-    /// Single-line, ellipsis-truncated rendering of <see cref="Npc.Notes"/> -- same "compact
-    /// inline summary" idiom as <see cref="CharacterListItemViewModel.StatsSummary"/>, so a row
-    /// with a long notes field stays a small, fixed height instead of growing and pushing other
-    /// NPCs out of view, which matters for this issue's "find one NPC in a list of 100 quickly"
-    /// acceptance criterion just as much as the search/filter/sort themselves do.
+    /// <see cref="Npc.Notes"/>, or a placeholder if blank -- rendered single-line and
+    /// ellipsis-truncated by <c>NpcsView.axaml</c>'s row template (<c>TextWrapping="NoWrap"</c> +
+    /// <c>TextTrimming="CharacterEllipsis"</c>), not by this property itself. Same "compact inline
+    /// summary" idiom as <see cref="CharacterListItemViewModel.StatsSummary"/>, so a row with a
+    /// long notes field stays a small, fixed height instead of growing and pushing other NPCs out
+    /// of view, which matters for this issue's "find one NPC in a list of 100 quickly" acceptance
+    /// criterion just as much as the search/filter/sort themselves do.
     /// </summary>
     public string NotesPreview => string.IsNullOrWhiteSpace(Notes) ? "No notes yet" : Notes;
 

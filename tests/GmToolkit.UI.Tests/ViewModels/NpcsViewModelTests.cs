@@ -239,6 +239,13 @@ public class NpcsViewModelTests
         vm.SearchText = string.Empty;
         Assert.False(vm.HasActiveFilters);
 
+        // Whitespace-only search matches nothing extra in ApplyFilter (it trims before
+        // matching), so it shouldn't count as an active filter either -- otherwise "Clear
+        // filters" would appear with nothing for it to actually clear.
+        vm.SearchText = "   ";
+        Assert.False(vm.HasActiveFilters);
+        vm.SearchText = string.Empty;
+
         vm.SelectedFaction = "The Iron Concord";
         Assert.True(vm.HasActiveFilters);
         vm.SelectedFaction = NpcsViewModel.AllOption;

@@ -187,7 +187,7 @@ public sealed partial class NpcsViewModel : ViewModelBase
     /// <see cref="SelectedLocation"/> is narrowing the list -- drives whether the "Clear filters"
     /// button shows at all. Deliberately doesn't consider <see cref="SortOrder"/>: sorting reorders
     /// the same NPCs rather than narrowing which ones show, so it isn't a "filter" to clear.</summary>
-    public bool HasActiveFilters => SearchText.Length > 0 || SelectedFaction != AllOption || SelectedLocation != AllOption;
+    public bool HasActiveFilters => SearchText.Trim().Length > 0 || SelectedFaction != AllOption || SelectedLocation != AllOption;
 
     [RelayCommand]
     private void SortByName() => SortOrder = NpcSortOrder.Name;
