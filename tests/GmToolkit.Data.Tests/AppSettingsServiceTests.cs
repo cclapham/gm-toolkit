@@ -136,4 +136,38 @@ public class AppSettingsServiceTests : IAsyncLifetime
         Assert.Single(siblingFiles);
         Assert.Equal(settingsPath, siblingFiles[0]);
     }
+
+    [Fact]
+    public async Task Concurrent_SetThemePreferenceAsync_calls_never_produce_a_torn_or_corrupt_file()
+    {
+        // Writes are serialized by a private SemaphoreSlim in AppSettingsService, so concurrent
+        // callers (e.g. a user flipping the Settings theme dropdown repeatedly) each complete a
+        // full temp-file-write-then-move before the next one starts. Task.WhenAll gives no
+        // guarantee about which of these concurrently *issued* calls finishes last, so the
+        // property worth proving isn't "last call in program order wins" -- it's that the result
+        // is always exactly one of the values passed in (never a blank/corrupt/interleaved file),
+        // and that no temp file is left behind once every write has completed.
+        var settingsPath = Path.Combine(_rootDirectory, "settings.json");
+        var service = new AppSettingsService(settingsPath);
+        var values = new[]
+        {
+            ThemePreference.Dark,
+            ThemePreference.Light,
+            ThemePreference.System,
+            ThemePreference.Dark,
+            ThemePreference.Light,
+            ThemePreference.System,
+            ThemePreference.Dark,
+            ThemePreference.Light,
+        };
+
+        await Task.WhenAll(values.Select(value => service.SetThemePreferenceAsync(value)));
+
+        var preference = await service.GetThemePreferenceAsync();
+        Assert.Contains(preference, values);
+
+        var siblingFiles = Directory.GetFiles(_rootDirectory);
+        Assert.Single(siblingFiles);
+        Assert.Equal(settingsPath, siblingFiles[0]);
+    }
 }

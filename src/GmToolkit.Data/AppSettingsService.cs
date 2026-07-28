@@ -38,6 +38,17 @@ namespace GmToolkit.Data;
 /// half-written (and therefore corrupt-on-next-read) <c>settings.json</c> behind -- the rename is
 /// atomic on both Windows and Linux for a same-directory move.
 /// </para>
+/// <para>
+/// <b><see cref="_writeLock"/> serializes concurrent writes.</b> Callers (e.g. <c>SettingsViewModel</c>,
+/// which fires <see cref="SetThemePreferenceAsync"/> without awaiting it) can trigger overlapping
+/// calls -- e.g. flipping the theme dropdown twice in quick succession. Without serialization, two
+/// concurrent temp-file-write-then-move sequences race, and the slower one can finish last and
+/// overwrite a newer selection with a stale one, even though each individual write is itself atomic.
+/// A single-count <see cref="SemaphoreSlim"/> around <see cref="WriteAsync"/>'s body forces writes
+/// to run one at a time, in call order, so the file always reflects a real, non-interleaved write
+/// (though which of several *concurrently issued* calls is "last" is still whatever order the
+/// runtime happened to schedule them in -- see this class's tests).
+/// </para>
 /// </remarks>
 public sealed class AppSettingsService : IAppSettingsService
 {
@@ -53,6 +64,7 @@ public sealed class AppSettingsService : IAppSettingsService
     };
 
     private readonly string _settingsFilePath;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     public AppSettingsService(string settingsFilePath)
     {
@@ -94,17 +106,25 @@ public sealed class AppSettingsService : IAppSettingsService
 
     private async Task WriteAsync(SettingsFile file, CancellationToken cancellationToken)
     {
-        var directory = Path.GetDirectoryName(_settingsFilePath);
-        if (!string.IsNullOrEmpty(directory))
+        await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            Directory.CreateDirectory(directory);
+            var directory = Path.GetDirectoryName(_settingsFilePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var json = JsonSerializer.Serialize(file, JsonOptions);
+
+            var tempPath = $"{_settingsFilePath}.tmp-{Guid.NewGuid():N}";
+            await File.WriteAllTextAsync(tempPath, json, cancellationToken).ConfigureAwait(false);
+            File.Move(tempPath, _settingsFilePath, overwrite: true);
         }
-
-        var json = JsonSerializer.Serialize(file, JsonOptions);
-
-        var tempPath = $"{_settingsFilePath}.tmp-{Guid.NewGuid():N}";
-        await File.WriteAllTextAsync(tempPath, json, cancellationToken).ConfigureAwait(false);
-        File.Move(tempPath, _settingsFilePath, overwrite: true);
+        finally
+        {
+            _writeLock.Release();
+        }
     }
 
     /// <summary>The on-disk JSON shape. Kept separate from <see cref="ThemePreference"/> itself
