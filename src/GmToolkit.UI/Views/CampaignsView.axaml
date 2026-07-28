@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
              xmlns:views="using:GmToolkit.UI.Views"
+             xmlns:controls="using:GmToolkit.UI.Controls"
              xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.CampaignsView"
@@ -91,25 +92,25 @@
                 <Button Classes="accent" Content="Try again" Command="{Binding RetryLoadCommand}" HorizontalAlignment="Left" />
             </StackPanel>
 
+            <!-- Loading state (#23): shown while the initial GetAllAsync read is in flight, so a
+                 slow load (e.g. on Raspberry Pi 4 hardware) never shows a blank area with nothing
+                 explaining what's happening — see LoadingIndicator's remarks for why a spinner,
+                 not a skeleton layout, is proportionate here. -->
+            <controls:LoadingIndicator Grid.Row="1"
+                                        IsVisible="{Binding IsLoading}"
+                                        Message="Loading campaigns..." />
+
             <!-- Empty state (#17): a first-time user with zero campaigns needs no instructions
                  beyond this: explain what a campaign is, and the only actionable next step is
-                 right here. -->
-            <StackPanel Grid.Row="1"
-                        IsVisible="{Binding IsEmpty}"
-                        Spacing="{StaticResource SpaceMD}"
-                        MaxWidth="480"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center">
-                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="Welcome to GM Toolkit" />
-                <TextBlock Classes="body"
-                           Foreground="{DynamicResource TextBrush}"
-                           TextWrapping="Wrap"
-                           Text="A campaign is your game -- it holds its player characters and NPCs, and everything else you track while running it. Create your first one to get started." />
-                <Button Classes="accent"
-                        Content="Create your first campaign"
-                        Command="{Binding ShowCreateFormCommand}"
-                        HorizontalAlignment="Left" />
-            </StackPanel>
+                 right here. Uses the reusable EmptyState control (#23) — see its remarks for the
+                 icon/heading/message/call-to-action design. -->
+            <controls:EmptyState Grid.Row="1"
+                                  IsVisible="{Binding IsEmpty}"
+                                  Icon="🗺️"
+                                  Title="Welcome to GM Toolkit"
+                                  Message="A campaign is your game -- it holds its player characters and NPCs, and everything else you track while running it. Create your first one to get started."
+                                  ActionText="Create your first campaign"
+                                  ActionCommand="{Binding ShowCreateFormCommand}" />
 
             <!-- Populated list, sorted by last opened (newest first). -->
             <ScrollViewer Grid.Row="1" IsVisible="{Binding IsListVisible}">

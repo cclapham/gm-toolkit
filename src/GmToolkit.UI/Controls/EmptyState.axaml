@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="240"
+             x:Class="GmToolkit.UI.Controls.EmptyState"
+             x:Name="Root">
+
+    <!-- Reusable empty-state control (#23): icon + heading + optional message + optional
+         call-to-action button. Replaces four near-identical hand-rolled StackPanels that used
+         to live directly in CampaignsView.axaml/CharactersView.axaml/NpcsView.axaml (one each
+         for "nothing here yet", plus NpcsView's separate "no search results" state) — see the
+         code-behind's remarks for the design decisions behind each piece. -->
+    <StackPanel Spacing="{StaticResource SpaceMD}"
+                MaxWidth="480"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center">
+        <!-- Icon: a single large glyph/emoji, not an icon-asset pipeline — see the code-behind's
+             remarks. Hidden entirely when Icon is unset/empty, so a screen with nothing
+             meaningful to show isn't forced to pick a glyph just to satisfy this control. -->
+        <TextBlock Text="{Binding #Root.Icon}"
+                   FontSize="40"
+                   LineHeight="48"
+                   IsVisible="{Binding #Root.Icon, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+        <!-- Heading: "display" (the larger of the two type-scale steps used here) by default,
+             matching every existing "nothing here yet" screen's look; NpcsView's "no search
+             results" state sets IsCompact="True" to keep its existing smaller/secondary "title"
+             look instead, since that state is a transient "try a different filter" nudge, not a
+             first-run "welcome" moment — see IsCompact's remarks. Two TextBlocks toggled by
+             IsVisible (not one TextBlock with a dynamically-bound Classes) because Classes is a
+             collection, not a plain CLR property, so it can't be the target of a normal
+             {Binding} the way Text/IsVisible can. -->
+        <TextBlock Classes="display"
+                   Foreground="{DynamicResource TextBrush}"
+                   TextWrapping="Wrap"
+                   Text="{Binding #Root.Title}"
+                   IsVisible="{Binding !#Root.IsCompact}" />
+        <TextBlock Classes="title"
+                   Foreground="{DynamicResource TextBrush}"
+                   TextWrapping="Wrap"
+                   Text="{Binding #Root.Title}"
+                   IsVisible="{Binding #Root.IsCompact}" />
+
+        <!-- Message: optional, hidden when unset/empty (mirrors Icon's visibility idiom above). -->
+        <TextBlock Classes="body"
+                   Foreground="{DynamicResource TextBrush}"
+                   TextWrapping="Wrap"
+                   Text="{Binding #Root.Message}"
+                   IsVisible="{Binding #Root.Message, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+        <!-- Call-to-action: optional — NpcsView's "no search results" state has nothing
+             actionable to do beyond changing the search/filter it already controls, so it
+             supplies neither ActionText nor ActionCommand and no button renders at all. See
+             HasAction's remarks for why both need to be supplied before the button shows. -->
+        <Button Classes="accent"
+                Content="{Binding #Root.ActionText}"
+                Command="{Binding #Root.ActionCommand}"
+                HorizontalAlignment="Left"
+                IsVisible="{Binding #Root.HasAction}" />
+    </StackPanel>
+</UserControl>
