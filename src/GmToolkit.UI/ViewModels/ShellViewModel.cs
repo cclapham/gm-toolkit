@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -114,6 +115,26 @@ public partial class ShellViewModel : ViewModelBase, System.IDisposable
     /// </summary>
     [ObservableProperty]
     public partial bool ShowActiveCampaignBanner { get; set; }
+
+    /// <summary>
+    /// Whether the nav rail's Exit button should show. Desktop-only (<see cref="IClassicDesktopStyleApplicationLifetime"/>):
+    /// there's no equivalent "quit the app" gesture on Android, which uses <c>IActivityApplicationLifetime</c>/
+    /// <c>ISingleViewApplicationLifetime</c> instead (see <c>App.axaml.cs</c>) and relies on the OS's own
+    /// back/home/recents affordances. Evaluated once at construction since <see cref="Avalonia.Application.ApplicationLifetime"/>
+    /// doesn't change over an app's lifetime, and is already set by the time either head's composition
+    /// root constructs this view model. False (and the button stays hidden) in plain xUnit tests and the
+    /// XAML previewer, where <see cref="Avalonia.Application.Current"/> has no running lifetime at all.
+    /// </summary>
+    public bool ShowExitButton { get; } = Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime;
+
+    [RelayCommand]
+    private void Exit()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
+        }
+    }
 
     [RelayCommand]
     private void NavigateTo(NavigationDestination destination)
