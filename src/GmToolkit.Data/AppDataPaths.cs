@@ -19,12 +19,29 @@ public static class AppDataPaths
     public const string DatabaseFileName = "gmtoolkit.db";
 
     /// <summary>
+    /// The app-settings JSON file name (issue #31 -- see <see cref="AppSettingsService"/>), shared
+    /// across platforms the same way <see cref="DatabaseFileName"/> is: it lives alongside the
+    /// database in whichever directory each platform resolves.
+    /// </summary>
+    public const string SettingsFileName = "settings.json";
+
+    /// <summary>
     /// Returns the desktop app-data database path: <c>%LOCALAPPDATA%\GmToolkit\gmtoolkit.db</c>
     /// on Windows, <c>~/.local/share/GmToolkit/gmtoolkit.db</c> on Linux.
     /// </summary>
-    public static string GetDesktopDatabasePath()
+    public static string GetDesktopDatabasePath() => Path.Combine(GetDesktopAppDataDirectory(), DatabaseFileName);
+
+    /// <summary>
+    /// Returns the desktop app-settings JSON file path: <c>%LOCALAPPDATA%\GmToolkit\settings.json</c>
+    /// on Windows, <c>~/.local/share/GmToolkit/settings.json</c> on Linux -- the same directory
+    /// <see cref="GetDesktopDatabasePath"/> resolves, since this is a small sidecar file next to
+    /// the database, not a separate app-data location.
+    /// </summary>
+    public static string GetDesktopSettingsPath() => Path.Combine(GetDesktopAppDataDirectory(), SettingsFileName);
+
+    private static string GetDesktopAppDataDirectory()
     {
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(localAppData, "GmToolkit", DatabaseFileName);
+        return Path.Combine(localAppData, "GmToolkit");
     }
 }

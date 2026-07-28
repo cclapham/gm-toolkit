@@ -13,12 +13,23 @@
     <!-- Padding="24" mirrors SpaceLG, Thickness-typed properties can't bind a plain-double
          StaticResource directly, see the note in Styles/Spacing.axaml. -->
     <Border Background="{DynamicResource BgBrush}" Padding="24">
-        <StackPanel Spacing="{StaticResource SpaceSM}" MaxWidth="480" HorizontalAlignment="Left">
+        <StackPanel Spacing="{StaticResource SpaceMD}" MaxWidth="480" HorizontalAlignment="Left">
             <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" Text="Settings" />
-            <TextBlock Classes="body"
-                       Foreground="{DynamicResource TextBrush}"
-                       TextWrapping="Wrap"
-                       Text="App-wide settings (theme, etc.) will live here. Always reachable, regardless of whether a campaign is active." />
+
+            <!-- Theme preference (issue #31): System follows the OS/platform theme wherever
+                 Avalonia's platform detection supports it (matches this app's default); Light/Dark
+                 are a manual override that works everywhere, including platforms that don't report
+                 an OS theme preference at all (Raspberry Pi/embedded Linux). A ComboBox, not radio
+                 buttons, for the same reason NpcsView.axaml's Faction/Location filters use one:
+                 three named options read fine from a dropdown, and it's the established pattern
+                 for "pick one of a short list" elsewhere in this app. -->
+            <StackPanel Spacing="{StaticResource SpaceXS}">
+                <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="Theme" />
+                <TextBlock Classes="caption"
+                           TextWrapping="Wrap"
+                           Text="System follows your OS's light/dark setting where supported. Light and Dark override it everywhere, including devices that don't report an OS theme preference." />
+                <ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}" MinWidth="160" />
+            </StackPanel>
         </StackPanel>
     </Border>
 </UserControl>

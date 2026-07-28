@@ -22,14 +22,20 @@ sealed class Program
         var databasePath = AppDataPaths.GetDesktopDatabasePath();
         var database = await GmToolkitDatabase.CreateAndInitializeAsync(databasePath);
 
+        var settingsPath = AppDataPaths.GetDesktopSettingsPath();
+        var appSettingsService = new AppSettingsService(settingsPath);
+
         var services = new ServiceCollection();
-        services.AddGmToolkitData(database);
+        services.AddGmToolkitData(database, appSettingsService);
         services.AddGmToolkitUi();
         var serviceProvider = services.BuildServiceProvider();
 
-        // Make the container reachable from GmToolkit.UI (see App.Services' doc comment), and
-        // restore whichever campaign was last opened before any UI is shown.
+        // Make the container reachable from GmToolkit.UI (see App.Services' doc comment), resolve
+        // the persisted theme preference (issue #31) so it can be applied before any UI is shown
+        // (see App.InitialThemePreference's doc comment), and restore whichever campaign was last
+        // opened before any UI is shown.
         App.Services = serviceProvider;
+        App.InitialThemePreference = await appSettingsService.GetThemePreferenceAsync();
         await serviceProvider.GetRequiredService<ActiveCampaignContext>().RestoreLastOpenedAsync();
 
         try

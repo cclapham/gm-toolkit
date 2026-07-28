@@ -40,6 +40,11 @@ namespace GmToolkit.Android
         // read that has to finish before any UI is shown (so the restored campaign is available
         // to the very first view model that asks for it), and OnCreate offers no clean async
         // path either — so it's blocked on for the same reasons as the database bootstrap above.
+        //
+        // Resolving the persisted theme preference (#31) is the same story again: one more local
+        // file read (the settings.json sidecar, not SQLite this time) that has to finish before
+        // any UI is shown so App.InitialThemePreference is applied before the first window/view is
+        // constructed (see that property's doc comment) — blocked on for the same reasons.
         public override void OnCreate()
         {
             base.OnCreate();
@@ -49,14 +54,21 @@ namespace GmToolkit.Android
                 .GetAwaiter()
                 .GetResult();
 
+            var settingsPath = System.IO.Path.Combine(FilesDir!.AbsolutePath, AppDataPaths.SettingsFileName);
+            var appSettingsService = new AppSettingsService(settingsPath);
+
             var services = new ServiceCollection();
-            services.AddGmToolkitData(database);
+            services.AddGmToolkitData(database, appSettingsService);
             services.AddGmToolkitUi();
             _serviceProvider = services.BuildServiceProvider();
 
-            // Make the container reachable from GmToolkit.UI (see App.Services' doc comment), and
-            // restore whichever campaign was last opened before any UI is shown.
+            // Make the container reachable from GmToolkit.UI (see App.Services' doc comment),
+            // resolve the persisted theme preference so it can be applied before any UI is shown,
+            // and restore whichever campaign was last opened before any UI is shown.
             App.Services = _serviceProvider;
+            App.InitialThemePreference = Task.Run(() => appSettingsService.GetThemePreferenceAsync())
+                .GetAwaiter()
+                .GetResult();
             var activeCampaignContext = _serviceProvider.GetRequiredService<ActiveCampaignContext>();
             Task.Run(() => activeCampaignContext.RestoreLastOpenedAsync())
                 .GetAwaiter()
