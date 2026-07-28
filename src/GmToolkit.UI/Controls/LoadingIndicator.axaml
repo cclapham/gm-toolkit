@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="120"
+             x:Class="GmToolkit.UI.Controls.LoadingIndicator"
+             x:Name="Root">
+
+    <!-- Reusable loading indicator (#23): an indeterminate ProgressBar plus an optional caption,
+         shown while a screen's IsLoading is true. Deliberately NOT a skeleton-shimmer layout that
+         mimics the eventual list/row shapes — see the code-behind's remarks for why a real
+         skeleton system would be disproportionate effort here. -->
+    <StackPanel Spacing="{StaticResource SpaceMD}"
+                MaxWidth="320"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True" Width="240" HorizontalAlignment="Left" />
+        <TextBlock Classes="body"
+                   Foreground="{DynamicResource TextMutedBrush}"
+                   TextWrapping="Wrap"
+                   Text="{Binding #Root.Message}"
+                   IsVisible="{Binding #Root.Message, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+</UserControl>

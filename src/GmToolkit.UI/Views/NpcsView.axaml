@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
              xmlns:views="using:GmToolkit.UI.Views"
+             xmlns:controls="using:GmToolkit.UI.Controls"
              xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.NpcsView"
@@ -129,41 +130,39 @@
                 <Button Classes="accent" Content="Try again" Command="{Binding RetryLoadCommand}" HorizontalAlignment="Left" />
             </StackPanel>
 
+            <!-- Loading state (#23): mirrors CampaignsView.axaml/CharactersView.axaml's identical
+                 state, so a slow load never shows a blank area with nothing explaining what's
+                 happening. -->
+            <controls:LoadingIndicator Grid.Row="2"
+                                        IsVisible="{Binding IsLoading}"
+                                        Message="Loading NPCs..." />
+
             <!-- Empty state: the active campaign has no NPCs yet at all. Has its own dedicated
                  create button (issue #25); the header's "+ Add NPC" button above is bound to
                  IsSearchBarVisible, which is false here (see that binding's remarks), so this state
-                 needs its own, same split as CharactersView.axaml/CampaignsView.axaml's empty states. -->
-            <StackPanel Grid.Row="2"
-                        IsVisible="{Binding IsEmpty}"
-                        Spacing="{StaticResource SpaceMD}"
-                        MaxWidth="480"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center">
-                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="No NPCs yet" />
-                <TextBlock Classes="body"
-                           Foreground="{DynamicResource TextBrush}"
-                           TextWrapping="Wrap"
-                           Text="This is where the active campaign's non-player characters live, with search and filter by faction/location. Add your first NPC to get started." />
-                <Button Classes="accent"
-                        Content="Add your first NPC"
-                        Command="{Binding ShowCreateFormCommand}"
-                        HorizontalAlignment="Left" />
-            </StackPanel>
+                 needs its own, same split as CharactersView.axaml/CampaignsView.axaml's empty
+                 states. Uses the reusable EmptyState control (#23) — see its remarks. -->
+            <controls:EmptyState Grid.Row="2"
+                                  IsVisible="{Binding IsEmpty}"
+                                  Icon="🎭"
+                                  Title="No NPCs yet"
+                                  Message="This is where the active campaign's non-player characters live, with search and filter by faction/location. Add your first NPC to get started."
+                                  ActionText="Add your first NPC"
+                                  ActionCommand="{Binding ShowCreateFormCommand}" />
 
             <!-- No-search-results state, distinct from IsEmpty above: the campaign has NPCs, but
-                 none match the current search/filter. See NpcsViewModel.IsNoSearchResults's remarks. -->
-            <StackPanel Grid.Row="2"
-                        IsVisible="{Binding IsNoSearchResults}"
-                        Spacing="{StaticResource SpaceMD}"
-                        MaxWidth="480"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center">
-                <TextBlock Classes="title" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="No NPCs match your search" />
-                <TextBlock Classes="body"
-                           Foreground="{DynamicResource TextBrush}"
-                           TextWrapping="Wrap"
-                           Text="Try a different search term, or reset the faction/location filter back to All." />
-            </StackPanel>
+                 none match the current search/filter. See NpcsViewModel.IsNoSearchResults's remarks.
+                 Also uses EmptyState (#23), with IsCompact="True" to keep this state's previous,
+                 less prominent "title" heading look (it's a transient nudge, not a first-run
+                 "welcome" moment) and no ActionText/ActionCommand — there's nothing actionable to
+                 do here beyond adjusting the search/filter controls already on screen, so
+                 EmptyState.HasAction is false and no button renders. -->
+            <controls:EmptyState Grid.Row="2"
+                                  IsVisible="{Binding IsNoSearchResults}"
+                                  Icon="🔍"
+                                  IsCompact="True"
+                                  Title="No NPCs match your search"
+                                  Message="Try a different search term, or reset the faction/location filter back to All." />
 
             <!-- Populated list. Each row is compact and fixed-height (NotesPreview is single-line,
                  ellipsis-truncated, see NpcListItemViewModel's remarks) so a list of 100 NPCs

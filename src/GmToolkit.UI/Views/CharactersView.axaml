@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
              xmlns:views="using:GmToolkit.UI.Views"
+             xmlns:controls="using:GmToolkit.UI.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="GmToolkit.UI.Views.CharactersView"
              x:DataType="vm:CharactersViewModel">
@@ -60,23 +61,21 @@
                 <Button Classes="accent" Content="Try again" Command="{Binding RetryLoadCommand}" HorizontalAlignment="Left" />
             </StackPanel>
 
-            <!-- Empty state (#20): a campaign with no PCs yet needs a clear, single next step. -->
-            <StackPanel Grid.Row="1"
-                        IsVisible="{Binding IsEmpty}"
-                        Spacing="{StaticResource SpaceMD}"
-                        MaxWidth="480"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center">
-                <TextBlock Classes="display" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="No characters yet" />
-                <TextBlock Classes="body"
-                           Foreground="{DynamicResource TextBrush}"
-                           TextWrapping="Wrap"
-                           Text="This is where the active campaign's player-character roster lives -- the thing you actually stare at during a session. Add your first player character to get started." />
-                <Button Classes="accent"
-                        Content="Add your first character"
-                        Command="{Binding ShowCreateFormCommand}"
-                        HorizontalAlignment="Left" />
-            </StackPanel>
+            <!-- Loading state (#23): mirrors CampaignsView.axaml's identical state, so a slow load
+                 never shows a blank area with nothing explaining what's happening. -->
+            <controls:LoadingIndicator Grid.Row="1"
+                                        IsVisible="{Binding IsLoading}"
+                                        Message="Loading characters..." />
+
+            <!-- Empty state (#20): a campaign with no PCs yet needs a clear, single next step.
+                 Uses the reusable EmptyState control (#23) — see its remarks. -->
+            <controls:EmptyState Grid.Row="1"
+                                  IsVisible="{Binding IsEmpty}"
+                                  Icon="🧙"
+                                  Title="No characters yet"
+                                  Message="This is where the active campaign's player-character roster lives -- the thing you actually stare at during a session. Add your first player character to get started."
+                                  ActionText="Add your first character"
+                                  ActionCommand="{Binding ShowCreateFormCommand}" />
 
             <!-- Populated roster, sorted alphabetically by character name. Each row is compact
                  and fixed-height (StatsSummary is single-line, ellipsis-truncated - see
