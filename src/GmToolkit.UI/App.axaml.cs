@@ -4,6 +4,8 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
+using GmToolkit.Core.Services;
+using GmToolkit.UI.Services;
 using GmToolkit.UI.ViewModels;
 using GmToolkit.UI.Views;
 
@@ -28,6 +30,18 @@ public partial class App : Application
     /// </remarks>
     public static IServiceProvider? Services { get; internal set; }
 
+    /// <summary>
+    /// The theme preference (issue #31) resolved from <see cref="IAppSettingsService"/> by the
+    /// composition root before the Avalonia lifetime starts -- set the same way and for the same
+    /// reason as <see cref="Services"/> (Avalonia constructs <see cref="App"/> itself, so this
+    /// can't be threaded through a constructor parameter). Applied at the very top of
+    /// <see cref="OnFrameworkInitializationCompleted"/>, before any window/view is constructed, so
+    /// there is never a flash of the wrong theme on startup -- mirrors how
+    /// <c>ActiveCampaignContext.RestoreLastOpenedAsync</c> is already awaited before either head
+    /// starts the Avalonia lifetime at all.
+    /// </summary>
+    public static ThemePreference InitialThemePreference { get; internal set; } = ThemePreference.System;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -46,6 +60,10 @@ public partial class App : Application
         var services = Services ?? throw new InvalidOperationException(
             $"{nameof(App)}.{nameof(Services)} must be set by the composition root " +
             "(GmToolkit.Desktop/Program.cs or GmToolkit.Android/Application.cs) before the Avalonia lifetime starts.");
+
+        // Apply the persisted theme preference before constructing any window/view below -- see
+        // InitialThemePreference's remarks.
+        ThemeApplier.Apply(this, InitialThemePreference);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

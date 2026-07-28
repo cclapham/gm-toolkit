@@ -4,6 +4,26 @@
     From the "Foundations" design system (claude.ai/design, project "GM Toolkit").
     Light is a sepia/parchment tone; dark is genuinely dark, not sepia — issue #31
     calls for a dark mode people can actually run games by in a dim room.
+
+    WCAG AA contrast verification (issue #31): every foreground/background pairing actually used
+    across GmToolkit.UI's shared styles and views was checked against the standard
+    relative-luminance contrast formula (thresholds: 4.5:1 normal text, 3:1 large text/UI component
+    boundaries). Every pairing in both palettes passed except one: SuccessColor text directly on
+    BgColor in Light (the Generator screen's save-confirmation caption, GeneratorView.axaml) was
+    4.01:1, so SuccessColor was darkened from #15803D to #126C33 (same hue/saturation, only
+    lightness reduced) to bring it to 5.21:1 against BgColor (and correspondingly higher against
+    every other background it appears in front of), while the badge pairing that uses it as a
+    *background* (SurfaceColor text on SuccessColor, NpcsView.axaml's "known to players" badge)
+    only improved (4.54:1 to 5.90:1) since a darker background gives light text more contrast, not
+    less. BorderColor against BgColor/SurfaceColor computes below the 3:1 UI component boundary
+    threshold in both palettes, but every actual BorderBrush usage in this app is a decorative
+    divider or panel outline (nav-rail separator, rounded-corner outlines around
+    delete/discard-confirmation callouts and the markdown notes preview box) rather than the sole
+    means of identifying an interactive control, and WCAG 1.4.11 only applies to UI components and
+    graphical objects required to identify/operate them, explicitly exempting appearance the
+    author hasn't modified from the user agent's own default (this app's TextBox/ComboBox/Button
+    chrome is unmodified Avalonia FluentTheme default styling, not colored via BorderBrush at all),
+    so no change was made there.
   -->
   <ResourceDictionary.ThemeDictionaries>
     <ResourceDictionary x:Key="Light">
@@ -16,7 +36,7 @@
       <Color x:Key="AccentColor">#92400E</Color>
       <Color x:Key="AccentHoverColor">#7C3B0F</Color>
       <Color x:Key="AccentSoftColor">#EAD9B0</Color>
-      <Color x:Key="SuccessColor">#15803D</Color>
+      <Color x:Key="SuccessColor">#126C33</Color>
       <Color x:Key="DangerColor">#B91C1C</Color>
 
       <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}" />

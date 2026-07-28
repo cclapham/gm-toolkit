@@ -47,7 +47,7 @@ public sealed class NavigationService : INavigationService
     // cheap to do now, and avoids having to retrofit it later.
     private readonly Dictionary<NavigationDestination, ViewModelBase> _cache = [];
 
-    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, INpcRepository npcRepository, IGeneratorRegistry generatorRegistry, INpcGenerator npcGenerator, ActiveCampaignContext activeCampaignContext)
+    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, INpcRepository npcRepository, IGeneratorRegistry generatorRegistry, INpcGenerator npcGenerator, ActiveCampaignContext activeCampaignContext, IAppSettingsService appSettingsService)
     {
         _factories = new Dictionary<NavigationDestination, Func<ViewModelBase>>
         {
@@ -55,7 +55,7 @@ public sealed class NavigationService : INavigationService
             [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext),
             [NavigationDestination.Npcs] = () => new NpcsViewModel(npcRepository, activeCampaignContext),
             [NavigationDestination.Generator] = () => new GeneratorViewModel(generatorRegistry, npcGenerator, npcRepository, activeCampaignContext, this),
-            [NavigationDestination.Settings] = () => new SettingsViewModel(),
+            [NavigationDestination.Settings] = () => new SettingsViewModel(appSettingsService),
         };
 
         CurrentDestination = NavigationDestination.Campaigns;
@@ -66,14 +66,14 @@ public sealed class NavigationService : INavigationService
     /// <c>Design.DataContext</c> (via <see cref="ShellViewModel"/>'s own parameterless
     /// constructor) and by tests that don't need a real database. Backed by the same
     /// always-empty, no-op <see cref="DesignTimeCampaignRepository"/>/<see cref="DesignTimePlayerCharacterRepository"/>/
-    /// <see cref="DesignTimeNpcRepository"/> used elsewhere for this purpose, plus a real
-    /// <see cref="GeneratorRegistry"/>/<see cref="NpcGenerator"/> over the embedded tables (see
-    /// <see cref="GeneratorViewModel"/>'s own design-time constructor for why those two don't need a
-    /// design-time fake). Never used at
+    /// <see cref="DesignTimeNpcRepository"/>/<see cref="DesignTimeAppSettingsService"/> used
+    /// elsewhere for this purpose, plus a real <see cref="GeneratorRegistry"/>/<see cref="NpcGenerator"/>
+    /// over the embedded tables (see <see cref="GeneratorViewModel"/>'s own design-time constructor
+    /// for why those two don't need a design-time fake). Never used at
     /// runtime; both heads resolve the constructor above via DI (see
     /// <c>ServiceCollectionExtensions.AddGmToolkitUi</c>).</summary>
     public NavigationService()
-        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new DesignTimeNpcRepository(), GeneratorRegistry.FromEmbeddedTables(), CreateDesignTimeNpcGenerator(), new ActiveCampaignContext(new DesignTimeCampaignRepository()))
+        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new DesignTimeNpcRepository(), GeneratorRegistry.FromEmbeddedTables(), CreateDesignTimeNpcGenerator(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), new DesignTimeAppSettingsService())
     {
     }
 
