@@ -46,10 +46,19 @@ namespace GmToolkit.Android
         // file read (the settings.json sidecar, not SQLite this time) that has to finish before
         // any UI is shown so App.InitialThemePreference is applied before the first window/view is
         // constructed (see that property's doc comment) — blocked on for the same reasons.
+        // base.OnCreate() is deliberately called LAST here, not first -- confirmed by a real
+        // on-device crash (not caught by CI, which only ever cross-compiles this head, never runs
+        // it): AvaloniaAndroidApplication<TApp>.OnCreate() synchronously drives Avalonia's entire
+        // framework-init chain (InitializeAppLifetime -> AppBuilder.SetupWithLifetime -> ... ->
+        // App.OnFrameworkInitializationCompleted), and that last step throws immediately if
+        // App.Services isn't set yet. Calling base.OnCreate() first (the usual override
+        // convention) means Avalonia tries to build the shell before this method ever reaches the
+        // App.Services assignment below -- guaranteed InvalidOperationException on every launch.
+        // Everything this override needs to do (DB bootstrap, DI container, App.Services/
+        // InitialThemePreference, restoring the last-opened campaign) has to complete before
+        // handing control to Avalonia, so base.OnCreate() has to be the final statement instead.
         public override void OnCreate()
         {
-            base.OnCreate();
-
             // Global exception handling (issue #32) -- installed before anything else, including
             // the database bootstrap below, mirrors GmToolkit.Desktop/Program.cs's identical first
             // line; see GlobalExceptionHandler's remarks for the full design.
@@ -79,6 +88,8 @@ namespace GmToolkit.Android
             Task.Run(() => activeCampaignContext.RestoreLastOpenedAsync())
                 .GetAwaiter()
                 .GetResult();
+
+            base.OnCreate();
         }
 
         protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
