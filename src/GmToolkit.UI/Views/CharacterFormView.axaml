@@ -97,12 +97,14 @@
                     <TextBlock Classes="caption"
                                Foreground="{DynamicResource DangerBrush}"
                                Text="{Binding StatsError}"
+                               TextWrapping="Wrap"
                                IsVisible="{Binding StatsError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
 
                 <TextBlock Classes="caption"
                            Foreground="{DynamicResource DangerBrush}"
                            Text="{Binding SaveError}"
+                           TextWrapping="Wrap"
                            IsVisible="{Binding SaveError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
 
                 <!-- Spacing="8" mirrors SpaceSM, see the note in Styles/Spacing.axaml. -->
@@ -163,6 +165,7 @@
                     <TextBlock Classes="caption"
                                Foreground="{DynamicResource DangerBrush}"
                                Text="{Binding DeleteError}"
+                               TextWrapping="Wrap"
                                IsVisible="{Binding DeleteError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Classes="accent" Content="Cancel" Command="{Binding CancelDeleteCommand}" />

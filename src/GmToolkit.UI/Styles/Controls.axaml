@@ -30,4 +30,26 @@
   <Style Selector="Button.link:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
   </Style>
+
+  <!-- Toast/notification chrome (#32, GmToolkit.UI.Controls.ToastHost): a rounded, bordered card
+       whose background/border color signals severity. Base style sets the shared chrome; the
+       three severity-specific styles below only ever override Background/BorderBrush, so any
+       future new severity is a one-line addition here rather than a whole new template. -->
+  <Style Selector="Border.toast">
+    <Setter Property="Padding" Value="12" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="MinWidth" Value="240" />
+    <Setter Property="MaxWidth" Value="400" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+  </Style>
+  <Style Selector="Border.toast.warning">
+    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+  <Style Selector="Border.toast.error">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
+  </Style>
 </Styles>

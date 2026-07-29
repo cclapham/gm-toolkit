@@ -151,6 +151,22 @@ public class NpcFormViewModelTests
     }
 
     [Fact]
+    public async Task SaveAsync_when_the_repository_throws_a_DataAccessException_shows_its_friendly_message_instead_of_crashing()
+    {
+        // Mirrors CampaignFormViewModelTests'/CharacterFormViewModelTests' identical test (issue #32).
+        var repository = new FakeNpcRepository { ThrowOnAdd = new DataAccessException("The database file is missing.") };
+        var form = new NpcFormViewModel(repository);
+        form.BeginCreate(Guid.NewGuid());
+        form.Name = "Baelor the Butcher";
+
+        var exception = await Record.ExceptionAsync(() => form.SaveCommand.ExecuteAsync(null));
+
+        Assert.Null(exception);
+        Assert.NotNull(form.SaveError);
+        Assert.Contains("The database file is missing.", form.SaveError);
+    }
+
+    [Fact]
     public void BeginEdit_populates_every_field_from_the_existing_npc()
     {
         var npc = new Npc

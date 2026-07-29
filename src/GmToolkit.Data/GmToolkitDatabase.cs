@@ -32,8 +32,17 @@ public sealed class GmToolkitDatabase : IAsyncDisposable
 
     public SQLiteAsyncConnection Connection { get; }
 
+    /// <summary>
+    /// The path this database was opened at. Used by <see cref="DatabaseExceptionTranslator"/>
+    /// (issue #32) to proactively detect the file disappearing out from under a live connection --
+    /// see that type's remarks for why an existence check, not just catching whatever SQLite
+    /// itself throws, is necessary to reliably surface that specific failure.
+    /// </summary>
+    public string DatabasePath { get; }
+
     public GmToolkitDatabase(string databasePath)
     {
+        DatabasePath = databasePath;
         Batteries_V2.Init();
         Connection = new SQLiteAsyncConnection(databasePath);
     }

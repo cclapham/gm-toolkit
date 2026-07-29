@@ -61,6 +61,13 @@ public partial class App : Application
             $"{nameof(App)}.{nameof(Services)} must be set by the composition root " +
             "(GmToolkit.Desktop/Program.cs or GmToolkit.Android/Application.cs) before the Avalonia lifetime starts.");
 
+        // Global exception handling (issue #32): Dispatcher.UIThread is only guaranteed to exist
+        // once Avalonia's platform backend is set up, which has already happened by the time this
+        // method runs -- see GlobalExceptionHandler's remarks for why this specific hook (as
+        // opposed to the AppDomain/TaskScheduler ones each head installs at the very top of its own
+        // Main/OnCreate, before any of this) has to wait until here.
+        GlobalExceptionHandler.InstallDispatcherHandler();
+
         // Apply the persisted theme preference before constructing any window/view below -- see
         // InitialThemePreference's remarks.
         ThemeApplier.Apply(this, InitialThemePreference);

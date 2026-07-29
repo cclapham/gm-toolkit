@@ -12,38 +12,43 @@ namespace GmToolkit.Data.Repositories;
 /// </remarks>
 public class CampaignRepository(GmToolkitDatabase database) : ICampaignRepository
 {
-    public async Task<Campaign?> GetAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        var row = await database.Connection.FindAsync<CampaignRow>(id);
-        return row is null ? null : await ToModelAsync(row);
-    }
-
-    public async Task<IReadOnlyList<Campaign>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        var rows = await database.Connection.Table<CampaignRow>().ToListAsync();
-        var campaigns = new List<Campaign>(rows.Count);
-        foreach (var row in rows)
+    public Task<Campaign?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        DatabaseExceptionTranslator.RunAsync(database, async () =>
         {
-            campaigns.Add(await ToModelAsync(row));
-        }
+            var row = await database.Connection.FindAsync<CampaignRow>(id);
+            return row is null ? null : await ToModelAsync(row);
+        });
 
-        return campaigns;
-    }
+    public Task<IReadOnlyList<Campaign>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        DatabaseExceptionTranslator.RunAsync(database, async () =>
+        {
+            var rows = await database.Connection.Table<CampaignRow>().ToListAsync();
+            var campaigns = new List<Campaign>(rows.Count);
+            foreach (var row in rows)
+            {
+                campaigns.Add(await ToModelAsync(row));
+            }
+
+            return (IReadOnlyList<Campaign>)campaigns;
+        });
 
     public Task AddAsync(Campaign campaign, CancellationToken cancellationToken = default) =>
-        database.Connection.InsertAsync(CampaignMapper.ToRow(campaign));
+        DatabaseExceptionTranslator.RunAsync(database, () =>
+            database.Connection.InsertAsync(CampaignMapper.ToRow(campaign)));
 
     public Task UpdateAsync(Campaign campaign, CancellationToken cancellationToken = default) =>
-        database.Connection.UpdateAsync(CampaignMapper.ToRow(campaign));
+        DatabaseExceptionTranslator.RunAsync(database, () =>
+            database.Connection.UpdateAsync(CampaignMapper.ToRow(campaign)));
 
-    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        // Explicit cascade — sqlite-net-pcl's attribute-driven schema creation doesn't emit
-        // FOREIGN KEY/ON DELETE CASCADE clauses (see #10's notes).
-        await database.Connection.ExecuteAsync("DELETE FROM PlayerCharacters WHERE CampaignId = ?", id);
-        await database.Connection.ExecuteAsync("DELETE FROM Npcs WHERE CampaignId = ?", id);
-        await database.Connection.ExecuteAsync("DELETE FROM Campaigns WHERE Id = ?", id);
-    }
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        DatabaseExceptionTranslator.RunAsync(database, async () =>
+        {
+            // Explicit cascade — sqlite-net-pcl's attribute-driven schema creation doesn't emit
+            // FOREIGN KEY/ON DELETE CASCADE clauses (see #10's notes).
+            await database.Connection.ExecuteAsync("DELETE FROM PlayerCharacters WHERE CampaignId = ?", id);
+            await database.Connection.ExecuteAsync("DELETE FROM Npcs WHERE CampaignId = ?", id);
+            await database.Connection.ExecuteAsync("DELETE FROM Campaigns WHERE Id = ?", id);
+        });
 
     private async Task<Campaign> ToModelAsync(CampaignRow row)
     {

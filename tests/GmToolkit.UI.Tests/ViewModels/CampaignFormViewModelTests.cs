@@ -1,4 +1,5 @@
 using GmToolkit.Core.Models;
+using GmToolkit.Core.Repositories;
 using GmToolkit.UI.Tests.Fakes;
 using GmToolkit.UI.ViewModels;
 
@@ -97,6 +98,26 @@ public class CampaignFormViewModelTests
         Assert.Equal("A crew of scoundrels in Duskvol.", all[0].Description);
         Assert.NotNull(saved);
         Assert.Equal("Wandering Souls", saved!.Name);
+    }
+
+    [Fact]
+    public async Task SaveAsync_when_the_repository_throws_a_DataAccessException_shows_its_friendly_message_instead_of_crashing()
+    {
+        // Issue #32's acceptance criterion, at the view-model level: a repository failure (e.g. a
+        // real DataAccessException from the database file disappearing mid-session) must not
+        // propagate out of this [RelayCommand]-generated async command uncaught -- it should be
+        // caught and surfaced as SaveError, the same friendly inline text CampaignsViewModel.LoadAsync/
+        // ConfirmDeleteAsync already show for their own repository failures.
+        var repository = new FakeCampaignRepository { ThrowOnAdd = new DataAccessException("The database file is missing.") };
+        var form = new CampaignFormViewModel(repository);
+        form.BeginCreate();
+        form.Name = "Wandering Souls";
+
+        var exception = await Record.ExceptionAsync(() => form.SaveCommand.ExecuteAsync(null));
+
+        Assert.Null(exception);
+        Assert.NotNull(form.SaveError);
+        Assert.Contains("The database file is missing.", form.SaveError);
     }
 
     [Fact]
