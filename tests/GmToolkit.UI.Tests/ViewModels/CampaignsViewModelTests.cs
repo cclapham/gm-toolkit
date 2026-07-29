@@ -365,6 +365,88 @@ public class CampaignsViewModelTests
     }
 
     [Fact]
+    public void ToggleExpandedCommand_expands_a_collapsed_row_without_activating_it()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var activeCampaignContext = new ActiveCampaignContext(repository);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var item = Assert.Single(vm.Campaigns);
+        Assert.False(item.IsExpanded);
+
+        vm.ToggleExpandedCommand.Execute(item);
+
+        Assert.True(item.IsExpanded);
+        Assert.Null(activeCampaignContext.ActiveCampaign);
+        Assert.False(item.IsActive);
+    }
+
+    [Fact]
+    public void ToggleExpandedCommand_collapses_an_already_expanded_row()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+        vm.ToggleExpandedCommand.Execute(item);
+        Assert.True(item.IsExpanded);
+
+        vm.ToggleExpandedCommand.Execute(item);
+
+        Assert.False(item.IsExpanded);
+    }
+
+    [Fact]
+    public void Each_rows_expanded_state_is_independent()
+    {
+        var first = new Campaign { Name = "Wandering Souls" };
+        var second = new Campaign { Name = "Shadows Over Blackmoor" };
+        var repository = new FakeCampaignRepository(first, second);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var firstItem = vm.Campaigns.Single(c => c.Campaign.Id == first.Id);
+        var secondItem = vm.Campaigns.Single(c => c.Campaign.Id == second.Id);
+
+        vm.ToggleExpandedCommand.Execute(firstItem);
+
+        Assert.True(firstItem.IsExpanded);
+        Assert.False(secondItem.IsExpanded);
+    }
+
+    [Fact]
+    public void DescriptionOrPlaceholder_falls_back_to_a_placeholder_when_the_campaign_has_no_description()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls", Description = string.Empty };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+
+        Assert.Equal("No description", item.DescriptionOrPlaceholder);
+    }
+
+    [Fact]
+    public void DescriptionOrPlaceholder_shows_the_campaigns_description_when_set()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls", Description = "A long-running homebrew campaign." };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+
+        Assert.Equal("A long-running homebrew campaign.", item.DescriptionOrPlaceholder);
+    }
+
+    [Fact]
+    public void CreatedUtc_is_exposed_from_the_underlying_campaign()
+    {
+        var createdUtc = new DateTime(2023, 5, 17, 0, 0, 0, DateTimeKind.Utc);
+        var campaign = new Campaign { Name = "Wandering Souls", CreatedUtc = createdUtc };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+
+        Assert.Equal(createdUtc, item.CreatedUtc);
+    }
+
+    [Fact]
     public void Subscribing_to_the_real_ActiveCampaignChanged_event_does_not_throw_synchronously_without_a_running_dispatcher()
     {
         // Mirrors ShellViewModelTests' identical test -- proves the subscription path itself

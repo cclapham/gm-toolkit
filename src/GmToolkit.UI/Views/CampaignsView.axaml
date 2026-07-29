@@ -45,9 +45,9 @@
             <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
         </Style>
 
-        <!-- The "edit" (issue #71) and "delete" triggers: both siblings of campaignRowSelect (not
-             nested inside it - see this style block's opening comment), so neither one's click
-             also selects the campaign. -->
+        <!-- The "edit" (issue #71), "expand/collapse" (issue #72) and "delete" triggers: all
+             siblings of campaignRowSelect (not nested inside it - see this style block's opening
+             comment), so none of their clicks also selects the campaign. -->
         <Style Selector="Button.campaignRowEdit">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -55,6 +55,15 @@
             <Setter Property="Padding" Value="8,12" />
         </Style>
         <Style Selector="Button.campaignRowEdit:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        </Style>
+        <Style Selector="Button.campaignRowExpand">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <!-- Padding="8,12" mirrors SpaceSM/SpaceMD, see the note in Styles/Spacing.axaml. -->
+            <Setter Property="Padding" Value="8,12" />
+        </Style>
+        <Style Selector="Button.campaignRowExpand:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
         </Style>
         <Style Selector="Button.campaignRowDelete">
@@ -166,10 +175,14 @@
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Button>
-                                        <!-- Edit (issue #71) and delete (issue #19) triggers, side by side: both siblings of
-                                             campaignRowSelect above (not nested inside it - see this view's Styles block), so
-                                             neither click also activates the campaign. -->
+                                        <!-- Expand/collapse (issue #72), edit (issue #71) and delete (issue #19) triggers, side
+                                             by side: all siblings of campaignRowSelect above (not nested inside it - see this
+                                             view's Styles block), so none of their clicks also activates the campaign. -->
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                            <Button Classes="campaignRowExpand"
+                                                    Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).ToggleExpandedCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="{Binding ExpandToggleLabel}" />
                                             <Button Classes="campaignRowEdit"
                                                     Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).RequestEditCommand}"
                                                     CommandParameter="{Binding}"
@@ -180,6 +193,19 @@
                                                     Content="Delete" />
                                         </StackPanel>
                                     </Grid>
+
+                                    <!-- Expanded overview panel (issue #72): collapsed by default, toggled per row by the
+                                         "More"/"Less" button above. Additive alongside the compact summary line inside
+                                         campaignRowSelect (CountsLabel/LastOpenedUtc/Active badge), which stays visible in
+                                         both states - this only adds Description (with a placeholder instead of an empty
+                                         gap when blank) and CreatedUtc, formatted the same way LastOpenedUtc already is
+                                         above. -->
+                                    <StackPanel IsVisible="{Binding IsExpanded}"
+                                                Spacing="{StaticResource SpaceXS}"
+                                                Margin="12,0,12,12">
+                                        <TextBlock Classes="body" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Text="{Binding DescriptionOrPlaceholder}" />
+                                        <TextBlock Classes="caption" Text="{Binding CreatedUtc, StringFormat='Created {0:MMM d, yyyy}'}" />
+                                    </StackPanel>
 
                                     <!-- Inline delete-confirmation panel (issue #19): same
                                          no-popup-dialog idiom as CampaignFormView.axaml's discard
