@@ -30,7 +30,13 @@ Most GM tools are either web-only (useless at a table with no wifi), locked to o
 
 ## Screenshots
 
-_Coming once the MVP UI lands. See [ROADMAP.md](ROADMAP.md)._
+_Populated with invented campaign/character names — no content from published books._
+
+| | Light | Dark |
+| --- | --- | --- |
+| **Campaigns** | ![Campaigns list, light theme](docs/images/campaigns-light.png) | ![Campaigns list, dark theme](docs/images/campaigns-dark.png) |
+| **Player characters** | ![Player character roster, light theme](docs/images/characters-light.png) | ![Player character roster, dark theme](docs/images/characters-dark.png) |
+| **NPC generator** | ![NPC generator, light theme](docs/images/generator-light.png) | ![NPC generator, dark theme](docs/images/generator-dark.png) |
 
 ---
 
