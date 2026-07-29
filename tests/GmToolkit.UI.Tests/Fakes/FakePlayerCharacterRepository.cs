@@ -20,13 +20,27 @@ internal sealed class FakePlayerCharacterRepository(params PlayerCharacter[] pla
     /// <see cref="FakeCampaignRepository.ThrowOnAdd"/> (issue #32).</summary>
     public Exception? ThrowOnAdd { get; set; }
 
+    /// <summary>When set, <see cref="GetByCampaignAsync"/> waits for this to complete before
+    /// returning -- mirrors <see cref="FakeNpcRepository.GetByCampaignGate"/>'s identical purpose.</summary>
+    public TaskCompletionSource? GetByCampaignGate { get; set; }
+
     public Task<PlayerCharacter?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_playerCharacters.FirstOrDefault(p => p.Id == id));
 
-    public Task<IReadOnlyList<PlayerCharacter>> GetByCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
-        ThrowOnGetByCampaign is not null
-            ? Task.FromException<IReadOnlyList<PlayerCharacter>>(ThrowOnGetByCampaign)
-            : Task.FromResult<IReadOnlyList<PlayerCharacter>>([.. _playerCharacters.Where(p => p.CampaignId == campaignId)]);
+    public async Task<IReadOnlyList<PlayerCharacter>> GetByCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default)
+    {
+        if (GetByCampaignGate is not null)
+        {
+            await GetByCampaignGate.Task;
+        }
+
+        if (ThrowOnGetByCampaign is not null)
+        {
+            throw ThrowOnGetByCampaign;
+        }
+
+        return [.. _playerCharacters.Where(p => p.CampaignId == campaignId)];
+    }
 
     public Task AddAsync(PlayerCharacter playerCharacter, CancellationToken cancellationToken = default)
     {

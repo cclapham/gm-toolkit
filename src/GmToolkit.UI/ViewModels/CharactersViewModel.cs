@@ -150,12 +150,21 @@ public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
     /// <remarks>Delegates straight to <see cref="LoadAsync"/> -- the same method the constructor's
     /// own fire-and-forget initial load already calls -- mirrors
     /// <see cref="NpcsViewModel.RefreshAsync"/>'s identical remark on why this deliberately does not
-    /// also close <see cref="Form"/>.</remarks>
-    public Task RefreshAsync() => LoadAsync();
+    /// also close <see cref="Form"/>. Passes <c>showLoadingIndicator: false</c> -- see
+    /// <see cref="NpcsViewModel.RefreshAsync"/>'s remarks on why toggling <see cref="IsLoading"/> on
+    /// every single navigation back to an already-populated screen would be a UX regression.</remarks>
+    public Task RefreshAsync() => LoadAsync(showLoadingIndicator: false);
 
-    private async Task LoadAsync()
+    /// <param name="showLoadingIndicator">Whether to toggle <see cref="IsLoading"/> true for the
+    /// duration of this load -- mirrors <see cref="NpcsViewModel.LoadAsync(bool)"/>'s identical
+    /// parameter one-for-one.</param>
+    private async Task LoadAsync(bool showLoadingIndicator = true)
     {
-        IsLoading = true;
+        if (showLoadingIndicator)
+        {
+            IsLoading = true;
+        }
+
         LoadError = null;
 
         var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
@@ -165,7 +174,12 @@ public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
             // yet (see OnActiveCampaignChanged) or it's being constructed before one is selected.
             // Not an error state: just show as empty.
             Characters = [];
-            IsLoading = false;
+
+            if (showLoadingIndicator)
+            {
+                IsLoading = false;
+            }
+
             return;
         }
 
@@ -185,7 +199,10 @@ public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
         }
         finally
         {
-            IsLoading = false;
+            if (showLoadingIndicator)
+            {
+                IsLoading = false;
+            }
         }
     }
 

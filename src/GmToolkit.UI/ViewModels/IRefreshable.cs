@@ -1,13 +1,17 @@
 namespace GmToolkit.UI.ViewModels;
 
 /// <summary>
-/// Implemented by screen view models that list campaign-owned data (<see cref="CampaignsViewModel"/>,
-/// <see cref="CharactersViewModel"/>, <see cref="NpcsViewModel"/>) which some other screen's action
-/// could make stale while this one sits cached forever in <see cref="Services.NavigationService"/>
-/// (issue #68) -- e.g. <see cref="GeneratorViewModel"/> saving a generated NPC straight through
-/// <see cref="Core.Repositories.INpcRepository.AddAsync"/> rather than through
-/// <see cref="NpcsViewModel"/>'s own <see cref="NpcsViewModel.Form"/>, which raises nothing
-/// <see cref="NpcsViewModel"/> was ever listening for.
+/// Implemented by screen view models that show campaign-owned data (<see cref="CampaignsViewModel"/>,
+/// <see cref="CharactersViewModel"/>, <see cref="NpcsViewModel"/>, <see cref="GeneratorViewModel"/>)
+/// which some other screen's action could make stale while this one sits cached forever in
+/// <see cref="Services.NavigationService"/> (issue #68) -- e.g. an NPC added via
+/// <see cref="NpcsViewModel"/>'s own <see cref="NpcsViewModel.Form"/> going unseen by
+/// <see cref="GeneratorViewModel"/>'s <see cref="GeneratorViewModel.FactionSuggestions"/>/
+/// <see cref="GeneratorViewModel.LocationSuggestions"/>, which raises nothing
+/// <see cref="GeneratorViewModel"/> was ever listening for. "Shows campaign-owned data" is
+/// deliberately broader than "shows a list" here -- <see cref="GeneratorViewModel"/> has no list of
+/// its own, but its faction/location suggestions are exactly the same class of repository-backed,
+/// another-screen-can-mutate-it data the other three implementations reload.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,10 +22,11 @@ namespace GmToolkit.UI.ViewModels;
 /// possibly-diverging path for navigate-time refreshing.
 /// </para>
 /// <para>
-/// <b>Deliberately not implemented by <see cref="GeneratorViewModel"/> or <see cref="SettingsViewModel"/>.</b>
-/// Neither shows a list of campaign-owned data that another screen's action could make stale --
-/// <see cref="GeneratorViewModel"/> already refreshes its own suggestion data as part of its own save
-/// flow, and <see cref="SettingsViewModel"/> isn't campaign-scoped at all.
+/// <b>Deliberately not implemented by <see cref="SettingsViewModel"/>.</b> It isn't campaign-scoped
+/// at all, so there's no campaign-owned data on that screen for another screen's action to make
+/// stale in the first place -- unlike <see cref="GeneratorViewModel"/> (see this interface's summary),
+/// which does implement this despite having no list, precisely because its suggestion data *is*
+/// campaign-owned and repository-backed.
 /// </para>
 /// </remarks>
 public interface IRefreshable

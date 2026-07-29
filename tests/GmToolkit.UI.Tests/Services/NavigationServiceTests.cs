@@ -131,6 +131,34 @@ public class NavigationServiceTests
     }
 
     [Fact]
+    public async Task NavigateTo_refreshes_Generator_suggestions_for_an_npc_added_via_another_screen()
+    {
+        // Skeptical review of PR #80: GeneratorViewModel's own FactionSuggestions/LocationSuggestions
+        // are campaign-owned data read from INpcRepository, exactly the same staleness class of bug
+        // issue #68 fixed for NpcsViewModel -- mirrors
+        // NavigateTo_refreshes_an_already_cached_screen_that_implements_IRefreshable above, for the
+        // one IRefreshable screen with no list of its own.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var (navigationService, npcRepository) = CreateWithActiveCampaign(campaign);
+
+        navigationService.NavigateTo(NavigationDestination.Generator);
+        var generatorViewModel = Assert.IsType<GeneratorViewModel>(navigationService.CurrentViewModel);
+        Assert.Empty(generatorViewModel.FactionSuggestions);
+        Assert.Empty(generatorViewModel.LocationSuggestions);
+
+        navigationService.NavigateTo(NavigationDestination.Npcs);
+        await npcRepository.AddAsync(new Npc { CampaignId = campaign.Id, Name = "Generated Ghoul", Faction = "The Iron Concord", Location = "Blackmoor Docks" });
+        navigationService.NavigateTo(NavigationDestination.Generator);
+
+        // GeneratorViewModel.RefreshAsync (invoked fire-and-forget from NavigateTo) races the
+        // assertions below against FakeNpcRepository, which completes synchronously -- same reasoning
+        // as NavigateTo_refreshes_an_already_cached_screen_that_implements_IRefreshable above.
+        Assert.Same(generatorViewModel, navigationService.CurrentViewModel);
+        Assert.Equal(["The Iron Concord"], generatorViewModel.FactionSuggestions);
+        Assert.Equal(["Blackmoor Docks"], generatorViewModel.LocationSuggestions);
+    }
+
+    [Fact]
     public async Task Acceptance_generating_and_saving_an_npc_then_navigating_to_Npcs_shows_it_without_reselecting_the_campaign()
     {
         // The exact scenario from issue #68's Acceptance section: generate an NPC on the Generator

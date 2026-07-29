@@ -22,13 +22,27 @@ internal sealed class FakeCampaignRepository(params Campaign[] campaigns) : ICam
     /// <see cref="ThrowOnGetAll"/>.</summary>
     public Exception? ThrowOnAdd { get; set; }
 
+    /// <summary>When set, <see cref="GetAllAsync"/> waits for this to complete before returning --
+    /// mirrors <see cref="FakeNpcRepository.GetByCampaignGate"/>'s identical purpose.</summary>
+    public TaskCompletionSource? GetAllGate { get; set; }
+
     public Task<Campaign?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_campaigns.FirstOrDefault(c => c.Id == id));
 
-    public Task<IReadOnlyList<Campaign>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        ThrowOnGetAll is not null
-            ? Task.FromException<IReadOnlyList<Campaign>>(ThrowOnGetAll)
-            : Task.FromResult<IReadOnlyList<Campaign>>([.. _campaigns]);
+    public async Task<IReadOnlyList<Campaign>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        if (GetAllGate is not null)
+        {
+            await GetAllGate.Task;
+        }
+
+        if (ThrowOnGetAll is not null)
+        {
+            throw ThrowOnGetAll;
+        }
+
+        return [.. _campaigns];
+    }
 
     public Task AddAsync(Campaign campaign, CancellationToken cancellationToken = default)
     {

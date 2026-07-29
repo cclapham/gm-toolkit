@@ -194,8 +194,11 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     /// <see cref="Campaign.LastOpenedUtc"/>-based sort and active-row marker (see
     /// <see cref="RefreshActiveSelection"/>) every time it's navigated to is exactly what makes this
     /// class immune to the same staleness class of bug issue #68 fixed for
-    /// <see cref="NpcsViewModel"/>/<see cref="CharactersViewModel"/>.</remarks>
-    public Task RefreshAsync() => LoadAsync();
+    /// <see cref="NpcsViewModel"/>/<see cref="CharactersViewModel"/>. Passes
+    /// <c>showLoadingIndicator: false</c> -- see <see cref="NpcsViewModel.RefreshAsync"/>'s remarks on
+    /// why toggling <see cref="IsLoading"/> on every single navigation back to an already-populated
+    /// screen would be a UX regression.</remarks>
+    public Task RefreshAsync() => LoadAsync(showLoadingIndicator: false);
 
     /// <summary>
     /// Opens <paramref name="item"/> in the shared create/edit form's edit mode (issue #71), via
@@ -334,9 +337,16 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     private void UpdateCanConfirmDelete() =>
         CanConfirmDelete = _deleteTarget is not null && string.Equals(DeleteConfirmationInput, _deleteTarget.Name, StringComparison.Ordinal);
 
-    private async Task LoadAsync()
+    /// <param name="showLoadingIndicator">Whether to toggle <see cref="IsLoading"/> true for the
+    /// duration of this load -- mirrors <see cref="NpcsViewModel.LoadAsync(bool)"/>'s identical
+    /// parameter one-for-one.</param>
+    private async Task LoadAsync(bool showLoadingIndicator = true)
     {
-        IsLoading = true;
+        if (showLoadingIndicator)
+        {
+            IsLoading = true;
+        }
+
         LoadError = null;
 
         try
@@ -359,7 +369,10 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
         }
         finally
         {
-            IsLoading = false;
+            if (showLoadingIndicator)
+            {
+                IsLoading = false;
+            }
         }
     }
 

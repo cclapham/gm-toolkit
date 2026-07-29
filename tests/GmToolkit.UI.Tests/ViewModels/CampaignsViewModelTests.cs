@@ -477,4 +477,59 @@ public class CampaignsViewModelTests
         Assert.True(vm.IsListVisible);
         Assert.Equal("Wandering Souls", vm.Campaigns.Single().Name);
     }
+
+    // -- Skeptical review of PR #80: navigate-triggered RefreshAsync must not flicker the loading state --
+
+    [Fact]
+    public async Task RefreshAsync_does_not_toggle_IsLoading_true_even_while_the_refresh_is_genuinely_in_flight()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        Assert.False(vm.IsLoading);
+
+        var isLoadingValuesSeen = new List<bool>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsLoading))
+            {
+                isLoadingValuesSeen.Add(vm.IsLoading);
+            }
+        };
+
+        repository.GetAllGate = new TaskCompletionSource();
+        var refreshTask = vm.RefreshAsync();
+
+        // Genuinely in flight -- the repository call hasn't been released yet -- and IsLoading is
+        // still false, not just "already back to false by the time we checked".
+        Assert.False(vm.IsLoading);
+
+        repository.GetAllGate.SetResult();
+        await refreshTask;
+
+        Assert.False(vm.IsLoading);
+        Assert.DoesNotContain(true, isLoadingValuesSeen);
+    }
+
+    [Fact]
+    public async Task RetryLoadCommand_still_shows_IsLoading_true_while_a_reload_is_genuinely_in_flight()
+    {
+        // Control for the test above: an explicit retry (as opposed to a navigate-triggered
+        // RefreshAsync) must still show the loading state -- this isn't a case of IsLoading never
+        // toggling true at all, only RefreshAsync deliberately suppressing it.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        Assert.False(vm.IsLoading);
+
+        repository.GetAllGate = new TaskCompletionSource();
+        var retryTask = vm.RetryLoadCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsLoading);
+
+        repository.GetAllGate.SetResult();
+        await retryTask;
+
+        Assert.False(vm.IsLoading);
+    }
 }

@@ -290,8 +290,13 @@ public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
     /// carry over exactly the way they already do across an active-campaign switch (see
     /// <see cref="HandleActiveCampaignChanged"/>'s remarks); this deliberately does not also close
     /// <see cref="Form"/>, since (unlike an active-campaign switch) simply navigating back to an
-    /// already-open form should not discard whatever the GM was mid-editing.</remarks>
-    public Task RefreshAsync() => LoadAsync();
+    /// already-open form should not discard whatever the GM was mid-editing. Passes
+    /// <c>showLoadingIndicator: false</c> -- unlike the constructor's own first load, this fires on
+    /// every single navigation back to an already-populated screen (see
+    /// <see cref="Services.NavigationService.NavigateTo"/>), so toggling <see cref="IsLoading"/> here
+    /// would blank the list back to the loading state and immediately back on every visit, a
+    /// regression versus the instant cached content this screen showed before issue #68.</remarks>
+    public Task RefreshAsync() => LoadAsync(showLoadingIndicator: false);
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
 
@@ -301,9 +306,20 @@ public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
 
     partial void OnSortOrderChanged(NpcSortOrder value) => ApplyFilter();
 
-    private async Task LoadAsync()
+    /// <param name="showLoadingIndicator">Whether to toggle <see cref="IsLoading"/> true for the
+    /// duration of this load -- <c>true</c> for the constructor's own initial load, an explicit
+    /// <see cref="RetryLoadAsync"/>, and an active-campaign switch (all of which either have nothing
+    /// to show yet or are swapping to a whole different campaign's data, so the loading state is
+    /// expected); <c>false</c> for <see cref="RefreshAsync"/>, which fires on every navigation back to
+    /// an already-populated screen and must not blank it back to the loading state in between -- see
+    /// <see cref="RefreshAsync"/>'s remarks.</param>
+    private async Task LoadAsync(bool showLoadingIndicator = true)
     {
-        IsLoading = true;
+        if (showLoadingIndicator)
+        {
+            IsLoading = true;
+        }
+
         LoadError = null;
 
         var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
@@ -317,7 +333,12 @@ public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
             AllNpcCount = 0;
             RebuildFilterOptions();
             ApplyFilter();
-            IsLoading = false;
+
+            if (showLoadingIndicator)
+            {
+                IsLoading = false;
+            }
+
             return;
         }
 
@@ -341,7 +362,10 @@ public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
         }
         finally
         {
-            IsLoading = false;
+            if (showLoadingIndicator)
+            {
+                IsLoading = false;
+            }
         }
     }
 
