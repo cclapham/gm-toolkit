@@ -69,6 +69,8 @@ publish/
 *.aab
 *.keystore
 *.jks
+*.keystore.b64
+*.jks.b64
 
 # Local SQLite data (if the app is ever run from a repo checkout instead of the platform app-data path)
 *.db

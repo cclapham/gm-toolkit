@@ -1,0 +1,111 @@
+name: Release Android
+
+# Deliberately not triggered on push/pull_request like build.yml's build-android job (which stays
+# a debug build, unsigned, and doesn't touch these secrets at all) -- a release-signed APK needs
+# ANDROID_KEYSTORE_BASE64/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD secrets that don't exist for
+# fork PRs (GitHub withholds secrets from those runs) and shouldn't be exercised on every commit
+# to main anyway. Runs only when explicitly asked for: manually (to verify signing works before a
+# real tag exists) or when a v* tag is actually pushed (issue #38's release).
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+# The repo's default workflow token permission is read-only, and the "Attach APK to the GitHub
+# release" step below needs contents:write to upload a release asset -- without this, that step
+# would 403 on a real tag push (the one time it actually runs), silently defeating the whole point
+# of this workflow. Least-privilege: only the one permission actually used, nothing broader.
+permissions:
+  contents: write
+
+jobs:
+  release-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
+
+      - name: Cache Android workload packs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.DOTNET_ROOT }}/packs
+            ${{ env.DOTNET_ROOT }}/sdk-manifests
+            ${{ env.DOTNET_ROOT }}/metadata
+          key: android-workload-${{ runner.os }}-v1
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      # The keystore itself is never committed -- decoded from the base64 secret into the
+      # runner's ephemeral workspace only, for this job's lifetime, then explicitly removed below.
+      - name: Decode signing keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "${{ runner.temp }}/release.keystore"
+
+      - name: Publish signed release APK
+        env:
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+          SIGNING_STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        # Passed via env + shell variable expansion rather than interpolating ${{ secrets.* }}
+        # straight into the command line: command-line arguments land in the process argument
+        # table (readable via /proc by anything else on the same machine) and can be echoed
+        # verbatim by MSBuild under verbose logging, whereas env vars aren't visible either way.
+        run: >
+          dotnet publish src/GmToolkit.Android/GmToolkit.Android.csproj
+          -f net10.0-android
+          -c Release
+          -p:AndroidKeyStore=true
+          -p:AndroidSigningKeyStore="${{ runner.temp }}/release.keystore"
+          -p:AndroidSigningKeyAlias="$SIGNING_KEY_ALIAS"
+          -p:AndroidSigningKeyPass="$SIGNING_KEY_PASS"
+          -p:AndroidSigningStorePass="$SIGNING_STORE_PASS"
+
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/release.keystore"
+
+      # Unverified in the sandbox this workflow was authored in (no real Android SDK available
+      # there -- dotnet publish for Android fails outright without one, so the exact output
+      # filename/path this step depends on was never actually observed, only inferred from .NET
+      # for Android's documented convention: a *-Signed.apk under bin/<Configuration>/<TFM>/publish/).
+      # Lists every .apk found either way so a first real run's Actions log immediately shows what
+      # was actually produced if this guess is wrong, rather than failing silently on a wrong path.
+      - name: Locate the signed APK
+        id: apk
+        run: |
+          echo "All .apk files under src/GmToolkit.Android/bin:"
+          find src/GmToolkit.Android/bin -name "*.apk" -print
+
+          apk_path=$(find src/GmToolkit.Android/bin -name "*-Signed.apk" | head -n1)
+          if [ -z "$apk_path" ]; then
+            apk_path=$(find src/GmToolkit.Android/bin -name "*.apk" | head -n1)
+          fi
+          if [ -z "$apk_path" ]; then
+            echo "No .apk found anywhere under src/GmToolkit.Android/bin -- see the listing above." >&2
+            exit 1
+          fi
+          echo "Using: $apk_path"
+          echo "path=$apk_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gmtoolkit-android-release-apk
+          path: ${{ steps.apk.outputs.path }}
+
+      # Only attach to an actual GitHub Release when this run was triggered by a real v* tag push
+      # (issue #38) -- a workflow_dispatch run (used to verify signing works before that tag
+      # exists) uploads to the run's own artifacts above, but has no release to attach to.
+      - name: Attach APK to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "${{ steps.apk.outputs.path }}" --repo ${{ github.repository }} --clobber
