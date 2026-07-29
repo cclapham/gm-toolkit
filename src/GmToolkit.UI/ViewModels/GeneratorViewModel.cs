@@ -89,7 +89,14 @@ namespace GmToolkit.UI.ViewModels;
 /// whole lifetime once the Generator screen has been visited once (see this class's remarks below on
 /// <see cref="_random"/>'s identical lifetime) -- so suggestions are also rebuilt whenever
 /// <see cref="ActiveCampaignContext.ActiveCampaignChanged"/> fires (e.g. the GM switches to a
-/// different campaign and later comes back to this screen), not just once at construction time.
+/// different campaign and later comes back to this screen), not just once at construction time. For
+/// the exact same staleness reason, this class also implements <see cref="IRefreshable"/> (issue #68):
+/// another screen's own NPC form can add a faction/location this screen's suggestions don't know about
+/// yet while this one sits cached, so <see cref="Services.NavigationService.NavigateTo"/> re-runs
+/// <see cref="RefreshAsync"/> every time it navigates here, same as
+/// <see cref="NpcsViewModel"/>/<see cref="CharactersViewModel"/>/<see cref="CampaignsViewModel"/> --
+/// see <see cref="RefreshAsync"/>'s own remarks for why this is the one screen in that group that has
+/// no list to reload.
 /// </para>
 /// <para>
 /// <b>One shared <see cref="IRandomSource"/> for this view model's entire lifetime, not one per
@@ -161,7 +168,7 @@ namespace GmToolkit.UI.ViewModels;
 /// table by a different route.
 /// </para>
 /// </remarks>
-public sealed partial class GeneratorViewModel : ViewModelBase
+public sealed partial class GeneratorViewModel : ViewModelBase, IRefreshable
 {
     /// <summary>Sentinel option meaning "no preference" for <see cref="SelectedNameCulture"/>/
     /// <see cref="SelectedOccupationCategory"/> -- always first in <see cref="NameCultureOptions"/>/
@@ -623,6 +630,33 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     [RelayCommand]
     private void ViewSavedNpc() => _navigationService.NavigateTo(NavigationDestination.Npcs);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Unlike <see cref="NpcsViewModel"/>/<see cref="CharactersViewModel"/>/<see cref="CampaignsViewModel"/>,
+    /// this screen has no list of its own to reload -- but <see cref="FactionSuggestions"/>/
+    /// <see cref="LocationSuggestions"/> are still campaign-owned data read from
+    /// <see cref="INpcRepository.GetByCampaignAsync"/> that another screen's own NPC form could make
+    /// stale while this one sits cached (issue #68), exactly the class of bug
+    /// <see cref="IRefreshable"/> exists for -- so this delegates to <see cref="LoadSuggestionsAsync"/>
+    /// for whichever campaign is currently active, same guard for "no active campaign" as
+    /// <see cref="HandleActiveCampaignChanged"/> (which now simply calls this). Deliberately does not
+    /// touch <see cref="HasGenerated"/>/any generated field/<see cref="GeneratingCampaign"/> -- same
+    /// reasoning as <see cref="HandleActiveCampaignChanged"/>'s remarks on not discarding an
+    /// in-progress generated-but-unsaved NPC just because the GM navigated back to this screen.
+    /// </remarks>
+    public Task RefreshAsync()
+    {
+        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
+        if (campaignId is null)
+        {
+            FactionSuggestions = [];
+            LocationSuggestions = [];
+            return Task.CompletedTask;
+        }
+
+        return LoadSuggestionsAsync(campaignId.Value);
+    }
+
     /// <summary>
     /// Clears every generated field, lock flag and fallback notice back to
     /// <see cref="GeneratorViewModel"/>'s own "nothing generated yet" state (issue #29's "generator
@@ -754,7 +788,9 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     /// in <c>AssemblyInfo.cs</c>). Not called directly by application code.
     /// </summary>
     /// <remarks>
-    /// Only rebuilds <see cref="FactionSuggestions"/>/<see cref="LocationSuggestions"/> -- unlike
+    /// Simply delegates to <see cref="RefreshAsync"/> (fire-and-forget, same as every other
+    /// <c>HandleActiveCampaignChanged</c> in this namespace delegating to its own <c>LoadAsync</c>) --
+    /// only rebuilds <see cref="FactionSuggestions"/>/<see cref="LocationSuggestions"/>. Unlike
     /// <c>NpcsViewModel.HandleActiveCampaignChanged</c>, this view model has no list to reload and
     /// deliberately does not reset any in-progress generated NPC or clear
     /// <see cref="SaveConfirmationMessage"/> just because the GM briefly looked at a different
@@ -767,18 +803,7 @@ public sealed partial class GeneratorViewModel : ViewModelBase
     /// skeptical review of PR #63 found the original version of this comment only addressed "don't
     /// destroy in-progress work" and not "save to the right campaign").
     /// </remarks>
-    internal void HandleActiveCampaignChanged()
-    {
-        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
-        if (campaignId is null)
-        {
-            FactionSuggestions = [];
-            LocationSuggestions = [];
-            return;
-        }
-
-        _ = LoadSuggestionsAsync(campaignId.Value);
-    }
+    internal void HandleActiveCampaignChanged() => _ = RefreshAsync();
 
     private void RerollNameField()
     {

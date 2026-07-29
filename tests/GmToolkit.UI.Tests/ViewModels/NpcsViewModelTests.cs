@@ -570,4 +570,120 @@ public class NpcsViewModelTests
 
         Assert.False(vm.IsFormVisible);
     }
+
+    [Fact]
+    public async Task RefreshAsync_picks_up_an_npc_added_directly_to_the_repository_bypassing_the_form()
+    {
+        // Mirrors issue #68's actual root cause: GeneratorViewModel.SaveAsync persists straight
+        // through INpcRepository.AddAsync, never touching this view model's own Form -- so nothing
+        // but a navigate-triggered RefreshAsync (see IRefreshable) should be needed to see it.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeNpcRepository();
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        Assert.True(vm.IsEmpty);
+
+        await repository.AddAsync(MakeNpc(campaign.Id, "Generated Ghoul"));
+        await vm.RefreshAsync();
+
+        Assert.False(vm.IsEmpty);
+        Assert.True(vm.IsListVisible);
+        Assert.Equal("Generated Ghoul", vm.Npcs.Single().Name);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_preserves_search_text_and_faction_filter()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var matching = MakeNpc(campaign.Id, "Baelor the Butcher", faction: "The Iron Concord");
+        var nonMatching = MakeNpc(campaign.Id, "Zoric the Pale", faction: "The Whispering Cult");
+        var repository = new FakeNpcRepository(matching, nonMatching);
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        vm.SearchText = "Baelor";
+        vm.SelectedFaction = "The Iron Concord";
+
+        await repository.AddAsync(MakeNpc(campaign.Id, "Another Generated NPC", faction: "The Iron Concord"));
+        await vm.RefreshAsync();
+
+        Assert.Equal("Baelor", vm.SearchText);
+        Assert.Equal("The Iron Concord", vm.SelectedFaction);
+        Assert.Equal("Baelor the Butcher", vm.Npcs.Single().Name);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_preserves_selected_location_and_sort_order()
+    {
+        // Same coverage as RefreshAsync_preserves_search_text_and_faction_filter above, for the two
+        // remaining pieces of in-progress state RefreshAsync must not disturb.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var matching = MakeNpc(campaign.Id, "Baelor the Butcher", location: "Blackmoor Docks", createdUtc: new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var newer = MakeNpc(campaign.Id, "Zoric the Pale", location: "Blackmoor Market", createdUtc: new DateTime(2022, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var repository = new FakeNpcRepository(matching, newer);
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        vm.SelectedLocation = "Blackmoor Docks";
+        vm.SortByRecentlyAddedCommand.Execute(null);
+
+        await repository.AddAsync(MakeNpc(campaign.Id, "Another Generated NPC", location: "Blackmoor Docks", createdUtc: new DateTime(2023, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+        await vm.RefreshAsync();
+
+        Assert.Equal("Blackmoor Docks", vm.SelectedLocation);
+        Assert.True(vm.IsSortedByRecentlyAdded);
+        Assert.Equal(["Another Generated NPC", "Baelor the Butcher"], vm.Npcs.Select(n => n.Name));
+    }
+
+    // -- Skeptical review of PR #80: navigate-triggered RefreshAsync must not flicker the loading state --
+
+    [Fact]
+    public async Task RefreshAsync_does_not_toggle_IsLoading_true_even_while_the_refresh_is_genuinely_in_flight()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher");
+        var repository = new FakeNpcRepository(npc);
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        Assert.False(vm.IsLoading);
+
+        var isLoadingValuesSeen = new List<bool>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsLoading))
+            {
+                isLoadingValuesSeen.Add(vm.IsLoading);
+            }
+        };
+
+        repository.GetByCampaignGate = new TaskCompletionSource();
+        var refreshTask = vm.RefreshAsync();
+
+        // Genuinely in flight -- the repository call hasn't been released yet -- and IsLoading is
+        // still false, not just "already back to false by the time we checked".
+        Assert.False(vm.IsLoading);
+
+        repository.GetByCampaignGate.SetResult();
+        await refreshTask;
+
+        Assert.False(vm.IsLoading);
+        Assert.DoesNotContain(true, isLoadingValuesSeen);
+    }
+
+    [Fact]
+    public async Task RetryLoadCommand_still_shows_IsLoading_true_while_a_reload_is_genuinely_in_flight()
+    {
+        // Control for the test above: an explicit retry (as opposed to a navigate-triggered
+        // RefreshAsync) must still show the loading state -- this isn't a case of IsLoading never
+        // toggling true at all, only RefreshAsync deliberately suppressing it.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher");
+        var repository = new FakeNpcRepository(npc);
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        Assert.False(vm.IsLoading);
+
+        repository.GetByCampaignGate = new TaskCompletionSource();
+        var retryTask = vm.RetryLoadCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsLoading);
+
+        repository.GetByCampaignGate.SetResult();
+        await retryTask;
+
+        Assert.False(vm.IsLoading);
+    }
 }

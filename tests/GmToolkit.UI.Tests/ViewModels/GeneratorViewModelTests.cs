@@ -517,4 +517,42 @@ public class GeneratorViewModelTests
         Assert.Contains("Test Campaign", viewModel.SaveConfirmationMessage);
         Assert.Null(viewModel.GeneratingCampaignName); // cleared by the reset
     }
+
+    // -- Skeptical review of PR #80: GeneratorViewModel's own suggestions go stale the same way --
+
+    [Fact]
+    public async Task RefreshAsync_picks_up_an_npc_added_via_another_screen_bypassing_this_view_model_entirely()
+    {
+        // The finding from PR #80's skeptical review: FactionSuggestions/LocationSuggestions are
+        // campaign-owned data read from INpcRepository, exactly like NpcsViewModel's own list -- an
+        // NPC added elsewhere (e.g. via NpcsViewModel's own Form) must show up here once RefreshAsync
+        // (see IRefreshable) is called, without this view model ever being told about it directly.
+        var campaignId = Guid.NewGuid();
+        var repository = new FakeNpcRepository();
+        var activeCampaignContext = CreateActiveCampaignContext(campaignId);
+        var viewModel = CreateViewModel(45, repository, activeCampaignContext);
+        Assert.Empty(viewModel.FactionSuggestions);
+        Assert.Empty(viewModel.LocationSuggestions);
+
+        await repository.AddAsync(new Npc { CampaignId = campaignId, Name = "Generated Ghoul", Faction = "The Iron Concord", Location = "Blackmoor Docks" });
+        await viewModel.RefreshAsync();
+
+        Assert.Equal(["The Iron Concord"], viewModel.FactionSuggestions);
+        Assert.Equal(["Blackmoor Docks"], viewModel.LocationSuggestions);
+    }
+
+    [Fact]
+    public void RefreshAsync_with_no_active_campaign_clears_suggestions_without_erroring()
+    {
+        // Mirrors HandleActiveCampaignChanged's identical no-active-campaign guard, which RefreshAsync
+        // now shares.
+        var context = new ActiveCampaignContext(new FakeCampaignRepository());
+        var viewModel = CreateViewModel(46, activeCampaignContext: context);
+
+        var exception = Record.Exception(() => viewModel.RefreshAsync().GetAwaiter().GetResult());
+
+        Assert.Null(exception);
+        Assert.Empty(viewModel.FactionSuggestions);
+        Assert.Empty(viewModel.LocationSuggestions);
+    }
 }

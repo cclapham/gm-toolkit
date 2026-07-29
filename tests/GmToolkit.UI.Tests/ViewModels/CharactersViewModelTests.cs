@@ -253,4 +253,80 @@ public class CharactersViewModelTests
 
         Assert.Null(exception);
     }
+
+    [Fact]
+    public async Task RefreshAsync_picks_up_a_character_added_directly_to_the_repository_bypassing_the_form()
+    {
+        // Mirrors issue #68's staleness class of bug: any save flow that persists straight through
+        // IPlayerCharacterRepository without going through this view model's own Form should still
+        // show up once RefreshAsync (see IRefreshable) is called.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakePlayerCharacterRepository();
+        var vm = new CharactersViewModel(repository, ActiveContextFor(campaign, new FakeCampaignRepository(campaign)));
+        Assert.True(vm.IsEmpty);
+
+        await repository.AddAsync(new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Arannis" });
+        await vm.RefreshAsync();
+
+        Assert.False(vm.IsEmpty);
+        Assert.True(vm.IsListVisible);
+        Assert.Equal("Arannis", vm.Characters.Single().CharacterName);
+    }
+
+    // -- Skeptical review of PR #80: navigate-triggered RefreshAsync must not flicker the loading state --
+
+    [Fact]
+    public async Task RefreshAsync_does_not_toggle_IsLoading_true_even_while_the_refresh_is_genuinely_in_flight()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var pc = new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Arannis" };
+        var repository = new FakePlayerCharacterRepository(pc);
+        var vm = new CharactersViewModel(repository, ActiveContextFor(campaign, new FakeCampaignRepository(campaign)));
+        Assert.False(vm.IsLoading);
+
+        var isLoadingValuesSeen = new List<bool>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsLoading))
+            {
+                isLoadingValuesSeen.Add(vm.IsLoading);
+            }
+        };
+
+        repository.GetByCampaignGate = new TaskCompletionSource();
+        var refreshTask = vm.RefreshAsync();
+
+        // Genuinely in flight -- the repository call hasn't been released yet -- and IsLoading is
+        // still false, not just "already back to false by the time we checked".
+        Assert.False(vm.IsLoading);
+
+        repository.GetByCampaignGate.SetResult();
+        await refreshTask;
+
+        Assert.False(vm.IsLoading);
+        Assert.DoesNotContain(true, isLoadingValuesSeen);
+    }
+
+    [Fact]
+    public async Task RetryLoadCommand_still_shows_IsLoading_true_while_a_reload_is_genuinely_in_flight()
+    {
+        // Control for the test above: an explicit retry (as opposed to a navigate-triggered
+        // RefreshAsync) must still show the loading state -- this isn't a case of IsLoading never
+        // toggling true at all, only RefreshAsync deliberately suppressing it.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var pc = new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Arannis" };
+        var repository = new FakePlayerCharacterRepository(pc);
+        var vm = new CharactersViewModel(repository, ActiveContextFor(campaign, new FakeCampaignRepository(campaign)));
+        Assert.False(vm.IsLoading);
+
+        repository.GetByCampaignGate = new TaskCompletionSource();
+        var retryTask = vm.RetryLoadCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsLoading);
+
+        repository.GetByCampaignGate.SetResult();
+        await retryTask;
+
+        Assert.False(vm.IsLoading);
+    }
 }
