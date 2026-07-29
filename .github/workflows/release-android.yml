@@ -12,6 +12,13 @@ on:
     tags:
       - "v*"
 
+# The repo's default workflow token permission is read-only, and the "Attach APK to the GitHub
+# release" step below needs contents:write to upload a release asset -- without this, that step
+# would 403 on a real tag push (the one time it actually runs), silently defeating the whole point
+# of this workflow. Least-privilege: only the one permission actually used, nothing broader.
+permissions:
+  contents: write
+
 jobs:
   release-android:
     runs-on: ubuntu-latest
@@ -44,15 +51,23 @@ jobs:
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "${{ runner.temp }}/release.keystore"
 
       - name: Publish signed release APK
+        env:
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+          SIGNING_STORE_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        # Passed via env + shell variable expansion rather than interpolating ${{ secrets.* }}
+        # straight into the command line: command-line arguments land in the process argument
+        # table (readable via /proc by anything else on the same machine) and can be echoed
+        # verbatim by MSBuild under verbose logging, whereas env vars aren't visible either way.
         run: >
           dotnet publish src/GmToolkit.Android/GmToolkit.Android.csproj
           -f net10.0-android
           -c Release
           -p:AndroidKeyStore=true
           -p:AndroidSigningKeyStore="${{ runner.temp }}/release.keystore"
-          -p:AndroidSigningKeyAlias="${{ secrets.KEY_ALIAS }}"
-          -p:AndroidSigningKeyPass="${{ secrets.KEY_PASSWORD }}"
-          -p:AndroidSigningStorePass="${{ secrets.KEYSTORE_PASSWORD }}"
+          -p:AndroidSigningKeyAlias="$SIGNING_KEY_ALIAS"
+          -p:AndroidSigningKeyPass="$SIGNING_KEY_PASS"
+          -p:AndroidSigningStorePass="$SIGNING_STORE_PASS"
 
       - name: Remove decoded keystore
         if: always()
