@@ -1,0 +1,8 @@
+{
+  "id": "names-bad-missing-surname",
+  "category": "names",
+  "culture": "test",
+  "entries": [
+    { "value": "Alex", "tags": ["given"] }
+  ]
+}

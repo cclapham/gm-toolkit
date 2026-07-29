@@ -90,6 +90,15 @@ public static class GeneratorTableLoader
         return table;
     }
 
+    /// <summary>Tag required on at least one entry of every "names"-category table (see <see cref="Validate"/>).</summary>
+    private const string GivenTag = "given";
+
+    /// <summary>Tag required on at least one entry of every "names"-category table (see <see cref="Validate"/>).</summary>
+    private const string SurnameTag = "surname";
+
+    /// <summary>The <see cref="GeneratorTable.Category"/> value that triggers the given/surname tag check.</summary>
+    private const string NamesCategory = "names";
+
     private static void Validate(GeneratorTable table, string resourceName)
     {
         if (string.IsNullOrWhiteSpace(table.Id))
@@ -122,6 +131,28 @@ public static class GeneratorTableLoader
                 throw new GeneratorTableLoadException(
                     $"Generator table '{resourceName}' (id '{table.Id}') entry '{entry.Value}' has a non-positive weight ({entry.Weight}); weight must be greater than zero.");
             }
+        }
+
+        if (string.Equals(table.Category, NamesCategory, StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureHasTaggedEntry(table, resourceName, GivenTag);
+            EnsureHasTaggedEntry(table, resourceName, SurnameTag);
+        }
+    }
+
+    /// <summary>
+    /// Ensures <paramref name="table"/> has at least one entry tagged <paramref name="tag"/>
+    /// (matched case-insensitively, mirroring <c>NameGenerator.FilterByTag</c>). A "names"-category
+    /// table with no "given" or no "surname" entries would otherwise only fail deep inside
+    /// <c>NameGenerator.GenerateFrom</c>, and only when that specific table happens to be picked.
+    /// </summary>
+    private static void EnsureHasTaggedEntry(GeneratorTable table, string resourceName, string tag)
+    {
+        var hasTaggedEntry = table.Entries.Any(entry => entry.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase));
+        if (!hasTaggedEntry)
+        {
+            throw new GeneratorTableLoadException(
+                $"Generator table '{resourceName}' (id '{table.Id}') is a 'names' category table but has no entry tagged '{tag}'.");
         }
     }
 }
