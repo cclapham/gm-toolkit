@@ -23,6 +23,17 @@ public sealed partial class CampaignListItemViewModel(Campaign campaign) : Obser
 
     public DateTime LastOpenedUtc => Campaign.LastOpenedUtc;
 
+    public DateTime CreatedUtc => Campaign.CreatedUtc;
+
+    /// <summary>
+    /// <see cref="Campaign.Description"/> for display in the expanded row (issue #72), with a
+    /// placeholder in place of an empty gap when the campaign has none -- <see cref="Description"/>
+    /// is optional free text (see <c>Campaign.Description</c>'s doc comment), so a never-filled-in
+    /// field is a routine case, not an error state.
+    /// </summary>
+    public string DescriptionOrPlaceholder =>
+        string.IsNullOrWhiteSpace(Campaign.Description) ? "No description" : Campaign.Description;
+
     /// <summary>
     /// Counts come straight from <see cref="Campaign.PlayerCharacters"/>/<see cref="Campaign.Npcs"/>
     /// as populated by <c>ICampaignRepository.GetAllAsync</c> -- no separate count query needed at
@@ -58,4 +69,23 @@ public sealed partial class CampaignListItemViewModel(Campaign campaign) : Obser
     /// <see cref="IsActive"/>.</summary>
     [ObservableProperty]
     public partial bool IsShowingDeleteConfirmation { get; set; }
+
+    /// <summary>
+    /// Whether this row's expanded overview panel (issue #72: description + created date,
+    /// alongside the compact summary line that stays visible either way) is showing. Collapsed by
+    /// default and toggled independently per row (not a single shared "which row is expanded"
+    /// piece of state on <see cref="CampaignsViewModel"/>, unlike <c>IsShowingDeleteConfirmation</c>
+    /// above) -- there's no reason opening one campaign's details should close another's, the way
+    /// there is for delete confirmations (only one destructive action should be able to be mid-flight
+    /// at a time).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExpandToggleLabel))]
+    public partial bool IsExpanded { get; set; }
+
+    /// <summary>Button label for the expand/collapse toggle above, reflecting its current state --
+    /// computed here (rather than a converter in <c>CampaignsView.axaml</c>) so the view only needs
+    /// one straightforward string binding, matching <see cref="DeleteConfirmationPrompt"/>'s
+    /// convention.</summary>
+    public string ExpandToggleLabel => IsExpanded ? "Less ▲" : "More ▼";
 }

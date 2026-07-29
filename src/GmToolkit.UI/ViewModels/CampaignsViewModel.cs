@@ -207,6 +207,27 @@ public sealed partial class CampaignsViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Toggles <paramref name="item"/>'s expanded overview panel (issue #72: description + created
+    /// date) open or closed. A third sibling of <see cref="RequestEdit"/>/<see cref="RequestDelete"/>'s
+    /// row-level triggers, not a reuse of <see cref="SelectAsync"/>'s row click -- same reasoning as
+    /// those two commands' doc comments: looking at more detail about a campaign must never make it
+    /// the active one as a side effect. Unlike <see cref="RequestDelete"/>, expanding one row does
+    /// not collapse any other -- each row's <see cref="CampaignListItemViewModel.IsExpanded"/> is
+    /// independent, since there's no correctness reason (unlike delete confirmation) to limit this
+    /// to one row at a time.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleExpanded(CampaignListItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        item.IsExpanded = !item.IsExpanded;
+    }
+
+    /// <summary>
     /// Shows <paramref name="item"/>'s inline delete-confirmation panel (issue #19) -- the delete
     /// trigger's own click never deletes anything by itself, only this. If another row already
     /// has its confirmation showing, it's closed first: only one row can be mid-delete at a time,
