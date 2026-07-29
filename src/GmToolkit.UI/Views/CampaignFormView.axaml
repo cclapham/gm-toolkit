@@ -47,6 +47,7 @@
             <TextBlock Classes="caption"
                        Foreground="{DynamicResource DangerBrush}"
                        Text="{Binding SaveError}"
+                       TextWrapping="Wrap"
                        IsVisible="{Binding SaveError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
 
             <!-- Spacing="8" mirrors SpaceSM, see the note in Styles/Spacing.axaml. -->

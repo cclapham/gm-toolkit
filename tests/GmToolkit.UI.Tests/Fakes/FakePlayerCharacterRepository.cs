@@ -16,6 +16,10 @@ internal sealed class FakePlayerCharacterRepository(params PlayerCharacter[] pla
     /// exercising a load failure without needing a real broken database.</summary>
     public Exception? ThrowOnGetByCampaign { get; set; }
 
+    /// <summary>When set, <see cref="AddAsync"/> throws this instead of adding -- mirrors
+    /// <see cref="FakeCampaignRepository.ThrowOnAdd"/> (issue #32).</summary>
+    public Exception? ThrowOnAdd { get; set; }
+
     public Task<PlayerCharacter?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_playerCharacters.FirstOrDefault(p => p.Id == id));
 
@@ -26,6 +30,11 @@ internal sealed class FakePlayerCharacterRepository(params PlayerCharacter[] pla
 
     public Task AddAsync(PlayerCharacter playerCharacter, CancellationToken cancellationToken = default)
     {
+        if (ThrowOnAdd is not null)
+        {
+            return Task.FromException(ThrowOnAdd);
+        }
+
         _playerCharacters.Add(playerCharacter);
         return Task.CompletedTask;
     }

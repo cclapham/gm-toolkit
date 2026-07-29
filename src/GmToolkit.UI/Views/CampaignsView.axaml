@@ -193,6 +193,7 @@
                                             <TextBlock Classes="caption"
                                                        Foreground="{DynamicResource DangerBrush}"
                                                        Text="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).DeleteError}"
+                                                       TextWrapping="Wrap"
                                                        IsVisible="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).DeleteError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
                                             <!-- "Cancel" (the safe, non-destructive default) gets
                                                  the accent styling; "Delete campaign" stays plain

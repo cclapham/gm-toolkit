@@ -291,6 +291,12 @@ public sealed partial class NpcFormViewModel : ObservableValidator
             // this should be unreachable in practice. See CharacterFormViewModel's identical remark.
             SaveError = ex.Message;
         }
+        catch (Exception ex)
+        {
+            // A real repository failure (issue #32) -- see CampaignFormViewModel.SaveAsync's
+            // identical catch and GlobalExceptionHandler's remarks.
+            SaveError = $"Couldn't save this NPC: {ex.Message}";
+        }
     }
 
     [RelayCommand]

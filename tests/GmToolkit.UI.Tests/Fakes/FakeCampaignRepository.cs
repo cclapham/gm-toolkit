@@ -16,6 +16,12 @@ internal sealed class FakeCampaignRepository(params Campaign[] campaigns) : ICam
     /// real broken database.</summary>
     public Exception? ThrowOnGetAll { get; set; }
 
+    /// <summary>When set, <see cref="AddAsync"/> throws this instead of adding -- for exercising a
+    /// save failure (issue #32, e.g. <c>CampaignFormViewModel.SaveAsync</c>'s
+    /// <c>catch (Exception ex)</c> path) without needing a real broken database. Mirrors
+    /// <see cref="ThrowOnGetAll"/>.</summary>
+    public Exception? ThrowOnAdd { get; set; }
+
     public Task<Campaign?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_campaigns.FirstOrDefault(c => c.Id == id));
 
@@ -26,6 +32,11 @@ internal sealed class FakeCampaignRepository(params Campaign[] campaigns) : ICam
 
     public Task AddAsync(Campaign campaign, CancellationToken cancellationToken = default)
     {
+        if (ThrowOnAdd is not null)
+        {
+            return Task.FromException(ThrowOnAdd);
+        }
+
         _campaigns.Add(campaign);
         return Task.CompletedTask;
     }

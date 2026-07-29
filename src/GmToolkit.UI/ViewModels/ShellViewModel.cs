@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 
@@ -50,11 +51,13 @@ public partial class ShellViewModel : ViewModelBase, System.IDisposable
 {
     private readonly INavigationService _navigationService;
     private readonly ActiveCampaignContext _activeCampaignContext;
+    private readonly INotificationService _notificationService;
 
-    public ShellViewModel(INavigationService navigationService, ActiveCampaignContext activeCampaignContext)
+    public ShellViewModel(INavigationService navigationService, ActiveCampaignContext activeCampaignContext, INotificationService notificationService)
     {
         _navigationService = navigationService;
         _activeCampaignContext = activeCampaignContext;
+        _notificationService = notificationService;
 
         NavItems =
         [
@@ -74,6 +77,19 @@ public partial class ShellViewModel : ViewModelBase, System.IDisposable
         // restored state here -- no additional startup-ordering work needed.
         RefreshGatingState();
         RefreshSelection();
+    }
+
+    /// <summary>
+    /// Convenience overload for every existing caller (this project's own xUnit tests, mostly) that
+    /// doesn't care about toasts (issue #32) -- constructs a fresh, private
+    /// <see cref="NotificationService"/> rather than requiring every one of those call sites to be
+    /// updated just to supply one. The real DI-resolved constructor above is what both heads
+    /// actually get via <c>ServiceCollectionExtensions.AddGmToolkitUi</c>'s singleton
+    /// <see cref="INotificationService"/> registration, so this overload is never reachable there.
+    /// </summary>
+    public ShellViewModel(INavigationService navigationService, ActiveCampaignContext activeCampaignContext)
+        : this(navigationService, activeCampaignContext, new NotificationService())
+    {
     }
 
     /// <summary>
@@ -106,6 +122,11 @@ public partial class ShellViewModel : ViewModelBase, System.IDisposable
     public IReadOnlyList<NavItemViewModel> NavItems { get; }
 
     public ViewModelBase CurrentViewModel => _navigationService.CurrentViewModel;
+
+    /// <summary>Every toast currently showing (issue #32), bound from <c>ShellView.axaml</c>'s
+    /// <c>ToastHost</c> -- see <see cref="INotificationService.Toasts"/>'s remarks for why this
+    /// is hosted at the shell level rather than per-screen.</summary>
+    public ObservableCollection<ToastViewModel> Toasts => _notificationService.Toasts;
 
     /// <summary>
     /// Whether to show the "select a campaign" banner above the content area. True whenever

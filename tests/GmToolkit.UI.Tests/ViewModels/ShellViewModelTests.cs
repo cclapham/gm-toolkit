@@ -171,6 +171,24 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void Toasts_reflects_whatever_the_injected_INotificationService_reports()
+    {
+        // Issue #32: proves the shell's Toasts binding surface actually comes from the injected
+        // INotificationService rather than some separate collection of its own -- the 2-arg
+        // convenience overload used by every other test in this file constructs its own private
+        // NotificationService (see that overload's remarks), so this test supplies one explicitly
+        // to assert against it directly.
+        var notificationService = new NotificationService();
+        var shell = new ShellViewModel(new NavigationService(), new ActiveCampaignContext(new FakeCampaignRepository()), notificationService);
+
+        notificationService.Show("Something went wrong.", ToastSeverity.Error);
+
+        var toast = Assert.Single(shell.Toasts);
+        Assert.Equal("Something went wrong.", toast.Message);
+        Assert.Same(notificationService.Toasts, shell.Toasts);
+    }
+
+    [Fact]
     public void Dispose_unsubscribes_from_ActiveCampaignChanged()
     {
         var activeCampaignContext = new ActiveCampaignContext(new FakeCampaignRepository());

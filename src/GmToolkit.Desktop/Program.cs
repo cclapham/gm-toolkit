@@ -6,6 +6,7 @@ using Avalonia;
 using GmToolkit.Core.Services;
 using GmToolkit.Data;
 using GmToolkit.UI;
+using GmToolkit.UI.Services;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,14 @@ sealed class Program
     [STAThread]
     public static async Task Main(string[] args)
     {
+        // Global exception handling (issue #32) -- installed before anything else (including DB
+        // bootstrap below, which is itself capable of throwing) so nothing in this method runs
+        // without at least the AppDomain/TaskScheduler safety net in place. Only touches
+        // AppDomain/TaskScheduler, neither of which is Avalonia/SynchronizationContext-reliant, so
+        // this is safe this early -- see GlobalExceptionHandler's remarks for the full design and
+        // why the Dispatcher-based hook (App.axaml.cs's job) has to wait until later instead.
+        GlobalExceptionHandler.InstallProcessWideHandlers();
+
         var databasePath = AppDataPaths.GetDesktopDatabasePath();
         var database = await GmToolkitDatabase.CreateAndInitializeAsync(databasePath);
 

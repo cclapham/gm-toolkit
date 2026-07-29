@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="360" d:DesignHeight="200"
+             x:Class="GmToolkit.UI.Controls.ToastHost"
+             x:Name="Root"
+             HorizontalAlignment="Right"
+             VerticalAlignment="Top">
+
+    <!-- Reusable toast/notification host (#32), see the code-behind's remarks. Anchored top-right
+         over whatever screen is currently showing (ShellView.axaml stacks this on top of its
+         content Grid). An empty ItemsControl (no toasts showing) is a zero-size box, so it never
+         intercepts pointer input meant for the screen underneath it, no extra IsHitTestVisible
+         plumbing needed. -->
+    <ItemsControl ItemsSource="{Binding #Root.ItemsSource}"
+                  Margin="16">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Spacing="{StaticResource SpaceSM}" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ToastViewModel">
+                <Border Classes="toast"
+                        Classes.info="{Binding IsInfo}"
+                        Classes.warning="{Binding IsWarning}"
+                        Classes.error="{Binding IsError}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Classes="body"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="320"
+                                   Text="{Binding Message}" />
+                        <!-- Plain "x" glyph, not an icon asset, mirrors EmptyState's identical
+                             "no icon-font pipeline exists in this app" reasoning (issue #23). -->
+                        <Button Grid.Column="1"
+                                Classes="link"
+                                Content="✕"
+                                Command="{Binding DismissCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip.Tip="Dismiss" />
+                    </Grid>
+                </Border>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

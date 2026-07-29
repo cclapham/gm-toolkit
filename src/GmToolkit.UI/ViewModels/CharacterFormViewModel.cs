@@ -311,6 +311,12 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
             // identical remark.
             SaveError = ex.Message;
         }
+        catch (Exception ex)
+        {
+            // A real repository failure (issue #32) -- see CampaignFormViewModel.SaveAsync's
+            // identical catch and GlobalExceptionHandler's remarks.
+            SaveError = $"Couldn't save this character: {ex.Message}";
+        }
     }
 
     [RelayCommand]

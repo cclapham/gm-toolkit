@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
              xmlns:services="using:GmToolkit.UI.Services"
+             xmlns:controls="using:GmToolkit.UI.Controls"
              mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
              x:Class="GmToolkit.UI.Views.ShellView"
              x:DataType="vm:ShellViewModel">
@@ -46,6 +47,11 @@
         </Style>
     </UserControl.Styles>
 
+    <!-- Panel (not the Grid directly) is the root so the toast/notification host (#32) can stack
+         on top of everything else via plain z-order (later children paint over earlier ones in a
+         Panel), regardless of which screen is currently showing underneath it. See ToastHost's
+         own remarks for why the shell is the right place to host this. -->
+    <Panel>
     <Grid ColumnDefinitions="Auto,*">
         <!-- Navigation rail: see ShellViewModel's doc comment for the layout decision behind this
              narrow, single (non-breakpoint-swapped) rail. -->
@@ -129,4 +135,7 @@
             <ContentControl Grid.Row="1" Content="{Binding CurrentViewModel}" />
         </Grid>
     </Grid>
+
+    <controls:ToastHost ItemsSource="{Binding Toasts}" />
+    </Panel>
 </UserControl>

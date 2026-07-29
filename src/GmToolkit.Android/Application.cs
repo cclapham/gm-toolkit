@@ -7,6 +7,7 @@ using Avalonia.Android;
 using GmToolkit.Core.Services;
 using GmToolkit.Data;
 using GmToolkit.UI;
+using GmToolkit.UI.Services;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -48,6 +49,11 @@ namespace GmToolkit.Android
         public override void OnCreate()
         {
             base.OnCreate();
+
+            // Global exception handling (issue #32) -- installed before anything else, including
+            // the database bootstrap below, mirrors GmToolkit.Desktop/Program.cs's identical first
+            // line; see GlobalExceptionHandler's remarks for the full design.
+            GlobalExceptionHandler.InstallProcessWideHandlers();
 
             var databasePath = System.IO.Path.Combine(FilesDir!.AbsolutePath, AppDataPaths.DatabaseFileName);
             var database = Task.Run(() => GmToolkitDatabase.CreateAndInitializeAsync(databasePath))

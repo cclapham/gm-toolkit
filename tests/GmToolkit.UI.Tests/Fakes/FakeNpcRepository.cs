@@ -14,6 +14,10 @@ internal sealed class FakeNpcRepository(params Npc[] npcs) : INpcRepository
     /// exercising a load failure without needing a real broken database.</summary>
     public Exception? ThrowOnGetByCampaign { get; set; }
 
+    /// <summary>When set, <see cref="AddAsync"/> throws this instead of adding -- mirrors
+    /// <see cref="FakeCampaignRepository.ThrowOnAdd"/> (issue #32).</summary>
+    public Exception? ThrowOnAdd { get; set; }
+
     public Task<Npc?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_npcs.FirstOrDefault(n => n.Id == id));
 
@@ -24,6 +28,11 @@ internal sealed class FakeNpcRepository(params Npc[] npcs) : INpcRepository
 
     public Task AddAsync(Npc npc, CancellationToken cancellationToken = default)
     {
+        if (ThrowOnAdd is not null)
+        {
+            return Task.FromException(ThrowOnAdd);
+        }
+
         _npcs.Add(npc);
         return Task.CompletedTask;
     }

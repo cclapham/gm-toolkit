@@ -1,4 +1,5 @@
 using GmToolkit.Core.Models;
+using GmToolkit.Core.Repositories;
 using GmToolkit.UI.Tests.Fakes;
 using GmToolkit.UI.ViewModels;
 
@@ -110,6 +111,22 @@ public class CharacterFormViewModelTests
         Assert.Equal(campaignId, persisted.CampaignId);
         Assert.NotNull(saved);
         Assert.Same(persisted, saved);
+    }
+
+    [Fact]
+    public async Task SaveAsync_when_the_repository_throws_a_DataAccessException_shows_its_friendly_message_instead_of_crashing()
+    {
+        // Mirrors CampaignFormViewModelTests' identical test (issue #32).
+        var repository = new FakePlayerCharacterRepository { ThrowOnAdd = new DataAccessException("The database file is missing.") };
+        var form = new CharacterFormViewModel(repository);
+        form.BeginCreate(Guid.NewGuid());
+        form.CharacterName = "Arannis Windrunner";
+
+        var exception = await Record.ExceptionAsync(() => form.SaveCommand.ExecuteAsync(null));
+
+        Assert.Null(exception);
+        Assert.NotNull(form.SaveError);
+        Assert.Contains("The database file is missing.", form.SaveError);
     }
 
     [Fact]

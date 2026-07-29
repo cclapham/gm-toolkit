@@ -40,6 +40,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGeneratorRegistry>(_ => GeneratorRegistry.FromEmbeddedTables());
         services.AddSingleton<INpcGenerator, NpcGenerator>();
         services.AddSingleton<INavigationService, NavigationService>();
+        // Singleton (issue #32): one app-wide toast stack, not one per screen -- see
+        // INotificationService's remarks on why the shell hosts it.
+        services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<ShellViewModel>();
         return services;
     }

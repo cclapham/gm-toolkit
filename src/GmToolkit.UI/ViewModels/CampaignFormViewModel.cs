@@ -178,6 +178,15 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
             // this should be unreachable in practice. See this class's remarks.
             SaveError = ex.Message;
         }
+        catch (Exception ex)
+        {
+            // A real repository failure (issue #32) -- e.g. a caught DataAccessException from the
+            // database file disappearing mid-session. Without this, the exception would otherwise
+            // propagate out of this [RelayCommand]-generated async command uncaught; see
+            // GlobalExceptionHandler's remarks for what happens then. Mirrors
+            // GeneratorViewModel.SaveAsync's identical catch.
+            SaveError = $"Couldn't save this campaign: {ex.Message}";
+        }
     }
 
     [RelayCommand]
