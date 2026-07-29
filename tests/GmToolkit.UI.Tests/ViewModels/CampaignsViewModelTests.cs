@@ -184,6 +184,44 @@ public class CampaignsViewModelTests
     }
 
     [Fact]
+    public void RequestEditCommand_opens_the_form_in_edit_mode_prefilled_with_the_campaigns_data_without_activating_it()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls", GameSystem = "D&D 5e", Description = "A long-running homebrew campaign." };
+        var repository = new FakeCampaignRepository(campaign);
+        var activeCampaignContext = new ActiveCampaignContext(repository);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var item = Assert.Single(vm.Campaigns);
+
+        vm.RequestEditCommand.Execute(item);
+
+        Assert.True(vm.IsFormVisible);
+        Assert.True(vm.Form.IsEditMode);
+        Assert.Equal("Wandering Souls", vm.Form.Name);
+        Assert.Equal("D&D 5e", vm.Form.GameSystem);
+        Assert.Equal("A long-running homebrew campaign.", vm.Form.Description);
+        Assert.Null(activeCampaignContext.ActiveCampaign);
+        Assert.False(item.IsActive);
+    }
+
+    [Fact]
+    public async Task Saving_an_edit_updates_the_existing_campaign_rather_than_creating_a_new_one()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls", GameSystem = "D&D 5e" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var item = Assert.Single(vm.Campaigns);
+        vm.RequestEditCommand.Execute(item);
+
+        vm.Form.Name = "Wandering Souls Renamed";
+        await vm.Form.SaveCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsFormVisible);
+        var updated = Assert.Single(vm.Campaigns);
+        Assert.Equal(campaign.Id, updated.Campaign.Id);
+        Assert.Equal("Wandering Souls Renamed", updated.Name);
+    }
+
+    [Fact]
     public void RequestDeleteCommand_shows_the_confirmation_panel_for_the_requested_row_and_ConfirmDeleteCommand_is_disabled()
     {
         var campaign = new Campaign { Name = "Wandering Souls" };

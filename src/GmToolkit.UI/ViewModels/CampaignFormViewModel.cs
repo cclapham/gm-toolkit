@@ -128,9 +128,9 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
         SetFields(string.Empty, string.Empty, string.Empty);
     }
 
-    /// <summary>Resets the form to edit <paramref name="campaign"/> in place. Not currently wired
-    /// to any UI entry point (#17/#18 don't ask for one), but built per #18's explicit "shared
-    /// view/view model for create and edit" requirement.</summary>
+    /// <summary>Resets the form to edit <paramref name="campaign"/> in place. Wired to
+    /// <see cref="CampaignsViewModel"/>'s per-row "Edit" trigger (issue #71); built per #18's
+    /// explicit "shared view/view model for create and edit" requirement.</summary>
     public void BeginEdit(Campaign campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
