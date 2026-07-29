@@ -75,7 +75,7 @@ namespace GmToolkit.UI.ViewModels;
 /// shouldn't also shrink the very control a GM would use to broaden back out.
 /// </para>
 /// </remarks>
-public sealed partial class NpcsViewModel : ViewModelBase
+public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
 {
     /// <summary>Sentinel option meaning "don't filter by faction/location" -- always first in
     /// <see cref="FactionOptions"/>/<see cref="LocationOptions"/>, regardless of what values are
@@ -283,6 +283,15 @@ public sealed partial class NpcsViewModel : ViewModelBase
     /// <summary>Retries a failed load -- mirrors <see cref="CharactersViewModel.RetryLoadCommand"/>.</summary>
     [RelayCommand]
     private Task RetryLoadAsync() => LoadAsync();
+
+    /// <inheritdoc/>
+    /// <remarks>Delegates straight to <see cref="LoadAsync"/> -- the same method the constructor's
+    /// own fire-and-forget initial load already calls -- so search text/faction/location/sort order
+    /// carry over exactly the way they already do across an active-campaign switch (see
+    /// <see cref="HandleActiveCampaignChanged"/>'s remarks); this deliberately does not also close
+    /// <see cref="Form"/>, since (unlike an active-campaign switch) simply navigating back to an
+    /// already-open form should not discard whatever the GM was mid-editing.</remarks>
+    public Task RefreshAsync() => LoadAsync();
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
 

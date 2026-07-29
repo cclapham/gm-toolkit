@@ -47,7 +47,7 @@ namespace GmToolkit.UI.ViewModels;
 /// screen without scrolling" (this issue's acceptance criterion) hold at typical laptop resolution.
 /// </para>
 /// </remarks>
-public sealed partial class CharactersViewModel : ViewModelBase
+public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
 {
     private readonly IPlayerCharacterRepository _playerCharacterRepository;
     private readonly ActiveCampaignContext _activeCampaignContext;
@@ -145,6 +145,13 @@ public sealed partial class CharactersViewModel : ViewModelBase
     /// <summary>Retries a failed load -- mirrors <see cref="CampaignsViewModel.RetryLoadAsync"/>.</summary>
     [RelayCommand]
     private Task RetryLoadAsync() => LoadAsync();
+
+    /// <inheritdoc/>
+    /// <remarks>Delegates straight to <see cref="LoadAsync"/> -- the same method the constructor's
+    /// own fire-and-forget initial load already calls -- mirrors
+    /// <see cref="NpcsViewModel.RefreshAsync"/>'s identical remark on why this deliberately does not
+    /// also close <see cref="Form"/>.</remarks>
+    public Task RefreshAsync() => LoadAsync();
 
     private async Task LoadAsync()
     {

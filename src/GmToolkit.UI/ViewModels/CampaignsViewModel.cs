@@ -47,7 +47,7 @@ namespace GmToolkit.UI.ViewModels;
 /// user might want to pick a *different* campaign from a moment later.
 /// </para>
 /// </remarks>
-public sealed partial class CampaignsViewModel : ViewModelBase
+public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
 {
     private readonly ICampaignRepository _campaignRepository;
     private readonly ActiveCampaignContext _activeCampaignContext;
@@ -185,6 +185,17 @@ public sealed partial class CampaignsViewModel : ViewModelBase
     /// error state, since there's nothing else to interact with on this screen when it's showing.</summary>
     [RelayCommand]
     private Task RetryLoadAsync() => LoadAsync();
+
+    /// <inheritdoc/>
+    /// <remarks>Delegates straight to <see cref="LoadAsync"/> -- the same method the constructor's
+    /// own fire-and-forget initial load already calls, and the only method that ever repopulates
+    /// <see cref="Campaigns"/> -- mirrors <see cref="NpcsViewModel.RefreshAsync"/>'s identical
+    /// remark. This screen has no search/filter state to preserve, but a fresh
+    /// <see cref="Campaign.LastOpenedUtc"/>-based sort and active-row marker (see
+    /// <see cref="RefreshActiveSelection"/>) every time it's navigated to is exactly what makes this
+    /// class immune to the same staleness class of bug issue #68 fixed for
+    /// <see cref="NpcsViewModel"/>/<see cref="CharactersViewModel"/>.</remarks>
+    public Task RefreshAsync() => LoadAsync();
 
     /// <summary>
     /// Opens <paramref name="item"/> in the shared create/edit form's edit mode (issue #71), via

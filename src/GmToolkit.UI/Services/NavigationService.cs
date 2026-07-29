@@ -95,6 +95,18 @@ public sealed class NavigationService : INavigationService
         CurrentDestination = destination;
         CurrentViewModel = GetOrCreate(destination);
 
+        // Issue #68: refresh whatever's showing every time it's navigated to -- including the very
+        // first time, when GetOrCreate above just constructed it -- so a screen that was left
+        // cached (see _cache's own remark) never goes on showing stale data after some other
+        // screen's action changed the same underlying data out from under it (e.g. GeneratorViewModel
+        // saving a generated NPC directly via INpcRepository.AddAsync, bypassing NpcsViewModel's own
+        // Form entirely -- see IRefreshable's remarks). Fire-and-forget, same idiom as these view
+        // models' own constructor-time initial load; errors surface via each one's own LoadError.
+        if (CurrentViewModel is IRefreshable refreshable)
+        {
+            _ = refreshable.RefreshAsync();
+        }
+
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentDestination)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentViewModel)));
     }

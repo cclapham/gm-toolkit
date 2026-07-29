@@ -461,4 +461,20 @@ public class CampaignsViewModelTests
 
         Assert.Null(exception);
     }
+
+    [Fact]
+    public async Task RefreshAsync_picks_up_a_campaign_added_directly_to_the_repository()
+    {
+        // Mirrors issue #68's staleness class of bug -- see IRefreshable's remarks.
+        var repository = new FakeCampaignRepository();
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        Assert.True(vm.IsEmpty);
+
+        await repository.AddAsync(new Campaign { Name = "Wandering Souls" });
+        await vm.RefreshAsync();
+
+        Assert.False(vm.IsEmpty);
+        Assert.True(vm.IsListVisible);
+        Assert.Equal("Wandering Souls", vm.Campaigns.Single().Name);
+    }
 }

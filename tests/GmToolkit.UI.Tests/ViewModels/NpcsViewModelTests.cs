@@ -570,4 +570,42 @@ public class NpcsViewModelTests
 
         Assert.False(vm.IsFormVisible);
     }
+
+    [Fact]
+    public async Task RefreshAsync_picks_up_an_npc_added_directly_to_the_repository_bypassing_the_form()
+    {
+        // Mirrors issue #68's actual root cause: GeneratorViewModel.SaveAsync persists straight
+        // through INpcRepository.AddAsync, never touching this view model's own Form -- so nothing
+        // but a navigate-triggered RefreshAsync (see IRefreshable) should be needed to see it.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeNpcRepository();
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        Assert.True(vm.IsEmpty);
+
+        await repository.AddAsync(MakeNpc(campaign.Id, "Generated Ghoul"));
+        await vm.RefreshAsync();
+
+        Assert.False(vm.IsEmpty);
+        Assert.True(vm.IsListVisible);
+        Assert.Equal("Generated Ghoul", vm.Npcs.Single().Name);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_preserves_search_text_and_faction_filter()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var matching = MakeNpc(campaign.Id, "Baelor the Butcher", faction: "The Iron Concord");
+        var nonMatching = MakeNpc(campaign.Id, "Zoric the Pale", faction: "The Whispering Cult");
+        var repository = new FakeNpcRepository(matching, nonMatching);
+        var vm = new NpcsViewModel(repository, ActiveContextFor(campaign));
+        vm.SearchText = "Baelor";
+        vm.SelectedFaction = "The Iron Concord";
+
+        await repository.AddAsync(MakeNpc(campaign.Id, "Another Generated NPC", faction: "The Iron Concord"));
+        await vm.RefreshAsync();
+
+        Assert.Equal("Baelor", vm.SearchText);
+        Assert.Equal("The Iron Concord", vm.SelectedFaction);
+        Assert.Equal("Baelor the Butcher", vm.Npcs.Single().Name);
+    }
 }

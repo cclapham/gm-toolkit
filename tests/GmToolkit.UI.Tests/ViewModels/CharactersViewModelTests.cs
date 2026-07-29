@@ -253,4 +253,23 @@ public class CharactersViewModelTests
 
         Assert.Null(exception);
     }
+
+    [Fact]
+    public async Task RefreshAsync_picks_up_a_character_added_directly_to_the_repository_bypassing_the_form()
+    {
+        // Mirrors issue #68's staleness class of bug: any save flow that persists straight through
+        // IPlayerCharacterRepository without going through this view model's own Form should still
+        // show up once RefreshAsync (see IRefreshable) is called.
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakePlayerCharacterRepository();
+        var vm = new CharactersViewModel(repository, ActiveContextFor(campaign, new FakeCampaignRepository(campaign)));
+        Assert.True(vm.IsEmpty);
+
+        await repository.AddAsync(new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Arannis" });
+        await vm.RefreshAsync();
+
+        Assert.False(vm.IsEmpty);
+        Assert.True(vm.IsListVisible);
+        Assert.Equal("Arannis", vm.Characters.Single().CharacterName);
+    }
 }
