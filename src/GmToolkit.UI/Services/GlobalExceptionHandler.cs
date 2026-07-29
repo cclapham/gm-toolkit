@@ -28,8 +28,10 @@ namespace GmToolkit.UI.Services;
 /// container construction) that could itself throw.</item>
 /// <item><see cref="TaskScheduler.UnobservedTaskException"/> -- fires when a faulted
 /// <see cref="Task"/> is garbage-collected without anyone having awaited/observed its exception.
-/// <see cref="UnobservedTaskExceptionEventArgs.SetObserved"/> below prevents this from being fatal;
-/// also installed by <see cref="InstallProcessWideHandlers"/>.</item>
+/// These are already non-fatal by default on modern .NET, so <see cref="UnobservedTaskExceptionEventArgs.SetObserved"/>
+/// below isn't preventing a crash -- it just marks the exception handled so it's still logged and
+/// surfaced to the user rather than silently vanishing with the garbage-collected Task. Also
+/// installed by <see cref="InstallProcessWideHandlers"/>.</item>
 /// <item><see cref="Dispatcher.UnhandledException"/> -- the one that matters most for this issue's
 /// concrete acceptance criterion. CommunityToolkit.Mvvm's generated <c>[RelayCommand]</c> async
 /// commands (every <c>SaveAsync</c>/<c>ConfirmDeleteAsync</c> in <c>GmToolkit.UI.ViewModels</c>) by
@@ -51,9 +53,10 @@ namespace GmToolkit.UI.Services;
 /// app has no existing file-based logging infrastructure (checked before starting this issue), and
 /// building one (rotation, a platform-specific log directory, etc.) is meaningfully more scope than
 /// this issue asks for -- its acceptance criterion is about the user seeing a comprehensible
-/// message, not about developer-facing crash forensics. <see cref="Trace"/> output is visible via
-/// each head's own <c>AppBuilder.LogToTrace()</c> (already configured) when a debugger/trace
-/// listener is attached, which is proportionate to a hobby-scale MVP's needs today.
+/// message, not about developer-facing crash forensics. <see cref="Trace"/> output runs in every
+/// build configuration (not just Debug) and is visible via each head's own <c>AppBuilder.LogToTrace()</c>
+/// (already configured) when a debugger/trace listener is attached, which is proportionate to a
+/// hobby-scale MVP's needs today.
 /// </para>
 /// <para>
 /// <b>Toasts are best-effort, guarded by <see cref="App.Services"/> possibly being unset.</b>
@@ -96,8 +99,11 @@ public static class GlobalExceptionHandler
     {
         LogException("TaskScheduler.UnobservedTaskException", e.Exception);
 
-        // Prevents this from being treated as a fatal, process-ending failure -- the whole point
-        // of this hook existing (see this class's remarks).
+        // Marks the exception observed so the finalizer thread that raised this event doesn't
+        // treat it as anything further to act on -- unobserved task exceptions are already
+        // non-fatal by default on modern .NET, so this isn't preventing a crash; it's here so the
+        // failure is still logged and surfaced to the user (see NotifyUserOnUiThread below) even
+        // though nothing awaited the faulted Task directly.
         e.SetObserved();
 
         NotifyUserOnUiThread(e.Exception);
@@ -128,7 +134,6 @@ public static class GlobalExceptionHandler
             App.Services?.GetService<INotificationService>()?.Show(UserFacingMessage, ToastSeverity.Error));
     }
 
-    [Conditional("DEBUG")]
     private static void LogException(string source, Exception exception) =>
         Trace.TraceError($"GmToolkit: unhandled exception via {source}: {exception}");
 }
