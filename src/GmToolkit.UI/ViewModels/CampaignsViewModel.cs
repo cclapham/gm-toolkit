@@ -187,6 +187,26 @@ public sealed partial class CampaignsViewModel : ViewModelBase
     private Task RetryLoadAsync() => LoadAsync();
 
     /// <summary>
+    /// Opens <paramref name="item"/> in the shared create/edit form's edit mode (issue #71), via
+    /// the same <see cref="CampaignFormViewModel.BeginEdit"/> that issue #18 already built but left
+    /// unwired. A sibling of <see cref="RequestDelete"/>'s trigger button, not a reuse of
+    /// <see cref="SelectAsync"/>'s row click: that click's job stays "activate this campaign" (see
+    /// this class's remarks), so making a campaign the active one is never a side effect of just
+    /// wanting to fix a typo in its name.
+    /// </summary>
+    [RelayCommand]
+    private void RequestEdit(CampaignListItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        Form.BeginEdit(item.Campaign);
+        IsFormVisible = true;
+    }
+
+    /// <summary>
     /// Shows <paramref name="item"/>'s inline delete-confirmation panel (issue #19) -- the delete
     /// trigger's own click never deletes anything by itself, only this. If another row already
     /// has its confirmation showing, it's closed first: only one row can be mid-delete at a time,

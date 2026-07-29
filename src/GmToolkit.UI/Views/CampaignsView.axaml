@@ -45,8 +45,18 @@
             <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
         </Style>
 
-        <!-- The "delete" trigger: a sibling of campaignRowSelect (not nested inside it - see
-             this style block's opening comment), so its click never also selects the campaign. -->
+        <!-- The "edit" (issue #71) and "delete" triggers: both siblings of campaignRowSelect (not
+             nested inside it - see this style block's opening comment), so neither one's click
+             also selects the campaign. -->
+        <Style Selector="Button.campaignRowEdit">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <!-- Padding="8,12" mirrors SpaceSM/SpaceMD, see the note in Styles/Spacing.axaml. -->
+            <Setter Property="Padding" Value="8,12" />
+        </Style>
+        <Style Selector="Button.campaignRowEdit:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+        </Style>
         <Style Selector="Button.campaignRowDelete">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -156,12 +166,19 @@
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Button>
-                                        <Button Grid.Column="1"
-                                                Classes="campaignRowDelete"
-                                                Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).RequestDeleteCommand}"
-                                                CommandParameter="{Binding}"
-                                                Content="Delete"
-                                                VerticalAlignment="Top" />
+                                        <!-- Edit (issue #71) and delete (issue #19) triggers, side by side: both siblings of
+                                             campaignRowSelect above (not nested inside it - see this view's Styles block), so
+                                             neither click also activates the campaign. -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                            <Button Classes="campaignRowEdit"
+                                                    Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).RequestEditCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="Edit" />
+                                            <Button Classes="campaignRowDelete"
+                                                    Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).RequestDeleteCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="Delete" />
+                                        </StackPanel>
                                     </Grid>
 
                                     <!-- Inline delete-confirmation panel (issue #19): same
