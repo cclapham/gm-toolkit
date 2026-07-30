@@ -63,11 +63,15 @@ Polish and ship. Light/dark theme pass, consistent validation and error handling
 
 ## M9 — Typed character/NPC systems & distribution
 
-Pluggable, declarative (no code execution, ever) stat schemas for PCs and NPCs, attached at the campaign level so every PC and NPC in a campaign shares the same system. Ships with four worked profiles chosen specifically to stress-test genericity — D&D 5e (2014), D&D 5e (2024 revision), Pathfinder 2e, and GURPS, the last of which has no class/level concept at all and is the real test of whether the schema format is generic rather than secretly D&D-shaped. Also the app's first-ever network capability: an explicit, opt-in HTTPS client for downloading community system packs from a separate approval/distribution service (a different project), sha256-pinned and structurally re-validated regardless of the hash match, never triggered except by deliberate user action.
+Pluggable, declarative (no code execution, ever) stat schemas for PCs and NPCs, attached at the campaign level so every PC and NPC in a campaign shares the same system. Ships with four worked profiles chosen specifically to stress-test genericity — D&D 5e (2014), D&D 5e (2024 revision), Pathfinder 2e, and GURPS, the last of which has no class/level concept at all and is the real test of whether the schema format is generic rather than secretly D&D-shaped.
+
+Community system-pack distribution (an explicit, opt-in HTTPS client downloading sha256-pinned packs from a separate approval/distribution service) is **paused** until that separate service exists — see [#91](https://github.com/cclapham/gm-toolkit/issues/91)/[#92](https://github.com/cclapham/gm-toolkit/issues/92)/[#93](https://github.com/cclapham/gm-toolkit/issues/93). The schema engine and all four built-in profiles don't depend on it and proceed now.
 
 Tracked as issues [#82](https://github.com/cclapham/gm-toolkit/issues/82)–[#93](https://github.com/cclapham/gm-toolkit/issues/93).
 
-**Exit:** a GM can run a D&D 5e, D&D 5e (2024), Pathfinder 2e, or GURPS campaign with typed, validated PC/NPC stat blocks, and install a community-approved system pack over HTTPS with its integrity verified.
+**Exit (active scope):** a GM can run a D&D 5e, D&D 5e (2024), Pathfinder 2e, or GURPS campaign with typed, validated PC/NPC stat blocks, using the four built-in profiles.
+
+**Exit (paused scope):** install a community-approved system pack over HTTPS with its integrity verified — blocked on the separate distribution service.
 
 **Status:** not started.
 
