@@ -13,13 +13,16 @@ public class CharacterSystemLoaderTests
     // ---- Embedded-resource loading (mirrors GeneratorTableLoader's own smoke tests) ----
 
     [Fact]
-    public void LoadAll_against_the_real_Core_assembly_succeeds_with_zero_packs()
+    public void LoadAll_against_the_real_Core_assembly_succeeds()
     {
-        // #83 ships the engine itself with no in-box system content -- that's #84-#87's job -- so
-        // it's not an error for LoadAll to find nothing embedded yet.
+        // #83 ships the engine itself with no in-box system content -- that's #84-#87's job. Once a
+        // content pack (e.g. dnd5e-2024's Resources/CharacterSystems/dnd5e-2024.json) is embedded,
+        // LoadAll must load and validate it without throwing -- the same smoke test
+        // GeneratorTableLoaderTests.LoadAll_loads_every_embedded_table_without_error runs for the
+        // generator tables.
         var systems = CharacterSystemLoader.LoadAll();
 
-        Assert.Empty(systems);
+        Assert.NotEmpty(systems);
     }
 
     [Fact]
