@@ -14,7 +14,10 @@
   <ItemGroup>
     <!-- Shared source icon from repo-root Resources/Icons/ (see GmToolkit.Core's GeneratorTables
     embedding for the same pattern); used for the launcher icon and splash_screen.xml. -->
-    <AndroidResource Include="..\..\Resources\Icons\GM-Toolkit-icon-256.png">
+    <!-- Android's resource compiler validates the source file's own name against
+    [a-zA-Z0-9_.]+ (no hyphens, no uppercase), regardless of the Link below, hence the
+    underscored/lowercase filename here rather than matching Resources/Icons/'s usual naming. -->
+    <AndroidResource Include="..\..\Resources\Icons\gmtoolkit_icon_256.png">
       <Link>Resources\drawable\Icon.png</Link>
     </AndroidResource>
   </ItemGroup>
