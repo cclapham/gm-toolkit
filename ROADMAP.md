@@ -17,6 +17,7 @@ Milestones are sequential and each has an exit criterion — a thing that is eit
 | M10 | Interactive map drawing | A DM draws a map, saves it against a campaign, and exports it as a usable print-ready file | Not started |
 | M11 | Campaign dashboard | Opening a campaign shows party levels, an NPC summary, and current quests at a glance | Not started |
 | M12 | Session diary & calendar | A GM schedules, completes, and reviews sessions with planning and summary notes | Not started |
+| M13 | World locations (gazetteer) | A GM builds a nested world (countries/regions/cities/features) and optionally links NPCs to it | Not started |
 
 ---
 
@@ -108,6 +109,16 @@ Tracked as issues [#107](https://github.com/cclapham/gm-toolkit/issues/107)–[#
 
 **Status:** not started.
 
+## M13 — World locations (gazetteer)
+
+A hierarchical world-building system: countries, regions, cities, and standalone geographic features (mountains, forests, seas, islands) as a single self-referencing `Location` entity with a GM-extensible `Kind` (not a hardcoded enum, matching this app's existing "GM defines the keys" philosophy) and arbitrary nesting depth. Political entities are a free-text "controlling faction" field on a location, not a new structured Faction model — that's separate, already-flagged future work. NPCs (and possibly PCs) get an optional structured location link **additively**, alongside their existing free-text Location field, which is never replaced or forced into structure. No map tie-in (M10) in v1.
+
+Tracked as issues [#112](https://github.com/cclapham/gm-toolkit/issues/112)–[#116](https://github.com/cclapham/gm-toolkit/issues/116).
+
+**Exit:** a GM builds a nested world (country → region → city, plus standalone features) entirely through the UI, and can optionally link an NPC to it without changing how the existing free-text field behaves for anyone who doesn't.
+
+**Status:** not started.
+
 ---
 
 ## Post-MVP (M5+)
@@ -122,5 +133,6 @@ Sequenced by what MVP users actually complain about, so treat the order below as
 - **M10 — Interactive map drawing.** See above.
 - **M11 — Campaign dashboard.** See above.
 - **M12 — Session diary & calendar.** See above.
+- **M13 — World locations (gazetteer).** See above.
 
-Other candidates with no milestone yet: relationship/faction graph, encounter builder, localisation, macOS/iOS support if there's ever a reason to chase it, an Avalonia Browser (WASM) head for browser play (tradeoff: sandboxed storage is a weaker fit for local-first data), Google Play Store distribution for Android (needs an `.aab` build and Play Console/Play App Signing enrollment, additive to the existing sideload APK path, not a replacement for it).
+Other candidates with no milestone yet: relationship/faction graph (note: M13 deliberately keeps political entities as a free-text field rather than building this, so a real faction graph is still open future work), encounter builder, localisation, macOS/iOS support if there's ever a reason to chase it, an Avalonia Browser (WASM) head for browser play (tradeoff: sandboxed storage is a weaker fit for local-first data), Google Play Store distribution for Android (needs an `.aab` build and Play Console/Play App Signing enrollment, additive to the existing sideload APK path, not a replacement for it).
