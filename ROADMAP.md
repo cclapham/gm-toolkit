@@ -2,17 +2,17 @@
 
 Milestones are sequential and each has an exit criterion — a thing that is either true or not. Milestones M0–M4 constitute the [MVP](MVP.md); M5+ are post-MVP and deliberately vague until the MVP ships.
 
-| # | Milestone | Exit criterion |
-| --- | --- | --- |
-| M0 | Foundations | A fresh clone builds and tests pass for a stranger; CI green |
-| M1 | Domain & data layer | A campaign with PCs and NPCs round-trips to SQLite, proven by tests |
-| M2 | Campaign & character management | A GM can manage campaigns and a PC roster through the UI |
-| M3 | NPC generator | Generate → reroll a field → save to campaign, in under 10 seconds |
-| M4 | MVP release | `v0.1.0` tagged and installable on Windows, Linux (desktop and Raspberry Pi 4) and Android |
-| M5 | Import / export | A campaign survives a round-trip through a JSON file |
-| M6 | Custom tables | A GM adds their own generator table without touching source |
-| M7 | At-the-table tools | Initiative tracker and session log usable during a live game |
-| M8 | Sync & sharing | Same campaign on two devices, and a player-facing read-only view |
+| # | Milestone | Exit criterion | Status |
+| --- | --- | --- | --- |
+| M0 | Foundations | A fresh clone builds and tests pass for a stranger; CI green | Done |
+| M1 | Domain & data layer | A campaign with PCs and NPCs round-trips to SQLite, proven by tests | Done |
+| M2 | Campaign & character management | A GM can manage campaigns and a PC roster through the UI | Done |
+| M3 | NPC generator | Generate → reroll a field → save to campaign, in under 10 seconds | Done |
+| M4 | MVP release | `v0.1.0` tagged and installable on Windows, Linux (desktop and Raspberry Pi 4) and Android | Nearly done — only [#38](https://github.com/cclapham/gm-toolkit/issues/38) (tag + publish) left |
+| M5 | Import / export | A campaign survives a round-trip through a JSON file | Not started |
+| M6 | Custom tables | A GM adds their own generator table without touching source | Not started |
+| M7 | At-the-table tools | Initiative tracker and session log usable during a live game | Not started |
+| M8 | Sync & sharing | Same campaign on two devices, and a player-facing read-only view | Not started |
 
 ---
 
@@ -24,6 +24,8 @@ Scaffolding, so that every later milestone is boring.
 
 **Exit:** a fresh clone runs `dotnet restore && dotnet build`, builds, and tests pass in CI and locally.
 
+**Status:** done.
+
 ## M1 — Domain & data layer
 
 `Campaign`, `PlayerCharacter`, `Npc` and the generator table models in `Core`. sqlite-net-pcl repository implementations in `Data`, DB creation on first run at the platform app-data path, and seeding of the generator tables from embedded JSON (`Resources/GeneratorTables`).
@@ -32,11 +34,15 @@ No UI in this milestone. Tests are the UI.
 
 **Exit:** integration tests create a campaign, add PCs and NPCs, close and reopen the database, and read them back.
 
+**Status:** done.
+
 ## M2 — Campaign & character management
 
 The first milestone you can show someone. App shell and navigation (Avalonia, MVVM), campaign list / create / edit / delete, campaign selection context, PC roster, PC create/edit form with validation, notes with markdown rendering, and empty states that tell a new user what to do.
 
 **Exit:** a GM can set up a real campaign and its party without touching the database.
+
+**Status:** done.
 
 ## M3 — NPC generator
 
@@ -44,11 +50,15 @@ The differentiator, so it gets its own milestone. Weighted-table generator engin
 
 **Exit:** the ten-second test in [MVP.md](MVP.md) passes.
 
+**Status:** done.
+
 ## M4 — MVP release
 
 Polish and ship. Light/dark theme pass, consistent validation and error handling, search across NPCs, performance check on cold start (Raspberry Pi 4 included), Windows/Linux packaging (including Raspberry Pi 4 / ARM64), Android APK/AAB produced by CI, manual QA pass on real devices across Windows, Ubuntu, Raspberry Pi 4 and Android, README screenshots, `v0.1.0` tag and release notes.
 
 **Exit:** someone who isn't you installs it and runs a session with it.
+
+**Status:** nearly done. Cold start, Windows/Linux/Android packaging, manual QA (including airplane-mode/zero-network-calls verification), and app icons/branding are all closed out; build artifacts for all four platforms already sit on a draft GitHub release. Only [#38](https://github.com/cclapham/gm-toolkit/issues/38) — tagging `v0.1.0`, writing release notes, publishing the release, and flipping the README status from pre-alpha to alpha — remains.
 
 ---
 
