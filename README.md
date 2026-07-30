@@ -7,7 +7,7 @@
 [![.NET](https://img.shields.io/badge/.NET-8-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Avalonia](https://img.shields.io/badge/UI-Avalonia-blueviolet)](https://avaloniaui.net/)
 
-**Status:** pre-alpha — working towards the [MVP](MVP.md). Expect breaking changes.
+**Status:** alpha — the [MVP](MVP.md) is out as `v0.1.0`. Post-MVP work (see [ROADMAP.md](ROADMAP.md)) may still bring breaking changes.
 
 ---
 
