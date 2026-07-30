@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=GM Toolkit
+Comment=Offline campaign, character and NPC manager for tabletop RPGs
+Exec=__EXEC_PATH__
+Icon=gmtoolkit
+Terminal=false
+Categories=Game;RolePlaying;Utility;
+StartupWMClass=GmToolkit.Desktop

@@ -97,6 +97,10 @@ dotnet restore
   ```
 - **Android:** `dotnet build src/GmToolkit.Android -f net10.0-android` produces a debug APK; deploy to a device or emulator from Rider/VS, or `dotnet publish -c Release` for a signed release build.
 
+### Linux desktop menu / taskbar icon
+
+The Linux release tarball has no installer, so there's no automatic app-menu or taskbar entry. Run `./install-desktop-entry.sh` from the folder you extracted the tarball into (it needs `GmToolkit.Desktop` and `gmtoolkit.png` alongside it) to install a per-user `.desktop` entry and icon — otherwise the app still runs fine, it just shows a generic icon in the dock instead of its own.
+
 ### Tests
 
 ```bash
