@@ -13,6 +13,7 @@ Milestones are sequential and each has an exit criterion — a thing that is eit
 | M6 | Custom tables | A GM adds their own generator table without touching source | Not started |
 | M7 | At-the-table tools | Initiative tracker and session log usable during a live game | Not started |
 | M8 | Sync & sharing | Same campaign on two devices, and a player-facing read-only view | Not started |
+| M9 | Typed character/NPC systems & distribution | A GM can run a D&D 5e, D&D 5e (2024), Pathfinder 2e, or GURPS campaign with typed, validated PC/NPC stat blocks, and install a community-approved system pack over HTTPS with its integrity verified | Not started |
 
 ---
 
@@ -60,6 +61,16 @@ Polish and ship. Light/dark theme pass, consistent validation and error handling
 
 **Status:** done. `v0.1.0` is tagged and published: [github.com/cclapham/gm-toolkit/releases/tag/v0.1.0](https://github.com/cclapham/gm-toolkit/releases/tag/v0.1.0).
 
+## M9 — Typed character/NPC systems & distribution
+
+Pluggable, declarative (no code execution, ever) stat schemas for PCs and NPCs, attached at the campaign level so every PC and NPC in a campaign shares the same system. Ships with four worked profiles chosen specifically to stress-test genericity — D&D 5e (2014), D&D 5e (2024 revision), Pathfinder 2e, and GURPS, the last of which has no class/level concept at all and is the real test of whether the schema format is generic rather than secretly D&D-shaped. Also the app's first-ever network capability: an explicit, opt-in HTTPS client for downloading community system packs from a separate approval/distribution service (a different project), sha256-pinned and structurally re-validated regardless of the hash match, never triggered except by deliberate user action.
+
+Tracked as issues [#82](https://github.com/cclapham/gm-toolkit/issues/82)–[#93](https://github.com/cclapham/gm-toolkit/issues/93).
+
+**Exit:** a GM can run a D&D 5e, D&D 5e (2024), Pathfinder 2e, or GURPS campaign with typed, validated PC/NPC stat blocks, and install a community-approved system pack over HTTPS with its integrity verified.
+
+**Status:** not started.
+
 ---
 
 ## Post-MVP (M5+)
@@ -70,5 +81,6 @@ Sequenced by what MVP users actually complain about, so treat the order below as
 - **M6 — Custom tables.** In-app table editor, import/export of table packs, community table sharing via plain files.
 - **M7 — At-the-table tools.** Initiative tracker, session log with timestamped notes, quick-reference pinning.
 - **M8 — Sync & sharing.** Optional account, cross-device sync, read-only player view. Last, because it's the only thing here that requires a server and therefore ongoing cost and a privacy policy.
+- **M9 — Typed character/NPC systems & distribution.** See above.
 
-Other candidates with no milestone yet: relationship/faction graph, encounter builder, localisation, plugin model for rules systems, macOS/iOS support if there's ever a reason to chase it, an Avalonia Browser (WASM) head for browser play (tradeoff: sandboxed storage is a weaker fit for local-first data), Google Play Store distribution for Android (needs an `.aab` build and Play Console/Play App Signing enrollment, additive to the existing sideload APK path, not a replacement for it).
+Other candidates with no milestone yet: relationship/faction graph, encounter builder, localisation, macOS/iOS support if there's ever a reason to chase it, an Avalonia Browser (WASM) head for browser play (tradeoff: sandboxed storage is a weaker fit for local-first data), Google Play Store distribution for Android (needs an `.aab` build and Play Console/Play App Signing enrollment, additive to the existing sideload APK path, not a replacement for it).
