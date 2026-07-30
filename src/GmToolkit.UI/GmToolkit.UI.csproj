@@ -7,6 +7,11 @@
   
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <!-- Shared source icon from repo-root Resources/Icons/ (see GmToolkit.Core's GeneratorTables
+    embedding for the same pattern); the Avalonia window icon shown in the title bar/taskbar. -->
+    <AvaloniaResource Include="..\..\Resources\Icons\GM-Toolkit-logo-256.ico">
+      <Link>Assets\AppIcon.ico</Link>
+    </AvaloniaResource>
   </ItemGroup>
 
   <ItemGroup>

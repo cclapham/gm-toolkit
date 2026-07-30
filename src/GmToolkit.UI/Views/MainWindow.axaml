@@ -6,7 +6,7 @@
         xmlns:views="using:GmToolkit.UI.Views"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="GmToolkit.UI.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/AppIcon.ico"
         Title="GmToolkit">
         <views:ShellView />
 </Window>

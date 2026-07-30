@@ -9,6 +9,9 @@
 
   <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Multi-resolution (16-256px) source icon shared from repo-root Resources/Icons/, same
+    convention as GmToolkit.Core's GeneratorTables embedding; sets the .exe's icon on Windows. -->
+    <ApplicationIcon>..\..\Resources\Icons\GM-Toolkit-logo-256.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

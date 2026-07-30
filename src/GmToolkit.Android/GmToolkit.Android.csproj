@@ -12,7 +12,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AndroidResource Include="Icon.png">
+    <!-- Shared source icon from repo-root Resources/Icons/ (see GmToolkit.Core's GeneratorTables
+    embedding for the same pattern); used for the launcher icon and splash_screen.xml. -->
+    <AndroidResource Include="..\..\Resources\Icons\GM-Toolkit-icon-256.png">
       <Link>Resources\drawable\Icon.png</Link>
     </AndroidResource>
   </ItemGroup>
