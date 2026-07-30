@@ -11,11 +11,12 @@ Milestones are sequential and each has an exit criterion — a thing that is eit
 | M4 | MVP release | `v0.1.0` tagged and installable on Windows, Linux (desktop and Raspberry Pi 4) and Android | Done |
 | M5 | Import / export | A campaign survives a round-trip through a JSON file | Not started |
 | M6 | Custom tables | A GM adds their own generator table without touching source | Not started |
-| M7 | At-the-table tools | Initiative tracker and session log usable during a live game | Not started |
+| M7 | At-the-table tools | Initiative tracker usable during a live game | Not started |
 | M8 | Sync & sharing | Same campaign on two devices, and a player-facing read-only view | Not started |
 | M9 | Typed character/NPC systems & distribution | A GM can run a D&D 5e, D&D 5e (2024), Pathfinder 2e, or GURPS campaign with typed, validated PC/NPC stat blocks, and install a community-approved system pack over HTTPS with its integrity verified | Not started |
 | M10 | Interactive map drawing | A DM draws a map, saves it against a campaign, and exports it as a usable print-ready file | Not started |
 | M11 | Campaign dashboard | Opening a campaign shows party levels, an NPC summary, and current quests at a glance | Not started |
+| M12 | Session diary & calendar | A GM schedules, completes, and reviews sessions with planning and summary notes | Not started |
 
 ---
 
@@ -97,6 +98,16 @@ Tracked as issues [#102](https://github.com/cclapham/gm-toolkit/issues/102)–[#
 
 **Status:** not started.
 
+## M12 — Session diary & calendar
+
+A GM-only planning and review tool: schedule upcoming sessions with planning notes, then write a diary/summary entry once each session actually happens. Starts as a chronological upcoming/past list, not a visual calendar grid. Explicitly excludes any player-facing coordination — invites, availability polling, notifications — which needs M8's sharing infrastructure first, and excludes OS-level reminder notifications, a separate and materially bigger cross-platform undertaking.
+
+Tracked as issues [#107](https://github.com/cclapham/gm-toolkit/issues/107)–[#111](https://github.com/cclapham/gm-toolkit/issues/111).
+
+**Exit:** a GM can schedule a session with planning notes, mark it completed, write up what happened, and review past sessions' diary entries alongside upcoming ones.
+
+**Status:** not started.
+
 ---
 
 ## Post-MVP (M5+)
@@ -110,5 +121,6 @@ Sequenced by what MVP users actually complain about, so treat the order below as
 - **M9 — Typed character/NPC systems & distribution.** See above.
 - **M10 — Interactive map drawing.** See above.
 - **M11 — Campaign dashboard.** See above.
+- **M12 — Session diary & calendar.** See above.
 
 Other candidates with no milestone yet: relationship/faction graph, encounter builder, localisation, macOS/iOS support if there's ever a reason to chase it, an Avalonia Browser (WASM) head for browser play (tradeoff: sandboxed storage is a weaker fit for local-first data), Google Play Store distribution for Android (needs an `.aab` build and Play Console/Play App Signing enrollment, additive to the existing sideload APK path, not a replacement for it).
