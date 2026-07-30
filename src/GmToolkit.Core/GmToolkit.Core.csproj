@@ -12,6 +12,13 @@
     <EmbeddedResource Include="..\..\Resources\GeneratorTables\*.json">
       <LogicalName>GmToolkit.Core.GeneratorTables.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
+    <!-- Character system pack data lives at the repo-root Resources/CharacterSystems/ (see
+         SYSTEMS.md), not under this project, mirroring Resources/GeneratorTables/ above. Empty for
+         now: #83 ships only the in-memory "generic" system (see GenericCharacterSystem); #84-#87
+         are what actually drop D&D/Pathfinder/GURPS pack JSON here. -->
+    <EmbeddedResource Include="..\..\Resources\CharacterSystems\*.json" Condition="Exists('..\..\Resources\CharacterSystems')">
+      <LogicalName>GmToolkit.Core.CharacterSystems.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
