@@ -8,7 +8,7 @@ Milestones are sequential and each has an exit criterion — a thing that is eit
 | M1 | Domain & data layer | A campaign with PCs and NPCs round-trips to SQLite, proven by tests | Done |
 | M2 | Campaign & character management | A GM can manage campaigns and a PC roster through the UI | Done |
 | M3 | NPC generator | Generate → reroll a field → save to campaign, in under 10 seconds | Done |
-| M4 | MVP release | `v0.1.0` tagged and installable on Windows, Linux (desktop and Raspberry Pi 4) and Android | Nearly done — only [#38](https://github.com/cclapham/gm-toolkit/issues/38) (tag + publish) left |
+| M4 | MVP release | `v0.1.0` tagged and installable on Windows, Linux (desktop and Raspberry Pi 4) and Android | Done |
 | M5 | Import / export | A campaign survives a round-trip through a JSON file | Not started |
 | M6 | Custom tables | A GM adds their own generator table without touching source | Not started |
 | M7 | At-the-table tools | Initiative tracker and session log usable during a live game | Not started |
@@ -58,7 +58,7 @@ Polish and ship. Light/dark theme pass, consistent validation and error handling
 
 **Exit:** someone who isn't you installs it and runs a session with it.
 
-**Status:** nearly done. Cold start, Windows/Linux/Android packaging, manual QA (including airplane-mode/zero-network-calls verification), and app icons/branding are all closed out; build artifacts for all four platforms already sit on a draft GitHub release. Only [#38](https://github.com/cclapham/gm-toolkit/issues/38) — tagging `v0.1.0`, writing release notes, publishing the release, and flipping the README status from pre-alpha to alpha — remains.
+**Status:** done. `v0.1.0` is tagged and published: [github.com/cclapham/gm-toolkit/releases/tag/v0.1.0](https://github.com/cclapham/gm-toolkit/releases/tag/v0.1.0).
 
 ---
 

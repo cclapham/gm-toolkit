@@ -59,8 +59,10 @@ Written down so they can be said "no" to quickly:
 
 ## Definition of done for the MVP
 
-- [ ] Every issue in milestones M0–M4 is closed — only [#38](https://github.com/cclapham/gm-toolkit/issues/38) (tag `v0.1.0`) remains open
+- [x] Every issue in milestones M0–M4 is closed
 - [x] `dotnet test` (xUnit) green; CI green
 - [x] A signed-off manual QA pass against the one-sentence test above, on each of Windows, Ubuntu Linux, Raspberry Pi 4 and Android
 - [x] README screenshots replaced with real ones
-- [ ] Tagged `v0.1.0` with release notes and build artifacts for Windows, Linux x64, Linux ARM64 and Android attached — all four platforms' artifacts already exist on a draft release; tagging, release notes and publishing it is what #38 is for
+- [x] Tagged `v0.1.0` with release notes and build artifacts for Windows, Linux x64, Linux ARM64 and Android attached — [github.com/cclapham/gm-toolkit/releases/tag/v0.1.0](https://github.com/cclapham/gm-toolkit/releases/tag/v0.1.0)
+
+**The MVP has shipped.** M5+ (see [ROADMAP.md](ROADMAP.md)) is fair game.
