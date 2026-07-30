@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="480"
+        x:Class="GmToolkit.UI.Views.SplashWindow"
+        Title="GM Toolkit"
+        Width="420" Height="480"
+        CanResize="False"
+        WindowDecorations="None"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False"
+        Background="Black"
+        Icon="/Assets/AppIcon.ico">
+
+    <!-- Purely cosmetic branding moment shown while the desktop head starts up; see
+         SplashWindow.axaml.cs's remarks for why the progress bar below is a fixed-duration
+         animation rather than tracking any real work. -->
+    <Window.Styles>
+        <Style Selector="ProgressBar.splash">
+            <Style.Animations>
+                <Animation Duration="0:0:3" FillMode="Forward">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Value" Value="0.0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Value" Value="100.0" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </Window.Styles>
+
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="{StaticResource SpaceLG}">
+        <Image Source="/Assets/SplashLogo.png" Width="340" Height="340" Stretch="Uniform" />
+        <ProgressBar Classes="splash" Minimum="0" Maximum="100" Width="280" Height="6" HorizontalAlignment="Center" />
+    </StackPanel>
+</Window>

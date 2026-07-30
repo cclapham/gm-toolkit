@@ -1,6 +1,8 @@
 using System;
+using System.Threading.Tasks;
 
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
@@ -42,6 +44,12 @@ public partial class App : Application
     /// </summary>
     public static ThemePreference InitialThemePreference { get; internal set; } = ThemePreference.System;
 
+    /// <summary>
+    /// How long <see cref="SplashWindow"/> stays up before <see cref="MainWindow"/> replaces it —
+    /// see that window's remarks for why this is a fixed cosmetic delay, not tied to real work.
+    /// </summary>
+    private static readonly TimeSpan SplashDuration = TimeSpan.FromSeconds(3);
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -74,10 +82,17 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow
+            var splash = new SplashWindow();
+            splash.Show();
+
+            var mainWindow = new MainWindow
             {
                 DataContext = services.GetRequiredService<ShellViewModel>()
             };
+
+            // Fire-and-forget: exceptions surface via GlobalExceptionHandler's Dispatcher hook
+            // (installed above) once the awaited delay resumes back on this UI thread.
+            _ = ShowMainWindowAfterSplashAsync(desktop, splash, mainWindow);
         }
         else if (ApplicationLifetime is IActivityApplicationLifetime singleViewFactoryApplicationLifetime)
         {
@@ -93,5 +108,25 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Waits out <see cref="SplashDuration"/>, then swaps <paramref name="splash"/> for
+    /// <paramref name="mainWindow"/> as the classic desktop lifetime's <c>MainWindow</c>.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="mainWindow"/> is shown (and <c>desktop.MainWindow</c> reassigned to it)
+    /// <i>before</i> <paramref name="splash"/> closes, not after — with the default
+    /// <c>ShutdownMode.OnLastWindowClose</c>, closing the splash while it's still the only open
+    /// window would tear down the whole app before the real window ever appeared.
+    /// </remarks>
+    private static async Task ShowMainWindowAfterSplashAsync(
+        IClassicDesktopStyleApplicationLifetime desktop, Window splash, Window mainWindow)
+    {
+        await Task.Delay(SplashDuration);
+
+        desktop.MainWindow = mainWindow;
+        mainWindow.Show();
+        splash.Close();
     }
 }

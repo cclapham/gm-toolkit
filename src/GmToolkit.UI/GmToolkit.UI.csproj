@@ -12,6 +12,9 @@
     <AvaloniaResource Include="..\..\Resources\Icons\GM-Toolkit-logo-256.ico">
       <Link>Assets\AppIcon.ico</Link>
     </AvaloniaResource>
+    <AvaloniaResource Include="..\..\Resources\Icons\GM-Toolkit-logo-Large.png">
+      <Link>Assets\SplashLogo.png</Link>
+    </AvaloniaResource>
   </ItemGroup>
 
   <ItemGroup>
