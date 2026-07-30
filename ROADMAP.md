@@ -14,6 +14,8 @@ Milestones are sequential and each has an exit criterion — a thing that is eit
 | M7 | At-the-table tools | Initiative tracker and session log usable during a live game | Not started |
 | M8 | Sync & sharing | Same campaign on two devices, and a player-facing read-only view | Not started |
 | M9 | Typed character/NPC systems & distribution | A GM can run a D&D 5e, D&D 5e (2024), Pathfinder 2e, or GURPS campaign with typed, validated PC/NPC stat blocks, and install a community-approved system pack over HTTPS with its integrity verified | Not started |
+| M10 | Interactive map drawing | A DM draws a map, saves it against a campaign, and exports it as a usable print-ready file | Not started |
+| M11 | Campaign dashboard | Opening a campaign shows party levels, an NPC summary, and current quests at a glance | Not started |
 
 ---
 
@@ -75,6 +77,26 @@ Tracked as issues [#82](https://github.com/cclapham/gm-toolkit/issues/82)–[#93
 
 **Status:** not started.
 
+## M10 — Interactive map drawing
+
+A DM can draw maps interactively within the app (freehand pen, shapes, text, an adjustable square/hex grid), optionally over an imported background image, store them against a campaign, and export them for printing. Prep-time drawing/annotation only — no tokens, no live-play battle-map integration; that stays out of scope, matching MVP.md's original non-goals. A dedicated Raspberry Pi 4 performance check is part of this milestone, not an afterthought, since freehand drawing is a new kind of workload for hardware this app already treats as a hard constraint.
+
+Tracked as issues [#94](https://github.com/cclapham/gm-toolkit/issues/94)–[#101](https://github.com/cclapham/gm-toolkit/issues/101).
+
+**Exit:** a DM draws a map, saves it against a campaign, and exports it as a usable, correctly-scaled print-ready file.
+
+**Status:** not started.
+
+## M11 — Campaign dashboard
+
+A richer at-a-glance view of an active campaign: party roster with levels, an NPC summary, and a curated list of current objectives — a status-based quest/mission-log tracker (active/completed/failed), distinct from the timestamped session-log diary, which is its own milestone (see below).
+
+Tracked as issues [#102](https://github.com/cclapham/gm-toolkit/issues/102)–[#106](https://github.com/cclapham/gm-toolkit/issues/106).
+
+**Exit:** opening a campaign's Dashboard shows party levels, an NPC summary, and current quests at a glance, with sensible empty states for a brand-new campaign.
+
+**Status:** not started.
+
 ---
 
 ## Post-MVP (M5+)
@@ -83,8 +105,10 @@ Sequenced by what MVP users actually complain about, so treat the order below as
 
 - **M5 — Import / export.** JSON export of a whole campaign; import with conflict handling. Unblocks backups and sharing prep, and it's the cheapest insurance against schema changes.
 - **M6 — Custom tables.** In-app table editor, import/export of table packs, community table sharing via plain files.
-- **M7 — At-the-table tools.** Initiative tracker, session log with timestamped notes, quick-reference pinning.
+- **M7 — At-the-table tools.** Initiative tracker, quick-reference pinning. (The timestamped session log originally sketched here moved to M12 — a session diary deserved its own milestone rather than a line item.)
 - **M8 — Sync & sharing.** Optional account, cross-device sync, read-only player view. Last, because it's the only thing here that requires a server and therefore ongoing cost and a privacy policy.
 - **M9 — Typed character/NPC systems & distribution.** See above.
+- **M10 — Interactive map drawing.** See above.
+- **M11 — Campaign dashboard.** See above.
 
 Other candidates with no milestone yet: relationship/faction graph, encounter builder, localisation, macOS/iOS support if there's ever a reason to chase it, an Avalonia Browser (WASM) head for browser play (tradeoff: sandboxed storage is a weaker fit for local-first data), Google Play Store distribution for Android (needs an `.aab` build and Play Console/Play App Signing enrollment, additive to the existing sideload APK path, not a replacement for it).
