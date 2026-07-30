@@ -4,6 +4,8 @@ RFC output of [#82](https://github.com/cclapham/gm-toolkit/issues/82). Defines t
 
 **Deferred, not covered here:** the client-side distribution API contract (`GET {baseUrl}/systems`, the pack `downloadUrl` response) and the sha256 download-verification flow, both originally scoped in #82. Per [the comment on #82](https://github.com/cclapham/gm-toolkit/issues/82#issuecomment-5131472307), network distribution ([#91](https://github.com/cclapham/gm-toolkit/issues/91)/[#92](https://github.com/cclapham/gm-toolkit/issues/92)/[#93](https://github.com/cclapham/gm-toolkit/issues/93)) is paused until a separate approval/distribution service project exists — designing the wire format against a service that doesn't exist yet risks designing against the wrong shape. Everything below (the schema format itself) is active and unblocked, and is written so that format never has to change to accommodate that later work — a system pack is a JSON file whether it arrives in-box or downloaded.
 
+**A note on how "safe" this document claims to be:** a literal implementation of an earlier draft of this grammar was adversarially tested — hostile formulas, hostile regexes, pathological nesting — against a from-scratch implementation of exactly what's written below. That review is why the "resource limits" subsection exists and why the numbers in it are specific rather than left to #83 to guess at. The distinction that came out of it, stated up front: "this grammar can't execute arbitrary code" and "this grammar can't be abused to exhaust memory/CPU/stack" are two separate claims. This document makes both, but only the first one is true by construction alone — the second needed explicit bounds, which are now part of the format's contract, not an implementation detail.
+
 ## Attachment point
 
 A `CharacterSystem` attaches to a `Campaign` via `Campaign.CharacterSystemId`, shared by every `PlayerCharacter` and every `Npc` in that campaign. There is no per-character or per-NPC override — one campaign, one system. A campaign with no system attached keeps today's freeform `Dictionary<string, string>` behavior unchanged (the "generic" system, see #83); typed systems are additive, not a breaking migration.
@@ -29,6 +31,7 @@ Every field in a `CharacterSystem` is a `StatFieldDefinition`. All seven types b
 - `min` / `max` (optional) — inclusive range.
 - `precision` (optional, default `0`) — decimal places the value is stored/displayed at.
 - `step` (optional) — a UI increment hint (e.g. spinner step); not a validation rule.
+- `default` (optional) — the value a freshly-created character starts with, before the GM edits it. This is what backs "the adjustment field idiom" below being able to say a field "defaults to `0`" as an actual schema property, not just a convention asserted in prose.
 
 ### `text`
 
@@ -36,8 +39,8 @@ Every field in a `CharacterSystem` is a `StatFieldDefinition`. All seven types b
 { "key": "playerName", "label": "Player", "type": "text", "maxLength": 100 }
 ```
 
-- `maxLength` (optional).
-- `pattern` (optional) — a regex the value must match (e.g. constraining a code or short ID field). Most `text` fields set neither and just take `maxLength`.
+- `maxLength` (optional, except see below).
+- `pattern` (optional) — a regex the value must match (e.g. constraining a code or short ID field). Most `text` fields set neither and just take `maxLength`. **`pattern` must be written in the `RegexOptions.NonBacktracking` dialect** (.NET 7+), not the default backtracking regex engine, and **a field that sets `pattern` must also set `maxLength`** — see "Resource limits" under the derived-formula grammar section below for why (short version: a full backtracking engine plus unbounded input is a catastrophic-backtracking / ReDoS vector, and this format gave community packs exactly that combination in an earlier draft).
 
 ### `boolean`
 
@@ -96,8 +99,9 @@ A variable-length list of structured rows — not a flat key/value pair. Used fo
 }
 ```
 
-- `itemFields` (required, non-empty) — a `StatFieldDefinition[]` describing one row. May contain `number`/`text`/`boolean`/`enum`/`derived`/`free-text-block` fields. May **not** contain another `repeating-group` — no nested lists. One level is sufficient for every system sketched below and keeps the evaluator and the UI form generator simple.
-- `minItems` / `maxItems` (optional) — row-count bounds; both usually omitted (an empty list is valid — a character with no advantages yet).
+- `itemFields` (required, non-empty) — a `StatFieldDefinition[]` describing one row. May contain `number`/`text`/`boolean`/`enum`/`derived`/`free-text-block` fields. May **not** contain another `repeating-group` — no nested lists, no exceptions. One level is sufficient for every system sketched below and keeps the evaluator and the UI form generator simple; anything that would otherwise want a nested list (an advantage with its own sub-modifiers, say) gets a `free-text-block` description instead — prose is the standing answer for anything genuinely nesting-shaped, not a reason to add a second level to the format.
+- `minItems` / `maxItems` (optional) — row-count bounds; both usually omitted (an empty list is valid — a character with no advantages yet). Whatever a pack declares (or omits), the engine enforces its own hard ceiling regardless — see "Resource limits" below.
+- Row keys (the `key`s inside one group's `itemFields`) only have to be unique *within that group* — two different `repeating-group`s can both have a field called `name` (this doc's own D&D sketch below has `name` in `skills`, `traits`, `actions` and `legendaryActions` independently) because each group's rows are their own naming scope and never resolve against each other. See "Scope resolution" under the derived-formula grammar for the full key-uniqueness rule, including how top-level keys interact with row keys.
 
 ### `free-text-block`
 
@@ -113,6 +117,7 @@ Prose, not a structured value — a monster's trait description, a quirk's flavo
 
 ```json
 {
+  "formatVersion": 1,
   "id": "gurps-4e",
   "name": "GURPS Fourth Edition",
   "version": "1.0.0",
@@ -125,20 +130,37 @@ Prose, not a structured value — a monster's trait description, a quirk's flavo
 
 `pcFields` and `npcFields` are independent `StatFieldDefinition[]` (per #83's note that monster blocks need more structure than PC sheets — actions/traits/legendary-actions repeating groups that a PC sheet has no use for). They may share `key`s with the same meaning (both sides might have `st`), but there's no requirement that they do.
 
+- `formatVersion` (integer, required) — versions *this document's own JSON shape*, distinct from `version` (the pack's content version, e.g. semver, bumped when GURPS errata changes a formula, not when this RFC changes). A client that doesn't recognize a pack's `formatVersion` refuses to load it rather than silently misinterpreting a shape it's never seen. This document defines `formatVersion: 1`.
+- `id` (string, required) — format `^[a-z0-9][a-z0-9-]*$`, max 64 characters. Deliberately **not** the same regex as a field `key`: an `id` is never a formula identifier, but it is (per the deferred #91 work) a cache filename and part of a URL path, so its charset is restricted specifically to exclude `.`, `/`, `\`, and whitespace entirely — `"../../../etc/passwd"` doesn't even parse under this charset, so path traversal is closed off by construction rather than left to whatever consumes `id` later to sanitize. (`"gurps-4e"` is valid under this rule; it just isn't valid under the field-`key` rule, which is why the two need separate regexes rather than reusing one.)
+- **Collision rule:** `id` must be unique among all installed systems, and **built-ins always win** a collision — a pack (today: only the four in-box profiles; later, once #91 exists: a downloaded one too) declaring an `id` that matches an already-installed system is rejected at install time. An `id` collision must never silently rebind an existing campaign's `CharacterSystemId` to a different pack's fields out from under it. Stated now so the envelope shape doesn't need to change again once #91 exists to actually enforce it.
+
 ## The derived-formula grammar
 
-Arithmetic only, over named-field references. This is a strict security requirement, not a design nicety: a downloaded community system pack (paused for now, see the scope note above, but the format must never need to change when that work resumes) is untrusted data, forever. The grammar has to be **provably** incapable of executing anything beyond arithmetic — not "sandboxed," not "carefully reviewed," structurally incapable.
+Arithmetic only, over named-field references. This is a strict security requirement, not a design nicety: a downloaded community system pack (paused for now, see the scope note above, but the format must never need to change when that work resumes) is untrusted data, forever. The grammar has to be **provably incapable of executing arbitrary code** — not "sandboxed," not "carefully reviewed," structurally incapable. (That claim is specifically about code execution. Whether the grammar can be abused to *exhaust resources* — stack, CPU, memory — without ever executing anything is a separate property, addressed explicitly in "Resource limits" below rather than assumed to follow for free.)
 
 ### Allowed
 
 ```
+formula    := expression EOF
 expression := term (("+" | "-") term)*
 term       := factor (("*" | "/") factor)*
 factor     := number-literal | field-reference | "(" expression ")" | "-" factor
+number-literal  := digit+ ["." digit+]
 field-reference := key of another field visible in scope (see below)
 ```
 
-That's the entire grammar. `(ht + dx) / 4 + speedAdjustment` and `(str - 10) / 2` are the only kind of thing a formula can say.
+That's the entire grammar. `(ht + dx) / 4 + speedAdjustment` and `(str - 10) / 2` are the only kind of thing a formula can say. Two things worth calling out explicitly because they're easy to get wrong in a literal implementation:
+
+- **The top-level `formula := expression EOF` production is load-bearing.** A parser that parses a valid `expression` prefix and stops, discarding whatever's left over, will happily evaluate `"1 + 2 THIS IS NOT ARITHMETIC"` as `3`. Parsing a formula means parsing the *entire* string as one `expression` with nothing left over; any leftover input, however innocuous-looking, is a parse failure, full stop.
+- **`number-literal` has no exponent notation** — no `e`/`E`, and no sign (unary `-factor` in the grammar already covers negation, so the literal itself is always non-negative digits with an optional single decimal point). This isn't just lexical minimalism: without exponent syntax, a formula literally cannot write `1e400`, which is exactly the input that turns "silently becomes `Infinity`" from a live concern into something the grammar can't express in the first place.
+
+### Numeric type
+
+The evaluator's numeric type is `System.Decimal`, not `double`. This is a specific, load-bearing choice, not an implementation detail left to #83: `decimal` throws `OverflowException` on overflow and `DivideByZeroException` on division by zero, instead of `double`'s behavior of silently producing `Infinity` or `NaN`. That matters because `NaN` defeats a `min`/`max` clamp outright (every comparison with `NaN` is `false`) and defeats `rounding` (`Math.Floor(NaN)` is `NaN`) — a poisoned value sails straight through both and out the other side looking like an ordinary number, right up until it reaches a `JsonSerializer.Serialize` call somewhere downstream and throws there instead, on a totally different, unrelated character. `decimal` has no such value to smuggle: an evaluation either produces a real, finite number, or it throws immediately at the point of failure, where "Runtime failure semantics" below says exactly what happens next.
+
+A courtesy bound on top of that, for pack authors rather than as the actual security boundary: a `number-literal`'s value should stay within ±10^15. The actual boundary is that `decimal` throws on overflow rather than wrapping or going infinite, and the runtime contract requires that exception to fail the field closed — a formula can still be legally shaped to overflow `decimal` outright (deeply nested multiplication, say), and the format doesn't try to statically rule that out, because it doesn't need to: it degrades to "field shows blank," never a hang or a crash.
+
+All numeric parsing and formatting — formula literals, and any stat value stored or displayed as a number — is done with `CultureInfo.InvariantCulture`, explicitly and always. This isn't a style preference: `double.Parse("5.25")` (or `decimal.Parse`) under a culture that uses `,` as the decimal separator parses that string as `525`, silently, with no exception — an ordinary GURPS Basic Speed value turning into a wildly wrong number purely because of the host machine's locale, with nothing hostile involved at all. There's no existing precedent to follow here either way (the repo has no current `InvariantCulture` usage anywhere), so this is stated explicitly rather than left to whatever the first implementation happens to default to.
 
 ### Explicitly disallowed, and why
 
@@ -148,7 +170,19 @@ That's the entire grammar. `(ht + dx) / 4 + speedAdjustment` and `(str - 10) / 2
 - **No string operations** beyond a bare field reference — no concatenation, no formatting.
 - **No assignment, no side effects** — a formula is pure; evaluating it twice always gives the same answer for the same inputs.
 
-A hand-rolled recursive-descent parser over this grammar produces an AST with exactly four node kinds (`Literal`, `FieldRef`, `BinaryOp`, `UnaryNegate`), is trivially terminating (bounded by the formula's own text length — there's no construct that can recurse or loop independent of input size), and cannot be coerced into doing anything a four-function calculator couldn't. Malformed or hostile input (unknown field key, unbalanced parens, a cycle) fails validation at schema-load time; it never throws uncaught or gets partially evaluated (per #83's acceptance criteria).
+A hand-rolled recursive-descent parser over this grammar produces an AST with exactly four node kinds (`Literal`, `FieldRef`, `BinaryOp`, `UnaryNegate`) and cannot be coerced into doing anything a four-function calculator couldn't — that's the code-execution claim, and it holds. It is **not**, on its own, "trivially terminating" or cheap to evaluate — see "Resource limits" immediately below, which an earlier draft of this document didn't state and which a literal implementation of that draft failed under adversarial input. Malformed or hostile input (unknown field key, unbalanced parens, a cycle, anything over the bounds in "Resource limits") fails validation at schema-load time; it never throws uncaught or gets partially evaluated (per #83's acceptance criteria).
+
+### Resource limits
+
+Arithmetic-only doesn't imply cheap-to-evaluate, and a from-scratch implementation of an earlier draft of this grammar demonstrated exactly that under adversarial input. These bounds are part of the format's contract — every conforming implementation enforces all of them, at load time wherever the check can be made statically:
+
+- **Formula string length: 500 characters, maximum.** Checked, and failed closed, before parsing begins. (The longest formula in any of the four worked sketches below is well under 100 characters.)
+- **Formula nesting depth: 32 levels, maximum**, tracked by a counter incremented *before* each recursive descent into `"(" expression ")"` or unary `-factor`, checked against the limit at that same point, and failed closed **before** the next recursive call is made — not after, and not by relying on the call eventually returning. An implementation that only checks depth on the way back out, or checks but recurses anyway "just this once," still overflows the stack. A from-scratch implementation of an earlier, unbounded version of this grammar crashed with an uncatchable `StackOverflowException` at roughly 20,000 levels of parenthesis nesting — a ~40KB formula string, unremarkable as JSON content and nowhere close to the 500-character ceiling above, which alone would already have rejected it.
+- **Derived-field dependency-chain depth: 64 fields, maximum** (see "Scope resolution" below for what a "chain" means here), **and evaluation must be single-pass and memoized** — every `derived` field involved in evaluating a character is computed **at most once**, in an order fixed by a topological sort of the (already cycle-checked) dependency graph, with each field's result cached for reuse by every other field that references it. This is a format requirement, not an optimization left for #83 to discover: a naive evaluator that resolves a field reference by *re-running that field's own formula from scratch* is exponential in how many times a field gets referenced along a chain — a chain of 20 fields, each formula referencing the previous field twice, measured at roughly 2 million evaluations (40ms); 28 fields, ~537 million (8.8s); around 40 fields was an effective permanent hang. That's a ~2KB pack. Single-pass memoized evaluation is O(number of derived fields) regardless of reference count, which is also why the topological-sort step itself has to be iterative or explicitly depth-bounded — a naive recursive depth-first cycle check has the same stack-depth problem as formula nesting does, just one level up.
+- **`pattern` regex dialect: `RegexOptions.NonBacktracking` (.NET 7+), never the default backtracking engine.** `NonBacktracking` runs in time linear in input length by construction, which is what actually closes the ReDoS hole rather than just making it less likely: `^(a+)+$` under the default engine measured 97ms at 21 characters of input, 23 seconds at 29, and was still running past a 120-second timeout at 33 — `NonBacktracking` handles a 5,000-character adversarial input against the same shape of pattern in 41ms. The tradeoff is real and is the accepted one: `NonBacktracking` rejects some constructs outright (backreferences, lookaround), which is exactly the class of construct that makes catastrophic backtracking possible in the first place — a `pattern` that only compiles under the default engine is a `pattern` this format doesn't accept, full stop, and that's caught at schema-load time (see the `text` field type above). A field with `pattern` set must also set `maxLength`: a linear-time matcher against unbounded input is still an unbounded matcher.
+- **Hard ceilings, enforced by the engine regardless of what a pack declares:** `maxLength` ≤ 10,000 characters (`text`/`free-text-block`); `pattern` string itself ≤ 200 characters; `repeating-group` row count (whatever `maxItems` a pack sets, or the engine's own default if it sets none) ≤ 1,000; `itemFields` per group ≤ 50; total fields per `pcFields`/`npcFields` ≤ 200. A pack claiming a larger bound has the claim clamped, not honored.
+
+One more distinction worth stating plainly: `System.Text.Json`'s own default `MaxDepth` (64) already bounds how deeply the *pack's JSON document itself* can nest objects/arrays — but a `formula` is a single JSON *string value*, and parsing its contents is a wholly separate recursive-descent pass with no relationship to JSON's own nesting limit. The formula-nesting-depth bound above exists because JSON's `MaxDepth` doesn't and can't cover it.
 
 ### Rounding is field metadata, not a grammar function
 
@@ -160,26 +194,50 @@ D&D's ability modifier is conventionally written `floor((score - 10) / 2)`. Ther
 
 This is why `/` in the grammar is ordinary real-valued division, not floor/integer division: GURPS's `basicSpeed` genuinely needs the fractional remainder (`5.25`, not `5`), while D&D's ability modifier needs it floored. Same operator, different field-level rounding — the grammar stays uniform and the systems differ only in metadata.
 
+Order of operations, stated once so no two implementations can disagree: evaluate the formula to a raw `decimal`, **clamp** to `min`/`max` if either is set, **then** round the clamped value to `precision` decimal places using `rounding`'s strategy (`rounding: none`, the default, leaves the clamped value exactly as computed). Whatever a `derived` field's dependents see when they reference it by key is this final, clamped-then-rounded value — never the pre-clamp or pre-round intermediate.
+
+### Runtime failure semantics
+
+Evaluating a formula against an actual character's data can fail three ways that no amount of schema-load-time validation can rule out in advance, because they depend on runtime values, not on the formula's shape: a divisor of zero (an adjustment field a player set to `0` — perfectly ordinary data, not hostile input), an operation that overflows `decimal`'s range, or — defense in depth, should never happen after load-time validation — a referenced key that fails to resolve. In every case the field **fails closed**: its value is treated as invalid/blank for that character. The failure never propagates as an uncaught exception, and it never gets clamped, rounded, or serialized as if the computation had actually succeeded (per #83's own acceptance criteria). This applies transitively through the dependency chain — if `basicSpeed` fails, `basicMove`, which references it, fails closed too, rather than being computed from a garbage or default-substituted upstream value.
+
 ### Scope resolution: what a formula can reference
 
 - A `derived` field at the top level (directly in `pcFields`/`npcFields`) may only reference other **top-level** field keys of the same set. It can never reach into a `repeating-group`'s rows — there's no single row to resolve to.
 - A `derived` field that lives inside a `repeating-group`'s `itemFields` may reference (a) sibling field keys within the **same row**, and (b) any top-level field key of the same `pcFields`/`npcFields` set. It may **not** reference another row's fields, a different `repeating-group`'s rows, or aggregate across rows.
 - A `derived` field may reference another `derived` field (top-level or row-scoped), chained arbitrarily deep, provided the dependency graph is acyclic (see below).
 - **A formula may only reference field keys that are statically named in the formula's own text** — never a key selected dynamically via another field's value. E.g., a GURPS skill row can't say "add whichever of ST/DX/IQ/HT this row's `controllingAttribute` enum happens to name" — that's indirection/dynamic dispatch, which is exactly as capable of hiding conditional logic as an `if`, and the grammar has no facility for it. See "Where derived can't reach," in the GURPS section below, for how the four sketches actually handle this.
-- **No cycles.** The combined dependency graph of every `derived` field (top-level and row-scoped, both `pcFields` and `npcFields` separately) must be acyclic. A self-reference or a mutual reference is a schema validation error caught at load time, never a runtime failure or infinite evaluation.
+- **No cycles.** The combined dependency graph of every `derived` field (top-level and row-scoped, both `pcFields` and `npcFields` separately) must be acyclic. A self-reference or a mutual reference is a schema validation error caught at load time, never a runtime failure or infinite evaluation. A "chain" for the purposes of the 64-field dependency-chain-depth ceiling above is the longest path through this graph.
+- **Keys must be unique within their scope.** Once among all of a `pcFields` (or `npcFields`) set's top-level entries, and *independently* once among each individual `repeating-group`'s own `itemFields` — two different groups may reuse the same item key (both `actions` and `traits` having a `name` field, say) because their rows are separate scopes that never resolve against each other. See the `repeating-group` field type above for the same rule stated from the field-definition side.
+- **Shadowing precedence, stated once so it can't be resolved two different ways:** when a row-scoped `derived` field's formula uses a key that exists both among its own row's siblings and at the top level, **the row wins** — same-row references resolve before falling through to the top-level set of the same name. This has to be identical between the schema-load-time cycle check and the runtime evaluator. If the two ever disagreed on which field a name resolves to, the load-time check could certify a graph acyclic that the evaluator then actually walks as a live cycle at runtime — quietly defeating the entire "no cycles" guarantee above via a naming collision rather than an explicit self-reference.
 
 ### The "adjustment field" idiom
 
-A recurring pattern in the sketches below: something is *mostly* a fixed formula but needs an escape hatch for a value the rules let a character buy up or down independently (GURPS letting you buy extra HP above what ST implies; D&D letting proficiency change a save/skill bonus). Rather than adding a conditional to the grammar, the escape hatch is a plain, directly-entered `number` field (defaulting to `0`) that the `derived` formula references as an ordinary operand:
+A recurring pattern in the sketches below: something is *mostly* a fixed formula but needs an escape hatch for a value the rules let a character buy up or down independently (GURPS letting you buy extra HP above what ST implies; D&D letting proficiency change a save/skill bonus). Rather than adding a conditional to the grammar, the escape hatch is a plain, directly-entered `number` field (`default: 0`, so it contributes nothing until the player sets it) that the `derived` formula references as an ordinary operand:
 
 ```json
 [
-  { "key": "hpAdjustment", "label": "HP Adjustment", "type": "number", "min": -50, "max": 50 },
+  { "key": "hpAdjustment", "label": "HP Adjustment", "type": "number", "min": -50, "max": 50, "default": 0 },
   { "key": "hp", "label": "Hit Points", "type": "derived", "formula": "st + hpAdjustment" }
 ]
 ```
 
 The condition's *outcome* (how much to add) is entered once, as data; the formula never has to branch to decide whether to add it.
+
+## Load-time validation checklist
+
+Everything above that's a *static* rule (true or false from the pack's JSON content alone, without needing an actual character's data) is consolidated here in one place, so #83 has a concrete checklist to implement against rather than reassembling one from scattered prose. A pack — today, only the four in-box profiles; later, once #91 exists, a downloaded one too — is rejected before any character ever sees it if any of the following hold:
+
+1. `formatVersion` is missing or a value this client doesn't recognize.
+2. `id` doesn't match `^[a-z0-9][a-z0-9-]*$` (max 64 chars), or collides with an already-installed system's `id` (built-ins win — see "The `CharacterSystem` envelope").
+3. Any field's `key` fails `^[a-zA-Z_][a-zA-Z0-9_]*$`, or isn't unique within its scope (top-level `pcFields`/`npcFields`, or a single `repeating-group`'s own `itemFields` — see "Scope resolution").
+4. Any `enum` field's `options` list is empty.
+5. Any `text`/`free-text-block` field's `maxLength` exceeds the engine's 10,000-character hard ceiling; any `text` field sets `pattern` without also setting `maxLength`; any `pattern` exceeds 200 characters or fails to compile under `RegexOptions.NonBacktracking` (see "Resource limits").
+6. Any `repeating-group` contains another `repeating-group` in its `itemFields` (no nesting), or its `itemFields` count, or its `minItems`/`maxItems`, exceed the hard ceilings in "Resource limits"; or a `pcFields`/`npcFields` set has more than 200 top-level fields total.
+7. Any `formula` exceeds 500 characters or 32 levels of nesting depth, or fails to parse as a full `formula := expression EOF` — trailing unparsed input is a rejection, never a silent truncation (see "Allowed").
+8. Any `formula` references a key not visible in its scope per "Scope resolution" — an unknown key, or a key that only exists inside a *different* `repeating-group`'s rows.
+9. The combined dependency graph of every `derived` field (top-level and row-scoped, `pcFields` and `npcFields` checked separately, shadowing resolved per "Scope resolution") contains a cycle, or its longest chain exceeds 64 fields.
+
+Two things this checklist deliberately does *not* cover, because they're bounded elsewhere for reasons already stated in context: `System.Text.Json`'s own default `MaxDepth` (64) already bounds the pack *document's* structural JSON nesting — a separate concern from a `formula` string's own internal parse depth (item 7 above), which JSON's own limit doesn't and can't reach. And nothing on this list depends on runtime character data; anything that does (a zero divisor, an overflow) is "Runtime failure semantics" above, not a load-time rejection.
 
 ## Validation against the four target systems
 
@@ -204,22 +262,22 @@ GURPS has no class or level concept anywhere in this sketch, on purpose — that
 
 ```json
 [
-  { "key": "hpAdjustment", "label": "HP Adjustment", "type": "number", "min": -50, "max": 50 },
+  { "key": "hpAdjustment", "label": "HP Adjustment", "type": "number", "min": -50, "max": 50, "default": 0 },
   { "key": "hp", "label": "HP", "type": "derived", "formula": "st + hpAdjustment" },
 
-  { "key": "willAdjustment", "label": "Will Adjustment", "type": "number", "min": -20, "max": 20 },
+  { "key": "willAdjustment", "label": "Will Adjustment", "type": "number", "min": -20, "max": 20, "default": 0 },
   { "key": "will", "label": "Will", "type": "derived", "formula": "iq + willAdjustment" },
 
-  { "key": "perAdjustment", "label": "Perception Adjustment", "type": "number", "min": -20, "max": 20 },
+  { "key": "perAdjustment", "label": "Perception Adjustment", "type": "number", "min": -20, "max": 20, "default": 0 },
   { "key": "perception", "label": "Perception", "type": "derived", "formula": "iq + perAdjustment" },
 
-  { "key": "fpAdjustment", "label": "FP Adjustment", "type": "number", "min": -50, "max": 50 },
+  { "key": "fpAdjustment", "label": "FP Adjustment", "type": "number", "min": -50, "max": 50, "default": 0 },
   { "key": "fp", "label": "FP", "type": "derived", "formula": "ht + fpAdjustment" },
 
-  { "key": "speedAdjustment", "label": "Basic Speed Adjustment", "type": "number", "min": -5, "max": 5 },
+  { "key": "speedAdjustment", "label": "Basic Speed Adjustment", "type": "number", "min": -5, "max": 5, "default": 0 },
   { "key": "basicSpeed", "label": "Basic Speed", "type": "derived", "formula": "(ht + dx) / 4 + speedAdjustment", "precision": 2 },
 
-  { "key": "moveAdjustment", "label": "Basic Move Adjustment", "type": "number", "min": -5, "max": 5 },
+  { "key": "moveAdjustment", "label": "Basic Move Adjustment", "type": "number", "min": -5, "max": 5, "default": 0 },
   { "key": "basicMove", "label": "Basic Move", "type": "derived", "formula": "basicSpeed + moveAdjustment", "precision": 0, "rounding": "floor" }
 ]
 ```
@@ -271,7 +329,7 @@ This is the one real shape change GURPS forced: derived fields are for a fixed, 
 
 ```json
 [
-  { "key": "perceptionProficiencyBonus", "label": "Perception Proficiency Bonus", "type": "number", "min": 0, "max": 12 },
+  { "key": "perceptionProficiencyBonus", "label": "Perception Proficiency Bonus", "type": "number", "min": 0, "max": 12, "default": 0 },
   { "key": "passivePerception", "label": "Passive Perception", "type": "derived", "formula": "10 + wisMod + perceptionProficiencyBonus" }
 ]
 ```
@@ -361,3 +419,5 @@ The same `enum` rank list is reused for every other proficiency-gated stat (save
 ## Summary of what changed while validating
 
 The shape did **not** need a new field type or a grammar change to fit all four systems. What it needed, discovered by doing GURPS first as instructed, was one explicit rule about what `derived` is *not* for: a formula must be fixed and statically known, never dispatched on another field's runtime value. That rule shows up four times across the sketches above (GURPS skill levels, D&D saves/skills, D&D passive perception's proficiency gate, Pathfinder's proficiency rank) and is now written into the grammar section rather than left to be independently rediscovered per system profile in #84–#87.
+
+A subsequent security review found a second, separate class of gap in the same document: not in what the four systems needed, but in what an adversarial pack could do to the engine regardless of which system it claimed to be — unbounded formula nesting, naive re-evaluation of a dependency chain, and an unbounded backtracking regex, none of which are code execution, all three of which reproduce a hang or a crash. None of those findings changed a field type or the arithmetic grammar either; they became explicit numeric bounds and evaluation-strategy requirements ("Resource limits," "Runtime failure semantics," the memoized-evaluation and `NonBacktracking` requirements above) plus a few envelope gaps (`formatVersion`, `id`'s own format and collision rule) that were always going to be needed once #91 exists and are cheaper to settle now than to retrofit later.
