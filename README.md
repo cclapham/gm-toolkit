@@ -159,7 +159,7 @@ The work is tracked on the [GM Toolkit project board](https://github.com/users/c
 - **[MVP](MVP.md)** — campaigns, PCs, NPCs, NPC generator, Windows, Linux (desktop and Raspberry Pi 4), and Android, local only
 - **Post-MVP** — import/export, encounter & initiative tracking, session logs, custom generator tables in-app, optional sync
 
-Full breakdown in [ROADMAP.md](ROADMAP.md).
+Full breakdown in [ROADMAP.md](ROADMAP.md). Typed character/NPC systems (D&D 5e, Pathfinder 2e, GURPS) are M9 — see [SYSTEMS.md](SYSTEMS.md) for the schema format RFC.
 
 ## Licence
 

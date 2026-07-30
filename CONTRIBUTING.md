@@ -37,6 +37,10 @@ Thanks for considering it. This project is small and the bar is "does it work an
 
 Table data lives in `Resources/GeneratorTables/*.json`, embedded and loaded at startup. Adding entries to an existing table is a welcome, zero-risk contribution and doesn't need an issue first — just keep entries generic and setting-neutral, and **don't paste content from published RPG books**. Names, traits and quirks you wrote yourself, or that come from a public-domain or CC-licensed source with attribution, only.
 
+## Typed character/NPC systems
+
+Working on M9 (D&D 5e, Pathfinder 2e, GURPS stat schemas)? See [SYSTEMS.md](SYSTEMS.md) first — it's the RFC for the stat-field schema JSON shape and the derived-formula grammar, and everything in that milestone builds against it rather than re-deciding the shape per issue.
+
 ## Reporting bugs
 
 Include: OS and version, app version or commit, what you did, what happened, what you expected. Screenshots help. If it's a data bug, say whether the database was fresh or migrated.
