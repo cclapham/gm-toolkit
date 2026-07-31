@@ -12,7 +12,7 @@ namespace GmToolkit.Core.Tests.Systems;
 /// fixed skill enum (skills and traits are both open-ended <c>repeating-group</c>s). It also proves
 /// point-buy attribute cost can be <c>derived</c> directly from the bought score, and exercises the
 /// formula evaluator with real GURPS 4e math: multi-hop dependency chains, a field multiplied by
-/// itself (Basic Lift), and the pack's only use of <c>rounding: ceiling</c>.
+/// itself (Basic Lift).
 /// </summary>
 public class GurpsCharacterSystemTests
 {
@@ -240,7 +240,34 @@ public class GurpsCharacterSystemTests
         Assert.Equal(5m, results["basicMove"]); // floor(5.75) + 0 -- 2-hop chain via basicSpeed
         Assert.Equal(8m, results["dodge"]); // floor(5.75) + 3 + 0 -- also chains off basicSpeed, not basicMove
 
-        Assert.Equal(34m, results["basicLift"]); // ceiling(13*13/5) = ceiling(33.8) = 34
+        Assert.Equal(34m, results["basicLift"]); // round(13*13/5) = round(33.8) = 34
+    }
+
+    [Theory]
+    [InlineData(9, 16)]
+    [InlineData(11, 24)]
+    [InlineData(14, 39)]
+    [InlineData(16, 51)]
+    [InlineData(19, 72)]
+    public void Pc_basic_lift_rounds_to_nearest_per_gurps_4e_basic_set_table(int st, decimal expectedLift)
+    {
+        // GURPS 4e Basic Set p.15: basicLift = ST²/5 rounded to nearest (not up).
+        // These are the published table values; ceiling (old) vs. round (current) differ
+        // on these STs. Verifying the fix by comparing against actual published values.
+        var system = LoadSystem();
+        var graph = DerivedFieldGraph.Build(system.PcFields);
+
+        var rawValues = new Dictionary<string, string>
+        {
+            ["st"] = st.ToString(),
+            ["dx"] = "10",
+            ["iq"] = "10",
+            ["ht"] = "10",
+        };
+
+        var results = DerivedFieldEvaluator.EvaluateAll(system.PcFields, graph.EvaluationOrder, rawValues);
+
+        Assert.Equal(expectedLift, results["basicLift"]);
     }
 
     [Fact]
@@ -298,7 +325,7 @@ public class GurpsCharacterSystemTests
         Assert.Equal(5m, results["basicSpeed"]); // (10+10)/4 = 5.00
         Assert.Equal(5m, results["basicMove"]); // floor(5) + moveAdjustment default(0)
         Assert.Equal(8m, results["dodge"]); // floor(5) + 3 + dodgeAdjustment default(0)
-        Assert.Equal(20m, results["basicLift"]); // ceiling(10*10/5) = ceiling(20) = 20
+        Assert.Equal(20m, results["basicLift"]); // round(10*10/5) = round(20) = 20
     }
 
     [Fact]
