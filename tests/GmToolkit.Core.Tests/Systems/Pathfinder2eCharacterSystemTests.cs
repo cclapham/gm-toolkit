@@ -297,8 +297,8 @@ public class Pathfinder2eCharacterSystemTests
         var results = DerivedFieldEvaluator.EvaluateAll(system.PcFields, graph.EvaluationOrder, rawValues);
 
         Assert.Equal(0m, results["strMod"]); // floor((10-10)/2) = 0
-        Assert.Equal(12m, results["classDc"]); // 10 + classDcKeyAbilityModifier default(0) + classDcProficiencyBonus default(2)
-        Assert.Equal(2m, results["strikeAttackBonus"]); // strMod(0) + weaponProficiencyBonus default(2)
+        Assert.Equal(10m, results["classDc"]); // 10 + classDcKeyAbilityModifier default(0) + classDcProficiencyBonus default(0)
+        Assert.Equal(0m, results["strikeAttackBonus"]); // strMod(0) + weaponProficiencyBonus default(0)
         Assert.Equal(5m, results["encumberedThreshold"]); // 5 + strMod(0)
         Assert.Equal(10m, results["maximumBulk"]); // 10 + strMod(0)
     }
@@ -314,5 +314,33 @@ public class Pathfinder2eCharacterSystemTests
         var graph = DerivedFieldGraph.Build(system.NpcFields);
 
         Assert.Empty(graph.EvaluationOrder);
+    }
+
+    [Theory]
+    [InlineData("perception", 60)]
+    [InlineData("fortitudeSave", 60)]
+    [InlineData("reflexSave", 60)]
+    [InlineData("willSave", 60)]
+    public void Npc_stat_fields_accommodate_level_30_creatures(string key, int expectedMax)
+    {
+        // PF2e's creature-building table allows creatures up to level 30 (declared in npcFields.level: max 30).
+        // The Tarrasque (level 25) has Perception +48, Fortitude +50, Will +45, Athletics +52.
+        // Each stat includes: level + proficiency rank bonus (max +8 for Legendary) + ability modifier (max +5).
+        // At level 30 with Legendary proficiency: 30 + 8 + 5 = 43, so max should accommodate at least that.
+        // 60 gives proportional headroom matching the PC side's 40 (which handles level 20 + 8 + 5 = 33).
+        var system = LoadSystem();
+        var field = Assert.Single(system.NpcFields, f => f.Key == key);
+
+        Assert.Equal(expectedMax, field.Max);
+    }
+
+    [Fact]
+    public void Npc_skills_bonus_in_repeating_groups_accommodates_level_30()
+    {
+        var system = LoadSystem();
+        var npcSkills = Assert.Single(system.NpcFields, f => f.Key == "skills");
+        var bonusField = Assert.Single(npcSkills.ItemFields!, f => f.Key == "bonus");
+
+        Assert.Equal(60, bonusField.Max);
     }
 }

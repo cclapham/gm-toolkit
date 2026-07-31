@@ -261,7 +261,7 @@
       "min": 0,
       "max": 28,
       "precision": 0,
-      "default": 2
+      "default": 0
     },
     {
       "key": "classDc",
@@ -286,7 +286,7 @@
       "min": 0,
       "max": 28,
       "precision": 0,
-      "default": 2
+      "default": 0
     },
     {
       "key": "strikeAttackBonus",
@@ -488,7 +488,7 @@
       "label": "Perception",
       "type": "number",
       "min": -5,
-      "max": 40,
+      "max": 60,
       "precision": 0
     },
     {
@@ -502,7 +502,7 @@
       "label": "Fortitude Save",
       "type": "number",
       "min": -5,
-      "max": 40,
+      "max": 60,
       "precision": 0
     },
     {
@@ -516,7 +516,7 @@
       "label": "Reflex Save",
       "type": "number",
       "min": -5,
-      "max": 40,
+      "max": 60,
       "precision": 0
     },
     {
@@ -530,7 +530,7 @@
       "label": "Will Save",
       "type": "number",
       "min": -5,
-      "max": 40,
+      "max": 60,
       "precision": 0
     },
     {
@@ -561,7 +561,7 @@
           "label": "Total Bonus",
           "type": "number",
           "min": -5,
-          "max": 40,
+          "max": 60,
           "precision": 0
         }
       ],
