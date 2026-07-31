@@ -42,6 +42,14 @@ public static class DerivedFieldEvaluator
         // decimal is simply left unseeded here; any formula referencing it then fails closed as an
         // unresolved reference below -- exactly the same treatment a missing key gets, and exactly
         // SYSTEMS.md's "Runtime failure semantics" for runtime data that doesn't match its schema.
+        //
+        // A field with no stored raw value at all -- e.g. an adjustment field like
+        // `initiativeProficiencyBonus` on a freshly-created character, which has never been
+        // explicitly set -- falls back to its schema-declared `Default` instead of being left
+        // unresolved. This is the same "input to the formula" operation as reading rawValues,
+        // just from a different source: SYSTEMS.md's "adjustment field idiom" is that the default
+        // contributes nothing (e.g. `0`) until explicitly set, not that the field is absent from
+        // every formula that references it.
         var resolved = new Dictionary<string, decimal>(StringComparer.Ordinal);
         foreach (var field in fields)
         {
@@ -54,6 +62,10 @@ public static class DerivedFieldEvaluator
                 && decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
             {
                 resolved[field.Key] = parsed;
+            }
+            else if (field.Default.HasValue)
+            {
+                resolved[field.Key] = field.Default.Value;
             }
         }
 
