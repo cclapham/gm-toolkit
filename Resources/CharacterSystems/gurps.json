@@ -1,0 +1,644 @@
+{
+  "formatVersion": 1,
+  "id": "gurps-4e",
+  "name": "GURPS Fourth Edition",
+  "version": "1.0.0",
+  "author": "GM Toolkit",
+  "description": "Generic Universal RolePlaying System, Fourth Edition: no class, no level, no fixed skill list. Every capability comes from how a shared character-point budget is spent across four point-bought primary attributes, secondary characteristics derived from them (with an independent buy-up/buy-down adjustment for each, per GURPS's own rules), an open-ended list of advantages/disadvantages/quirks, and an open-ended list of individually-bought skills -- both repeating groups with no enum of valid entries, since GURPS has hundreds of each. This is the schema format's genericity acid test: SYSTEMS.md's GURPS worked sketch is reproduced here in full, plus additional real GURPS 4e Basic Set derived values (Dodge, Basic Lift) added specifically to exercise the formula evaluator further -- multi-hop dependency chains and a field multiplied by itself.",
+  "pcFields": [
+    {
+      "key": "st",
+      "label": "ST (Strength)",
+      "type": "number",
+      "helpText": "Physical power and lifting/striking ability. Point-bought like every GURPS attribute -- there is no class or level anywhere in this profile; a character's capabilities come entirely from how points are spent across attributes, secondary characteristics, advantages/disadvantages, and skills below.",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "dx",
+      "label": "DX (Dexterity)",
+      "type": "number",
+      "helpText": "Agility, coordination, and fine motor control.",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "iq",
+      "label": "IQ (Intelligence)",
+      "type": "number",
+      "helpText": "Reasoning ability and mental acuity.",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "ht",
+      "label": "HT (Health)",
+      "type": "number",
+      "helpText": "Physical vitality, resistance to disease/toxin, and stamina.",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "stCost",
+      "label": "ST Point Cost",
+      "type": "derived",
+      "helpText": "GURPS 4e Basic Set: ST costs 10 character points per level above 10, and refunds 10 points per level below 10 -- linear in both directions, so the point cost of the score bought is derived directly from the score rather than tracked as a separate player-entered value (issue #87's 'derive point cost from the attribute value if possible').",
+      "formula": "(st - 10) * 10",
+      "precision": 0
+    },
+    {
+      "key": "dxCost",
+      "label": "DX Point Cost",
+      "type": "derived",
+      "helpText": "20 points per level above 10, -20 per level below 10.",
+      "formula": "(dx - 10) * 20",
+      "precision": 0
+    },
+    {
+      "key": "iqCost",
+      "label": "IQ Point Cost",
+      "type": "derived",
+      "helpText": "20 points per level above 10, -20 per level below 10.",
+      "formula": "(iq - 10) * 20",
+      "precision": 0
+    },
+    {
+      "key": "htCost",
+      "label": "HT Point Cost",
+      "type": "derived",
+      "helpText": "10 points per level above 10, -10 per level below 10.",
+      "formula": "(ht - 10) * 10",
+      "precision": 0
+    },
+    {
+      "key": "attributePointsSpent",
+      "label": "Attribute Points Spent",
+      "type": "derived",
+      "helpText": "Total character points spent across the four primary attributes -- a derived field chained off the four cost fields above, itself proving the evaluator handles multi-hop dependency chains (attributePointsSpent -> stCost -> st), not just single-hop references to a flat attribute.",
+      "formula": "stCost + dxCost + iqCost + htCost",
+      "precision": 0
+    },
+    {
+      "key": "hpAdjustment",
+      "label": "HP Adjustment",
+      "type": "number",
+      "helpText": "GURPS lets a character buy Hit Points up or down independently of ST, at 2 character points per +1/-1 HP. Defaults to 0 (HP exactly equal to ST) until points are spent here.",
+      "min": -50,
+      "max": 50,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "hp",
+      "label": "HP (Hit Points)",
+      "type": "derived",
+      "formula": "st + hpAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "hpCost",
+      "label": "HP Point Cost",
+      "type": "derived",
+      "helpText": "2 character points per HP bought above (or refunded per HP below) the ST-derived default.",
+      "formula": "hpAdjustment * 2",
+      "precision": 0
+    },
+    {
+      "key": "willAdjustment",
+      "label": "Will Adjustment",
+      "type": "number",
+      "min": -20,
+      "max": 20,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "will",
+      "label": "Will",
+      "type": "derived",
+      "formula": "iq + willAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "willCost",
+      "label": "Will Point Cost",
+      "type": "derived",
+      "helpText": "5 character points per level.",
+      "formula": "willAdjustment * 5",
+      "precision": 0
+    },
+    {
+      "key": "perAdjustment",
+      "label": "Perception Adjustment",
+      "type": "number",
+      "min": -20,
+      "max": 20,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "perception",
+      "label": "Perception",
+      "type": "derived",
+      "formula": "iq + perAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "perceptionCost",
+      "label": "Perception Point Cost",
+      "type": "derived",
+      "helpText": "5 character points per level, same rate as Will.",
+      "formula": "perAdjustment * 5",
+      "precision": 0
+    },
+    {
+      "key": "fpAdjustment",
+      "label": "FP Adjustment",
+      "type": "number",
+      "min": -50,
+      "max": 50,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "fp",
+      "label": "FP (Fatigue Points)",
+      "type": "derived",
+      "formula": "ht + fpAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "fpCost",
+      "label": "FP Point Cost",
+      "type": "derived",
+      "helpText": "3 character points per level.",
+      "formula": "fpAdjustment * 3",
+      "precision": 0
+    },
+    {
+      "key": "speedAdjustment",
+      "label": "Basic Speed Adjustment",
+      "type": "number",
+      "min": -5,
+      "max": 5,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "basicSpeed",
+      "label": "Basic Speed",
+      "type": "derived",
+      "helpText": "(HT + DX) / 4, plus any points spent adjusting it -- GURPS's actual Basic Speed formula. Genuinely needs the fractional remainder (5.25, not 5), which is exactly why the grammar's `/` is ordinary real-valued division rather than floor/integer division (SYSTEMS.md's 'Rounding is field metadata').",
+      "formula": "(ht + dx) / 4 + speedAdjustment",
+      "precision": 2
+    },
+    {
+      "key": "speedCost",
+      "label": "Basic Speed Point Cost",
+      "type": "derived",
+      "helpText": "20 character points per full +1 to Basic Speed (equivalently 5 points per the usual +0.25 increment); speedAdjustment moves in whole numbers in this profile, so the cost scales at the same 20-per-level rate.",
+      "formula": "speedAdjustment * 20",
+      "precision": 0
+    },
+    {
+      "key": "moveAdjustment",
+      "label": "Basic Move Adjustment",
+      "type": "number",
+      "min": -5,
+      "max": 5,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "basicMove",
+      "label": "Basic Move",
+      "type": "derived",
+      "helpText": "floor(Basic Speed), plus any points spent adjusting it directly -- referencing basicSpeed (itself a derived field) proves formula chaining works, not just single-hop references to a flat attribute (SYSTEMS.md's GURPS sketch).",
+      "formula": "basicSpeed + moveAdjustment",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "moveCost",
+      "label": "Basic Move Point Cost",
+      "type": "derived",
+      "helpText": "5 character points per level.",
+      "formula": "moveAdjustment * 5",
+      "precision": 0
+    },
+    {
+      "key": "dodgeAdjustment",
+      "label": "Dodge Adjustment",
+      "type": "number",
+      "helpText": "Enhanced Dodge and similar traits add a flat bonus here rather than the formula branching on which trait is present.",
+      "min": -5,
+      "max": 5,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "dodge",
+      "label": "Dodge",
+      "type": "derived",
+      "helpText": "GURPS 4e's actual Dodge formula: floor(Basic Speed) + 3. Deliberately references basicSpeed directly rather than basicMove -- Dodge is defined off Basic Speed's own whole number, not off however much Basic Move was separately bought, so basicMove's moveAdjustment must not leak into this value.",
+      "formula": "basicSpeed + 3 + dodgeAdjustment",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "basicLift",
+      "label": "Basic Lift",
+      "type": "derived",
+      "helpText": "GURPS 4e's actual Basic Lift formula: ST squared, divided by 5, rounded to nearest. Demonstrates the grammar multiplying a field by itself (no exponent syntax needed -- `st * st` is ordinary multiplication). Note: ST below 8 yields BL under 10 lbs, which GURPS keeps fractional per the table; this field rounds to a whole number, so ST 1-7 values round rather than match the fractional table exactly.",
+      "formula": "(st * st) / 5",
+      "precision": 0,
+      "rounding": "round"
+    },
+    {
+      "key": "thrustDamage",
+      "label": "Thrust Damage",
+      "type": "text",
+      "helpText": "GURPS 4e's Thrust damage for this ST, read off the (non-linear) ST-to-damage table on Basic Set p.16 -- e.g. '1d-2' at ST 10, '2d+1' at ST 19. Unlike basicLift above, this genuinely can't be a `derived` formula: the table's steps aren't a fixed linear function of ST (nor any single fixed shape at all), so expressing it would need a lookup, and the grammar has no lookup/branching facility by design (SYSTEMS.md's 'Explicitly disallowed' section). Entered directly, same resolution as GURPS skill level below.",
+      "maxLength": 20
+    },
+    {
+      "key": "swingDamage",
+      "label": "Swing Damage",
+      "type": "text",
+      "helpText": "GURPS 4e's Swing damage for this ST, from the same non-linear table as Thrust Damage above -- e.g. '1d' at ST 10, '3d+2' at ST 19.",
+      "maxLength": 20
+    },
+    {
+      "key": "techLevel",
+      "label": "Tech Level (TL)",
+      "type": "number",
+      "helpText": "GURPS's genre/technology-era concept -- not the same thing as a D&D 'Level' despite the similar-looking name; it gates which equipment/skills exist for this setting (TL3 muskets vs. TL7 rifles vs. TL10 blasters) and several skills default off it. TL0 (Stone Age) through TL12 (roughly a century past today) per the Basic Set.",
+      "min": 0,
+      "max": 12,
+      "precision": 0,
+      "default": 8
+    },
+    {
+      "key": "appearance",
+      "label": "Appearance",
+      "type": "free-text-block",
+      "maxLength": 1000
+    },
+    {
+      "key": "notes",
+      "label": "Notes",
+      "type": "free-text-block",
+      "maxLength": 4000
+    },
+    {
+      "key": "traits",
+      "label": "Advantages, Disadvantages & Quirks",
+      "type": "repeating-group",
+      "helpText": "Open-ended list, player-chosen -- GURPS has hundreds of published advantages and disadvantages, plus homebrew ones, so there is deliberately no enum of valid names here (only Category below is a closed list, and it names the four kinds of trait GURPS itself recognizes, not which specific traits are allowed).",
+      "itemFields": [
+        { "key": "name", "label": "Name", "type": "text", "maxLength": 100 },
+        { "key": "category", "label": "Category", "type": "enum", "options": ["Advantage", "Disadvantage", "Quirk", "Perk"] },
+        { "key": "pointCost", "label": "Point Cost", "type": "number", "min": -50, "max": 50, "precision": 0 },
+        { "key": "description", "label": "Description", "type": "free-text-block", "maxLength": 1000 }
+      ],
+      "minItems": 0,
+      "maxItems": 100
+    },
+    {
+      "key": "skills",
+      "label": "Skills",
+      "type": "repeating-group",
+      "helpText": "Individually-bought skills, open-ended -- GURPS has 100+ published skills, many with specialties (e.g. 'Guns (Pistol)'), so Name is free text rather than an enum. Skill Level and Points are directly-entered numbers, not `derived` fields, for two independent reasons the RFC (SYSTEMS.md) found doing GURPS first: (1) Controlling Attribute varies per row -- 'add whichever of ST/DX/IQ/HT this row names' is dynamic dispatch on a field's own value, which the grammar structurally can't express (same limit that keeps D&D saves/skills and Pathfinder's proficiency rank flat too); (2) GURPS's real points-to-level conversion is a difficulty-based lookup table (Easy/Average/Hard/Very Hard, non-linear in points spent), not arithmetic at all -- a second, independent reason a formula couldn't reach it even if (1) didn't already rule it out.",
+      "itemFields": [
+        { "key": "name", "label": "Name", "type": "text", "maxLength": 100 },
+        { "key": "controllingAttribute", "label": "Attribute", "type": "enum", "options": ["ST", "DX", "IQ", "HT"] },
+        { "key": "relativeLevel", "label": "Relative Level", "type": "number", "min": -10, "max": 10, "precision": 0 },
+        { "key": "level", "label": "Skill Level", "type": "number", "min": 0, "max": 40, "precision": 0 },
+        { "key": "pointCost", "label": "Points", "type": "number", "min": 0, "max": 40, "precision": 0 }
+      ],
+      "minItems": 0,
+      "maxItems": 100
+    }
+  ],
+  "npcFields": [
+    {
+      "key": "st",
+      "label": "ST (Strength)",
+      "type": "number",
+      "helpText": "GURPS has no separate monster-stat-block format -- an NPC is built exactly like a PC, with the same point-bought attributes, secondary characteristics, traits, and skills below.",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "dx",
+      "label": "DX (Dexterity)",
+      "type": "number",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "iq",
+      "label": "IQ (Intelligence)",
+      "type": "number",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "ht",
+      "label": "HT (Health)",
+      "type": "number",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "stCost",
+      "label": "ST Point Cost",
+      "type": "derived",
+      "formula": "(st - 10) * 10",
+      "precision": 0
+    },
+    {
+      "key": "dxCost",
+      "label": "DX Point Cost",
+      "type": "derived",
+      "formula": "(dx - 10) * 20",
+      "precision": 0
+    },
+    {
+      "key": "iqCost",
+      "label": "IQ Point Cost",
+      "type": "derived",
+      "formula": "(iq - 10) * 20",
+      "precision": 0
+    },
+    {
+      "key": "htCost",
+      "label": "HT Point Cost",
+      "type": "derived",
+      "formula": "(ht - 10) * 10",
+      "precision": 0
+    },
+    {
+      "key": "attributePointsSpent",
+      "label": "Attribute Points Spent",
+      "type": "derived",
+      "formula": "stCost + dxCost + iqCost + htCost",
+      "precision": 0
+    },
+    {
+      "key": "hpAdjustment",
+      "label": "HP Adjustment",
+      "type": "number",
+      "min": -50,
+      "max": 50,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "hp",
+      "label": "HP (Hit Points)",
+      "type": "derived",
+      "formula": "st + hpAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "hpCost",
+      "label": "HP Point Cost",
+      "type": "derived",
+      "formula": "hpAdjustment * 2",
+      "precision": 0
+    },
+    {
+      "key": "willAdjustment",
+      "label": "Will Adjustment",
+      "type": "number",
+      "min": -20,
+      "max": 20,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "will",
+      "label": "Will",
+      "type": "derived",
+      "formula": "iq + willAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "willCost",
+      "label": "Will Point Cost",
+      "type": "derived",
+      "formula": "willAdjustment * 5",
+      "precision": 0
+    },
+    {
+      "key": "perAdjustment",
+      "label": "Perception Adjustment",
+      "type": "number",
+      "min": -20,
+      "max": 20,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "perception",
+      "label": "Perception",
+      "type": "derived",
+      "formula": "iq + perAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "perceptionCost",
+      "label": "Perception Point Cost",
+      "type": "derived",
+      "formula": "perAdjustment * 5",
+      "precision": 0
+    },
+    {
+      "key": "fpAdjustment",
+      "label": "FP Adjustment",
+      "type": "number",
+      "min": -50,
+      "max": 50,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "fp",
+      "label": "FP (Fatigue Points)",
+      "type": "derived",
+      "formula": "ht + fpAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "fpCost",
+      "label": "FP Point Cost",
+      "type": "derived",
+      "formula": "fpAdjustment * 3",
+      "precision": 0
+    },
+    {
+      "key": "speedAdjustment",
+      "label": "Basic Speed Adjustment",
+      "type": "number",
+      "min": -5,
+      "max": 5,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "basicSpeed",
+      "label": "Basic Speed",
+      "type": "derived",
+      "formula": "(ht + dx) / 4 + speedAdjustment",
+      "precision": 2
+    },
+    {
+      "key": "speedCost",
+      "label": "Basic Speed Point Cost",
+      "type": "derived",
+      "formula": "speedAdjustment * 20",
+      "precision": 0
+    },
+    {
+      "key": "moveAdjustment",
+      "label": "Basic Move Adjustment",
+      "type": "number",
+      "min": -5,
+      "max": 5,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "basicMove",
+      "label": "Basic Move",
+      "type": "derived",
+      "formula": "basicSpeed + moveAdjustment",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "moveCost",
+      "label": "Basic Move Point Cost",
+      "type": "derived",
+      "formula": "moveAdjustment * 5",
+      "precision": 0
+    },
+    {
+      "key": "dodgeAdjustment",
+      "label": "Dodge Adjustment",
+      "type": "number",
+      "min": -5,
+      "max": 5,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "dodge",
+      "label": "Dodge",
+      "type": "derived",
+      "formula": "basicSpeed + 3 + dodgeAdjustment",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "basicLift",
+      "label": "Basic Lift",
+      "type": "derived",
+      "helpText": "GURPS 4e's Basic Lift: ST squared, divided by 5, rounded to nearest. ST below 8 yields sub-10-lb values which are fractional in the table; this field rounds to a whole number.",
+      "formula": "(st * st) / 5",
+      "precision": 0,
+      "rounding": "round"
+    },
+    {
+      "key": "thrustDamage",
+      "label": "Thrust Damage",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "swingDamage",
+      "label": "Swing Damage",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "techLevel",
+      "label": "Tech Level (TL)",
+      "type": "number",
+      "min": 0,
+      "max": 12,
+      "precision": 0,
+      "default": 8
+    },
+    {
+      "key": "appearance",
+      "label": "Appearance",
+      "type": "free-text-block",
+      "maxLength": 1000
+    },
+    {
+      "key": "notes",
+      "label": "Notes",
+      "type": "free-text-block",
+      "maxLength": 4000
+    },
+    {
+      "key": "traits",
+      "label": "Advantages, Disadvantages & Quirks",
+      "type": "repeating-group",
+      "itemFields": [
+        { "key": "name", "label": "Name", "type": "text", "maxLength": 100 },
+        { "key": "category", "label": "Category", "type": "enum", "options": ["Advantage", "Disadvantage", "Quirk", "Perk"] },
+        { "key": "pointCost", "label": "Point Cost", "type": "number", "min": -50, "max": 50, "precision": 0 },
+        { "key": "description", "label": "Description", "type": "free-text-block", "maxLength": 1000 }
+      ],
+      "minItems": 0,
+      "maxItems": 100
+    },
+    {
+      "key": "skills",
+      "label": "Skills",
+      "type": "repeating-group",
+      "itemFields": [
+        { "key": "name", "label": "Name", "type": "text", "maxLength": 100 },
+        { "key": "controllingAttribute", "label": "Attribute", "type": "enum", "options": ["ST", "DX", "IQ", "HT"] },
+        { "key": "relativeLevel", "label": "Relative Level", "type": "number", "min": -10, "max": 10, "precision": 0 },
+        { "key": "level", "label": "Skill Level", "type": "number", "min": 0, "max": 40, "precision": 0 },
+        { "key": "pointCost", "label": "Points", "type": "number", "min": 0, "max": 40, "precision": 0 }
+      ],
+      "minItems": 0,
+      "maxItems": 100
+    },
+    {
+      "key": "reactionToPCs",
+      "label": "Reaction to PCs",
+      "type": "enum",
+      "helpText": "GM-facing: this NPC's starting attitude toward the party, per GURPS 4e's own Reaction Rolls table categories (Basic Set p.494) -- informs (not dictates) how the GM plays them at the table. Absent from the PC side of this pack; a PC has no need to track its own reaction to itself.",
+      "options": ["Disastrous", "Very Bad", "Poor", "Neutral", "Good", "Very Good", "Excellent"]
+    },
+    {
+      "key": "gmNotes",
+      "label": "GM Notes",
+      "type": "free-text-block",
+      "helpText": "GM-only notes -- motivations, secrets, plot hooks. Not shown to players; that's a display-layer concern the schema itself doesn't enforce.",
+      "maxLength": 4000
+    }
+  ]
+}
