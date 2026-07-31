@@ -9,9 +9,10 @@ namespace GmToolkit.Core.Tests.Systems;
 /// real <see cref="CharacterSystemLoader"/> (proving the formula grammar in it is actually legal --
 /// no <c>floor()</c>-style function calls, which SYSTEMS.md's grammar has never supported), its
 /// terminology reflects the 2024 revision rather than a re-skinned 2014 profile (species not race,
-/// an origin feat field, weapon mastery properties, an explicit proficiency-gated Initiative, and
-/// 2024 Monster Manual terminology on the NPC side), and its derived ability-modifier/proficiency-
-/// bonus/initiative/passive-perception fields actually compute the correct 5e values end to end.
+/// an origin feat field, weapon mastery properties, an Initiative Proficiency Bonus adjustment
+/// field (e.g. for the Alert origin feat), and 2024 Monster Manual terminology on the NPC side),
+/// and its derived ability-modifier/proficiency-bonus/initiative/passive-perception fields
+/// actually compute the correct 5e values end to end.
 /// </summary>
 public class Dnd5e2024CharacterSystemTests
 {
@@ -94,10 +95,12 @@ public class Dnd5e2024CharacterSystemTests
     }
 
     [Fact]
-    public void PcFields_gate_initiative_on_a_proficiency_bonus_not_a_bare_dex_modifier()
+    public void PcFields_add_an_initiative_proficiency_bonus_adjustment_to_the_dex_modifier()
     {
-        // 2024 rule change: Initiative is its own proficiency-gated stat, unlike the 2014 rules'
-        // bare Dexterity modifier (see SYSTEMS.md's own dnd5e-2014 sketch, which has no such field).
+        // Initiative is a Dexterity check in both the 2014 and 2024 rules; proficiency in it comes
+        // only from the Alert origin feat (or similar features), not from a 2024 rule change. The
+        // adjustment field idiom (SYSTEMS.md) still applies: initiativeProficiencyBonus defaults to
+        // 0 and only contributes when a feat/feature explicitly grants it.
         var system = LoadSystem();
 
         Assert.Contains(system.PcFields, f => f.Key == "initiativeProficiencyBonus");
@@ -193,6 +196,37 @@ public class Dnd5e2024CharacterSystemTests
         Assert.Equal(3m, results["proficiencyBonus"]); // floor((5-1)/4) + 2 = 3
         Assert.Equal(5m, results["initiative"]); // dexMod(2) + initiativeProficiencyBonus(3)
         Assert.Equal(11m, results["passivePerception"]); // 10 + wisMod(1) + 0
+    }
+
+    [Fact]
+    public void Pc_derived_fields_compute_correctly_on_a_freshly_created_character_with_unset_adjustment_fields()
+    {
+        // A brand-new character has only the fields a creation form actually collects up front --
+        // initiativeProficiencyBonus and perceptionProficiencyBonus (adjustment fields per
+        // SYSTEMS.md's "adjustment field idiom") aren't in rawValues at all yet. Both fields declare
+        // "default": 0 in the schema, so `initiative` and `passivePerception` must still resolve
+        // (using that default as the unset adjustment's contribution) rather than fail closed as
+        // unresolved references.
+        var system = LoadSystem();
+        var graph = DerivedFieldGraph.Build(system.PcFields);
+
+        var rawValues = new Dictionary<string, string>
+        {
+            ["strength"] = "10",
+            ["dexterity"] = "14",
+            ["constitution"] = "10",
+            ["intelligence"] = "10",
+            ["wisdom"] = "14",
+            ["charisma"] = "10",
+            ["level"] = "1",
+        };
+
+        var results = DerivedFieldEvaluator.EvaluateAll(system.PcFields, graph.EvaluationOrder, rawValues);
+
+        Assert.Equal(2m, results["dexMod"]); // floor((14-10)/2) = 2
+        Assert.Equal(2m, results["wisMod"]); // floor((14-10)/2) = 2
+        Assert.Equal(2m, results["initiative"]); // dexMod(2) + initiativeProficiencyBonus default(0)
+        Assert.Equal(12m, results["passivePerception"]); // 10 + wisMod(2) + perceptionProficiencyBonus default(0)
     }
 
     [Fact]

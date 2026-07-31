@@ -4,7 +4,7 @@
   "name": "D&D 5e (2024)",
   "version": "1.0.0",
   "author": "GM Toolkit",
-  "description": "D&D 5th Edition (2024 revision of the Player's Handbook and Monster Manual). A separate profile from dnd5e-2014, not a variant: species replaces race, backgrounds grant ability score increases plus an origin feat, weapons carry a mastery property, and Initiative and Proficiency Bonus are now explicit, proficiency-gated stats rather than a bare ability modifier or a background-derived number.",
+  "description": "D&D 5th Edition (2024 revision of the Player's Handbook and Monster Manual): species replaces race, backgrounds grant ability score increases plus an origin feat, weapons carry a mastery property, and Proficiency Bonus is printed explicitly on monster stat blocks rather than inferred from Challenge Rating.",
   "pcFields": [
     {
       "key": "strength",
@@ -202,7 +202,7 @@
       "key": "initiativeProficiencyBonus",
       "label": "Initiative Proficiency Bonus",
       "type": "number",
-      "helpText": "2024 rule change: Initiative is now its own proficiency-gated stat (like a skill check using Dexterity) rather than a bare Dexterity modifier as in 2014 -- some feats and class features grant proficiency (or expertise) in it. Enter 0 if not proficient, or a copy of Proficiency Bonus (doubled for expertise) if you are; the Initiative formula below adds this as a plain operand rather than branching on a proficiency flag.",
+      "helpText": "Proficiency bonus adjustment to initiative (e.g., from the Alert origin feat). Defaults to 0. Enter a copy of Proficiency Bonus (doubled for expertise) if a feat or feature grants it; the Initiative formula below adds this as a plain operand rather than branching on a proficiency flag.",
       "min": 0,
       "max": 12,
       "precision": 0,
@@ -212,7 +212,7 @@
       "key": "initiative",
       "label": "Initiative",
       "type": "derived",
-      "helpText": "Dexterity modifier plus Initiative Proficiency Bonus (0 if not proficient). In the 2014 rules this was always just the Dexterity modifier.",
+      "helpText": "Dexterity modifier plus Initiative Proficiency Bonus (0 unless a feat or feature grants proficiency, e.g. the Alert origin feat).",
       "formula": "dexMod + initiativeProficiencyBonus",
       "precision": 0
     },

@@ -101,6 +101,48 @@ public class DerivedFieldEvaluatorTests
     }
 
     [Fact]
+    public void EvaluateAll_seeds_an_unset_adjustment_field_from_its_schema_default_instead_of_failing_closed()
+    {
+        // The "adjustment field idiom" (SYSTEMS.md): a field like `initiativeProficiencyBonus`
+        // declares `"default": 0` and isn't in rawValues at all until a player explicitly sets it
+        // (e.g. via the Alert feat). That default must feed the formula the same way a stored raw
+        // value would -- it must not be treated as an unresolved reference.
+        var fields = new List<StatFieldDefinition>
+        {
+            NumberField("dex"),
+            NumberField("initiativeProficiencyBonus", defaultValue: 0m),
+            DerivedField("initiative", "dex + initiativeProficiencyBonus"),
+        };
+        var graph = DerivedFieldGraph.Build(fields);
+
+        // initiativeProficiencyBonus is deliberately absent from rawValues -- exactly the state of
+        // a freshly-created character that has never explicitly set it.
+        var results = DerivedFieldEvaluator.EvaluateAll(
+            fields, graph.EvaluationOrder, new Dictionary<string, string> { ["dex"] = "2" });
+
+        Assert.Equal(2m, results["initiative"]);
+    }
+
+    [Fact]
+    public void EvaluateAll_prefers_a_stored_raw_value_over_the_schema_default_when_both_are_present()
+    {
+        var fields = new List<StatFieldDefinition>
+        {
+            NumberField("dex"),
+            NumberField("initiativeProficiencyBonus", defaultValue: 0m),
+            DerivedField("initiative", "dex + initiativeProficiencyBonus"),
+        };
+        var graph = DerivedFieldGraph.Build(fields);
+
+        var results = DerivedFieldEvaluator.EvaluateAll(
+            fields,
+            graph.EvaluationOrder,
+            new Dictionary<string, string> { ["dex"] = "2", ["initiativeProficiencyBonus"] = "3" });
+
+        Assert.Equal(5m, results["initiative"]);
+    }
+
+    [Fact]
     public void EvaluateAll_propagates_a_failure_transitively_through_the_dependency_chain()
     {
         var fields = new List<StatFieldDefinition>
@@ -199,11 +241,12 @@ public class DerivedFieldEvaluatorTests
         Assert.Equal(expected, results[$"f{chainLength - 1}"]);
     }
 
-    private static StatFieldDefinition NumberField(string key) => new()
+    private static StatFieldDefinition NumberField(string key, decimal? defaultValue = null) => new()
     {
         Key = key,
         Label = key,
         Type = StatFieldTypes.Number,
+        Default = defaultValue,
     };
 
     private static StatFieldDefinition DerivedField(string key, string formula, int? precision = null, string? rounding = null) => new()
