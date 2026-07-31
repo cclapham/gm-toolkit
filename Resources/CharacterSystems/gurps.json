@@ -257,7 +257,7 @@
       "key": "basicLift",
       "label": "Basic Lift",
       "type": "derived",
-      "helpText": "GURPS 4e's actual Basic Lift formula: ST squared, divided by 5, rounded to nearest. Demonstrates the grammar multiplying a field by itself (no exponent syntax needed -- `st * st` is ordinary multiplication).",
+      "helpText": "GURPS 4e's actual Basic Lift formula: ST squared, divided by 5, rounded to nearest. Demonstrates the grammar multiplying a field by itself (no exponent syntax needed -- `st * st` is ordinary multiplication). Note: ST below 8 yields BL under 10 lbs, which GURPS keeps fractional per the table; this field rounds to a whole number, so ST 1-7 values round rather than match the fractional table exactly.",
       "formula": "(st * st) / 5",
       "precision": 0,
       "rounding": "round"
@@ -561,6 +561,7 @@
       "key": "basicLift",
       "label": "Basic Lift",
       "type": "derived",
+      "helpText": "GURPS 4e's Basic Lift: ST squared, divided by 5, rounded to nearest. ST below 8 yields sub-10-lb values which are fractional in the table; this field rounds to a whole number.",
       "formula": "(st * st) / 5",
       "precision": 0,
       "rounding": "round"
