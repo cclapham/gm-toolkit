@@ -7,6 +7,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
 using GmToolkit.Core.Services;
+using GmToolkit.UI.Controls;
 using GmToolkit.UI.Services;
 using GmToolkit.UI.ViewModels;
 using GmToolkit.UI.Views;
@@ -45,6 +46,23 @@ public partial class App : Application
     public static ThemePreference InitialThemePreference { get; internal set; } = ThemePreference.System;
 
     /// <summary>
+    /// Set by a composition root (<c>GmToolkit.Desktop/Program.cs</c>/<c>GmToolkit.Android/Application.cs</c>)
+    /// when <c>GmToolkit.Data.GmToolkitDatabase.CreateAndInitializeAsync</c> throws a
+    /// <see cref="GmToolkit.Core.Repositories.DataAccessException"/> during startup -- a transient
+    /// failure (disk full, file briefly read-only/locked, etc.) that leaves no database, and
+    /// therefore no <see cref="Services"/>, to build the normal shell against. When this is set,
+    /// <see cref="OnFrameworkInitializationCompleted"/> shows a friendly error screen carrying
+    /// <see cref="GmToolkit.Core.Repositories.DataAccessException.Message"/> instead of the normal
+    /// splash/shell sequence, rather than letting the composition root either crash with no
+    /// explanation or silently exit -- see <c>GmToolkitDatabase.CreateAndInitializeAsync</c>'s
+    /// remarks for what the caller (this property's two setters) is expected to do with a failure.
+    /// There's nothing to retry in-process (the transient condition is external -- e.g. free up
+    /// disk space, restore write access, close another copy holding the lock); the error screen's
+    /// only action is to close, and the user relaunches once the condition is cleared.
+    /// </summary>
+    public static string? StartupError { get; internal set; }
+
+    /// <summary>
     /// How long <see cref="SplashWindow"/> stays up before <see cref="MainWindow"/> replaces it —
     /// see that window's remarks for why this is a fixed cosmetic delay, not tied to real work.
     /// </summary>
@@ -60,6 +78,31 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // Global exception handling (issue #32): Dispatcher.UIThread is only guaranteed to exist
+        // once Avalonia's platform backend is set up, which has already happened by the time this
+        // method runs -- see GlobalExceptionHandler's remarks for why this specific hook (as
+        // opposed to the AppDomain/TaskScheduler ones each head installs at the very top of its own
+        // Main/OnCreate, before any of this) has to wait until here. Installed unconditionally,
+        // even on the StartupError branch below, so a failure while merely showing the error
+        // screen still gets the same net rather than none at all.
+        GlobalExceptionHandler.InstallDispatcherHandler();
+
+        // Apply the persisted theme preference before constructing any window/view below -- see
+        // InitialThemePreference's remarks. Left at its ThemePreference.System default on the
+        // StartupError branch below (the composition root never got as far as loading the real
+        // preference), which is a fine fallback for a screen that only has to be legible once.
+        ThemeApplier.Apply(this, InitialThemePreference);
+
+        // Startup DB bootstrap failed -- see StartupError's remarks. There is no DI container to
+        // resolve a real shell against in this case, so show the friendly error screen instead
+        // and skip everything below that assumes Services is set.
+        if (StartupError is { } startupError)
+        {
+            ShowStartupError(startupError);
+            base.OnFrameworkInitializationCompleted();
+            return;
+        }
+
         // Services is only unset here if a composition root forgot to set it before starting the
         // Avalonia lifetime -- there's no legitimate runtime path where it's null (the XAML
         // previewer never reaches this method at all; it renders views directly via their
@@ -68,17 +111,6 @@ public partial class App : Application
         var services = Services ?? throw new InvalidOperationException(
             $"{nameof(App)}.{nameof(Services)} must be set by the composition root " +
             "(GmToolkit.Desktop/Program.cs or GmToolkit.Android/Application.cs) before the Avalonia lifetime starts.");
-
-        // Global exception handling (issue #32): Dispatcher.UIThread is only guaranteed to exist
-        // once Avalonia's platform backend is set up, which has already happened by the time this
-        // method runs -- see GlobalExceptionHandler's remarks for why this specific hook (as
-        // opposed to the AppDomain/TaskScheduler ones each head installs at the very top of its own
-        // Main/OnCreate, before any of this) has to wait until here.
-        GlobalExceptionHandler.InstallDispatcherHandler();
-
-        // Apply the persisted theme preference before constructing any window/view below -- see
-        // InitialThemePreference's remarks.
-        ThemeApplier.Apply(this, InitialThemePreference);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -108,6 +140,38 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Shows <paramref name="message"/> in place of the normal splash/shell sequence -- see
+    /// <see cref="StartupError"/>'s remarks for when/why this runs instead of the usual path.
+    /// </summary>
+    /// <remarks>
+    /// Covers the same three <see cref="ApplicationLifetime"/> shapes as the normal path below it
+    /// (classic desktop, Android's <see cref="IActivityApplicationLifetime"/>, and the generic
+    /// <see cref="ISingleViewApplicationLifetime"/>), but skips <see cref="SplashWindow"/> entirely
+    /// on the classic-desktop branch -- there is nothing worth branding a wait for when startup has
+    /// already failed, and the whole point is to get the explanation in front of the user as fast
+    /// as possible instead of behind a further 3-second delay.
+    /// </remarks>
+    private void ShowStartupError(string message)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var errorWindow = new StartupErrorWindow { Message = message };
+            desktop.MainWindow = errorWindow;
+            errorWindow.Show();
+        }
+        else if (ApplicationLifetime is IActivityApplicationLifetime singleViewFactoryApplicationLifetime)
+        {
+            singleViewFactoryApplicationLifetime.MainViewFactory =
+                () => new EmptyState { Icon = "⚠️", Title = "GM Toolkit couldn't start", Message = message };
+        }
+        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
+        {
+            singleViewPlatform.MainView =
+                new EmptyState { Icon = "⚠️", Title = "GM Toolkit couldn't start", Message = message };
+        }
     }
 
     /// <summary>

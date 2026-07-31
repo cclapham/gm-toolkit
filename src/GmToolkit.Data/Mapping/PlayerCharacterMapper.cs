@@ -20,18 +20,25 @@ namespace GmToolkit.Data.Mapping;
 /// </remarks>
 internal static class PlayerCharacterMapper
 {
-    public static PlayerCharacter ToModel(PlayerCharacterRow row) => new()
+    public static PlayerCharacter ToModel(PlayerCharacterRow row)
     {
-        Id = row.Id,
-        CampaignId = row.CampaignId,
-        CharacterName = row.CharacterName,
-        PlayerName = row.PlayerName,
-        Ancestry = row.Ancestry,
-        Class = row.Class,
-        Level = row.Level,
-        Notes = row.Notes,
-        Stats = DeserializeStats(row.Id, row.CharacterName, row.StatsJson),
-    };
+        var (stats, malformedStatsJson) = DeserializeStats(row.Id, row.CharacterName, row.StatsJson);
+
+        return new()
+        {
+            Id = row.Id,
+            CampaignId = row.CampaignId,
+            CharacterName = row.CharacterName,
+            PlayerName = row.PlayerName,
+            Ancestry = row.Ancestry,
+            Class = row.Class,
+            Level = row.Level,
+            Notes = row.Notes,
+            Stats = stats,
+            HasMalformedStats = malformedStatsJson is not null,
+            MalformedStatsJson = malformedStatsJson,
+        };
+    }
 
     public static PlayerCharacterRow ToRow(PlayerCharacter model) => new()
     {
@@ -43,7 +50,11 @@ internal static class PlayerCharacterMapper
         Class = model.Class,
         Level = model.Level,
         Notes = model.Notes,
-        StatsJson = JsonSerializer.Serialize(model.Stats),
+        // HasMalformedStats means Stats is just an empty placeholder (see that property's
+        // remarks), not this PC's real data -- serializing it would permanently overwrite the
+        // original, still-possibly-recoverable bytes the moment this PC is next saved, even if
+        // nothing about its stats was ever touched. Write the original bytes back verbatim instead.
+        StatsJson = model.HasMalformedStats ? model.MalformedStatsJson! : JsonSerializer.Serialize(model.Stats),
     };
 
     /// <summary>
@@ -56,28 +67,35 @@ internal static class PlayerCharacterMapper
     /// <see cref="JsonException"/> up through <see cref="ToModel"/> and poisoning the whole
     /// campaign's PC list.
     /// </summary>
-    private static Dictionary<string, string> DeserializeStats(Guid characterId, string characterName, string? statsJson)
+    /// <returns>
+    /// The parsed stats (empty on failure) and, on failure, the original malformed JSON text so
+    /// <see cref="ToRow"/> can write it back unchanged instead of destroying it -- <c>null</c> on
+    /// success, since there is nothing to preserve.
+    /// </returns>
+    private static (Dictionary<string, string> Stats, string? MalformedStatsJson) DeserializeStats(
+        Guid characterId, string characterName, string? statsJson)
     {
         if (string.IsNullOrEmpty(statsJson))
         {
-            return [];
+            return ([], null);
         }
 
         try
         {
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(statsJson) ?? [];
+            return (JsonSerializer.Deserialize<Dictionary<string, string>>(statsJson) ?? [], null);
         }
         catch (JsonException ex)
         {
-            LogMalformedStats(characterId, characterName, ex);
-            return [];
+            LogMalformedStats(characterId, characterName, statsJson, ex);
+            return ([], statsJson);
         }
     }
 
-    private static void LogMalformedStats(Guid characterId, string characterName, JsonException ex)
+    private static void LogMalformedStats(Guid characterId, string characterName, string originalStatsJson, JsonException ex)
     {
         Trace.WriteLine(
             $"PlayerCharacterMapper: PlayerCharacter '{characterName}' ({characterId}) has malformed " +
-            $"StatsJson and was loaded with empty stats instead. Original error: {ex.Message}");
+            $"StatsJson and was loaded with empty stats instead. Original error: {ex.Message}. " +
+            $"Original StatsJson (preserved verbatim on next save): {originalStatsJson}");
     }
 }

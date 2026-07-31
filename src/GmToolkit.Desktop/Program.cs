@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 
 using Avalonia;
 
+using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
 using GmToolkit.Data;
 using GmToolkit.UI;
@@ -29,7 +30,27 @@ sealed class Program
         GlobalExceptionHandler.InstallProcessWideHandlers();
 
         var databasePath = AppDataPaths.GetDesktopDatabasePath();
-        var database = await GmToolkitDatabase.CreateAndInitializeAsync(databasePath);
+
+        GmToolkitDatabase database;
+        try
+        {
+            database = await GmToolkitDatabase.CreateAndInitializeAsync(databasePath);
+        }
+        catch (DataAccessException ex)
+        {
+            // Startup DB bootstrap failed with a friendly, actionable message (see
+            // GmToolkitDatabase.CreateAndInitializeAsync's remarks -- e.g. disk full, the file
+            // temporarily read-only, or another copy of GM Toolkit holding a lock). There's no
+            // database to hand the rest of this composition root, so skip straight to
+            // App.StartupError's screen (shared with GmToolkit.Android/Application.cs, see that
+            // property's remarks) instead of letting this propagate as an unhandled exception
+            // (silent crash, no window ever drawn) or exiting with no explanation at all. The user
+            // fixes the underlying condition and relaunches.
+            App.StartupError = ex.Message;
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            Environment.Exit(1);
+            return;
+        }
 
         var settingsPath = AppDataPaths.GetDesktopSettingsPath();
         var appSettingsService = new AppSettingsService(settingsPath);

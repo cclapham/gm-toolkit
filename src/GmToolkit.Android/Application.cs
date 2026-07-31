@@ -4,6 +4,7 @@ using Android.Runtime;
 using Avalonia;
 using Avalonia.Android;
 
+using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
 using GmToolkit.Data;
 using GmToolkit.UI;
@@ -51,10 +52,11 @@ namespace GmToolkit.Android
         // it): AvaloniaAndroidApplication<TApp>.OnCreate() synchronously drives Avalonia's entire
         // framework-init chain (InitializeAppLifetime -> AppBuilder.SetupWithLifetime -> ... ->
         // App.OnFrameworkInitializationCompleted), and that last step throws immediately if
-        // App.Services isn't set yet. Calling base.OnCreate() first (the usual override
-        // convention) means Avalonia tries to build the shell before this method ever reaches the
-        // App.Services assignment below -- guaranteed InvalidOperationException on every launch.
-        // Everything this override needs to do (DB bootstrap, DI container, App.Services/
+        // neither App.Services nor App.StartupError is set yet (see StartupError's remarks for the
+        // latter -- the database-bootstrap-failed branch below). Calling base.OnCreate() first (the
+        // usual override convention) means Avalonia tries to build the shell before this method
+        // ever reaches either assignment below -- guaranteed InvalidOperationException on every
+        // launch. Everything this override needs to do (DB bootstrap, DI container, App.Services/
         // InitialThemePreference, restoring the last-opened campaign) has to complete before
         // handing control to Avalonia, so base.OnCreate() has to be the final statement instead.
         public override void OnCreate()
@@ -65,9 +67,28 @@ namespace GmToolkit.Android
             GlobalExceptionHandler.InstallProcessWideHandlers();
 
             var databasePath = System.IO.Path.Combine(FilesDir!.AbsolutePath, AppDataPaths.DatabaseFileName);
-            var database = Task.Run(() => GmToolkitDatabase.CreateAndInitializeAsync(databasePath))
-                .GetAwaiter()
-                .GetResult();
+
+            GmToolkitDatabase database;
+            try
+            {
+                database = Task.Run(() => GmToolkitDatabase.CreateAndInitializeAsync(databasePath))
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (DataAccessException ex)
+            {
+                // Startup DB bootstrap failed with a friendly, actionable message (see
+                // GmToolkitDatabase.CreateAndInitializeAsync's remarks -- e.g. disk full or the
+                // file temporarily read-only). There's no database to build the DI container
+                // against, so skip straight to Avalonia's framework-init chain with
+                // App.StartupError set instead (mirrors GmToolkit.Desktop/Program.cs's identical
+                // catch) -- App.axaml.cs's OnFrameworkInitializationCompleted shows a friendly
+                // error screen as this process's single view instead of a force-close with no
+                // explanation. The user fixes the underlying condition and relaunches the app.
+                App.StartupError = ex.Message;
+                base.OnCreate();
+                return;
+            }
 
             var settingsPath = System.IO.Path.Combine(FilesDir!.AbsolutePath, AppDataPaths.SettingsFileName);
             var appSettingsService = new AppSettingsService(settingsPath);

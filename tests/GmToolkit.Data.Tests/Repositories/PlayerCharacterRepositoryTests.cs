@@ -124,6 +124,41 @@ public class PlayerCharacterRepositoryTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// A row with malformed <c>StatsJson</c> must not have that malformed data permanently
+    /// destroyed the moment the app happens to load and save it again -- e.g. a GM opening the
+    /// campaign, glancing at (but not touching) this PC's other fields, and saving. Before this
+    /// fix, <c>PlayerCharacter.Stats</c> came back empty on read (correctly, so the read itself
+    /// doesn't fail — see the sibling test above) but the write path unconditionally re-serialized
+    /// that same empty <c>Stats</c> right back over the original bytes on the very next save,
+    /// silently turning a recoverable "one row needs manual attention" problem into permanent data
+    /// loss. This is specifically a regression risk for PCs -- reading a malformed
+    /// <c>PlayerCharacter.StatsJson</c> used to throw outright, before this same fix made it
+    /// tolerant to match <c>NpcMapper</c>.
+    /// </summary>
+    [Fact]
+    public async Task Update_of_a_character_with_malformed_StatsJson_preserves_the_original_bytes_unchanged()
+    {
+        var pc = new PlayerCharacter { CampaignId = Guid.NewGuid(), CharacterName = "Brannigan" };
+        await _repository.AddAsync(pc);
+        const string malformedStatsJson = "{not valid json";
+        await _database.Connection.ExecuteAsync(
+            "UPDATE PlayerCharacters SET StatsJson = ? WHERE Id = ?", malformedStatsJson, pc.Id);
+
+        var fetched = await _repository.GetAsync(pc.Id);
+        Assert.NotNull(fetched);
+        Assert.True(fetched.HasMalformedStats);
+        Assert.Empty(fetched.Stats);
+
+        // Save it back completely unmodified -- e.g. the GM merely opened and re-saved this PC's
+        // other fields, never touching its stats at all.
+        await _repository.UpdateAsync(fetched);
+
+        var rawStatsJsonAfterSave = await _database.Connection.ExecuteScalarAsync<string>(
+            "SELECT StatsJson FROM PlayerCharacters WHERE Id = ?", pc.Id);
+        Assert.Equal(malformedStatsJson, rawStatsJsonAfterSave);
+    }
+
+    /// <summary>
     /// One PC row with malformed <c>StatsJson</c> must not poison the whole campaign's PC list —
     /// every other PC in that campaign must still come back normally.
     /// </summary>

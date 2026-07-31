@@ -111,6 +111,30 @@ public class CampaignRepositoryTests : IAsyncLifetime
         Assert.Equal("Blades in the Dark", fetched.GameSystem);
     }
 
+    /// <summary>
+    /// <see cref="Campaign.CharacterSystemId"/> round-trips through <c>UpdateAsync</c>, not just
+    /// <c>AddAsync</c> -- sqlite-net-pcl's update path is a different SQL statement (an
+    /// <c>UPDATE</c>, not an <c>INSERT</c>) from add, and the real GM flow for attaching a
+    /// character system to an already-created freeform campaign (create the campaign, decide on a
+    /// system later, attach it from settings) always goes through this path, not add.
+    /// </summary>
+    [Fact]
+    public async Task Update_changes_CharacterSystemId()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        await _repository.AddAsync(campaign);
+        var fetchedBeforeUpdate = await _repository.GetAsync(campaign.Id);
+        Assert.NotNull(fetchedBeforeUpdate);
+        Assert.Null(fetchedBeforeUpdate.CharacterSystemId);
+
+        campaign.CharacterSystemId = "dnd5e-2024";
+        await _repository.UpdateAsync(campaign);
+
+        var fetchedAfterUpdate = await _repository.GetAsync(campaign.Id);
+        Assert.NotNull(fetchedAfterUpdate);
+        Assert.Equal("dnd5e-2024", fetchedAfterUpdate.CharacterSystemId);
+    }
+
     [Fact]
     public async Task Delete_removes_the_campaign()
     {

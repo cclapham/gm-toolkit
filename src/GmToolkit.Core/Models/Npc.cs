@@ -37,9 +37,33 @@ public class Npc
     /// System-agnostic key/value bag, matching <see cref="PlayerCharacter.Stats"/>'s pattern —
     /// the GM (or an attached <see cref="Campaign.CharacterSystemId"/> schema) defines the keys.
     /// Empty for NPCs with no stat block at all, which is the common case for minor/incidental
-    /// NPCs.
+    /// NPCs. When <see cref="HasMalformedStats"/> is <c>true</c>, this is empty (nothing could be
+    /// parsed from the persisted row), not the NPC's real stats — see that property's remarks.
     /// </summary>
     public Dictionary<string, string> Stats { get; init; } = [];
+
+    /// <summary>
+    /// <c>true</c> when this NPC's persisted stats couldn't be parsed as JSON (hand-edited
+    /// directly in the database file, truncated by some other failure, etc.) — set by
+    /// <c>GmToolkit.Data.Mapping.NpcMapper</c> when loading a row whose <c>StatsJson</c> fails to
+    /// deserialize. <see cref="Stats"/> is left empty in that case rather than propagating the
+    /// parse failure and making the whole NPC inaccessible (see that mapper's remarks), but saving
+    /// this NPC back must not silently discard whatever the original, unparseable bytes actually
+    /// were — see <see cref="MalformedStatsJson"/>.
+    /// </summary>
+    public bool HasMalformedStats { get; internal set; }
+
+    /// <summary>
+    /// The original, unparseable <c>StatsJson</c> bytes this NPC was loaded with, when
+    /// <see cref="HasMalformedStats"/> is <c>true</c>; <c>null</c> otherwise. The mapper's write
+    /// path writes this back verbatim instead of re-serializing <see cref="Stats"/> (which is just
+    /// empty, not the NPC's real data) — round-tripping through an empty <see cref="Stats"/> would
+    /// permanently destroy whatever was there, turning a recoverable "this one row needs manual
+    /// attention" problem into unrecoverable data loss the moment the app so much as loads and
+    /// saves the campaign. Not a public setter: only the mapper that read the original bytes should
+    /// ever set this.
+    /// </summary>
+    public string? MalformedStatsJson { get; internal set; }
 
     private static string ValidateName(string value)
     {

@@ -132,10 +132,12 @@ public sealed class GmToolkitDatabase : IAsyncDisposable
     /// (and any <c>-journal</c>, <c>-wal</c>, or <c>-shm</c> sidecar files that exist alongside it)
     /// is renamed aside with a <c>.corrupt-{timestamp}</c> suffix (never deleted, in case the user
     /// wants to recover data from it later) and a fresh database is created and initialized at the
-    /// original path. If that second attempt also throws, the exception propagates — there's
-    /// nothing else reasonable to do without an error-display UI (a later milestone).
+    /// original path. If that second attempt also throws, the exception (always a
+    /// <see cref="DataAccessException"/>, per <see cref="DatabaseExceptionTranslator.ToFriendly"/>)
+    /// propagates -- see this method's remarks for what the caller is expected to do with it.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Any other failure -- e.g. the disk is full (<see cref="SQLite3.Result.Full"/>), the file is
     /// temporarily read-only (<see cref="SQLite3.Result.ReadOnly"/>), or another process/handle has
     /// it briefly locked (<see cref="SQLite3.Result.Busy"/>) -- is <b>not</b> treated as grounds to
@@ -143,8 +145,23 @@ public sealed class GmToolkitDatabase : IAsyncDisposable
     /// <c>CreateTableAsync</c> calls or its version-gated migration step. The existing file might be
     /// perfectly healthy; deleting/relocating it on a guess would destroy a GM's campaign over what
     /// may just be a full disk or a lock held for a moment too long. Instead it's translated to a
-    /// friendly <see cref="DataAccessException"/> and thrown, leaving the file exactly as it was —
-    /// the app (or its caller) can retry on next launch once the transient condition clears.
+    /// friendly <see cref="DataAccessException"/> and thrown, leaving the file exactly as it was.
+    /// </para>
+    /// <para>
+    /// <b>The caller is expected to catch <see cref="DataAccessException"/> and display
+    /// <see cref="Exception.Message"/> to the user, not let it propagate as an unhandled
+    /// exception.</b> Both heads' composition roots (<c>GmToolkit.Desktop/Program.cs</c> and
+    /// <c>GmToolkit.Android/Application.cs</c>) call this before any window/view exists, so there is
+    /// no view model or DI container yet to route the error through the app's normal
+    /// error-display paths (<c>INotificationService</c> toasts, inline <c>SaveError</c> text, etc.)
+    /// -- both catch this specific exception and set <c>GmToolkit.UI.App.StartupError</c> (see that
+    /// property's remarks), which makes Avalonia's normal startup path show a dedicated friendly
+    /// screen carrying the message instead of the usual splash/shell. There is nothing to
+    /// automatically retry in-process: the failure is an external, transient condition (free disk
+    /// space, restore write access, close another copy holding the lock, etc.), so the screen's
+    /// only action today is to close, and the user relaunches once the condition is cleared --
+    /// tracked as a follow-up in issue #123 (retry-in-place instead of a full relaunch).
+    /// </para>
     /// </remarks>
     public static async Task<GmToolkitDatabase> CreateAndInitializeAsync(string databasePath)
     {

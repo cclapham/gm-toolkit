@@ -121,6 +121,27 @@ public class NpcRepositoryTests : IAsyncLifetime
         Assert.Equal("Revealed to the party", fetched.Secret);
     }
 
+    /// <summary>
+    /// Stats round-trip through <c>UpdateAsync</c>, not just <c>AddAsync</c> -- sqlite-net-pcl's
+    /// update path is a different SQL statement (an <c>UPDATE</c>, not an <c>INSERT</c>) from add,
+    /// and the real GM flow for an existing NPC's stats (open an already-saved NPC, add/change a
+    /// stat, save) always goes through this path, not add.
+    /// </summary>
+    [Fact]
+    public async Task Update_changes_NpcStats()
+    {
+        var npc = new Npc { CampaignId = Guid.NewGuid(), Name = "The Pale Fisherman" };
+        await _repository.AddAsync(npc);
+
+        npc.Stats["HP"] = "45";
+        npc.Stats["AC"] = "14";
+        await _repository.UpdateAsync(npc);
+
+        var fetched = await _repository.GetAsync(npc.Id);
+        Assert.NotNull(fetched);
+        Assert.Equal(npc.Stats, fetched.Stats);
+    }
+
     [Fact]
     public async Task Delete_removes_the_npc()
     {
@@ -151,6 +172,38 @@ public class NpcRepositoryTests : IAsyncLifetime
         var fetched = await _repository.GetAsync(npc.Id);
         Assert.NotNull(fetched);
         Assert.Empty(fetched.Stats);
+    }
+
+    /// <summary>
+    /// A row with malformed <c>StatsJson</c> must not have that malformed data permanently
+    /// destroyed the moment the app happens to load and save it again -- e.g. a GM opening the
+    /// campaign, glancing at (but not touching) this NPC's other fields, and saving. Before this
+    /// fix, <c>Npc.Stats</c> came back empty on read (correctly, so the read itself doesn't fail —
+    /// see the sibling test above) but the write path unconditionally re-serialized that same
+    /// empty <c>Stats</c> right back over the original bytes on the very next save, silently
+    /// turning a recoverable "one row needs manual attention" problem into permanent data loss.
+    /// </summary>
+    [Fact]
+    public async Task Update_of_an_npc_with_malformed_StatsJson_preserves_the_original_bytes_unchanged()
+    {
+        var npc = new Npc { CampaignId = Guid.NewGuid(), Name = "Old Marta", Role = "Innkeeper" };
+        await _repository.AddAsync(npc);
+        const string malformedStatsJson = "{not valid json";
+        await _database.Connection.ExecuteAsync(
+            "UPDATE Npcs SET StatsJson = ? WHERE Id = ?", malformedStatsJson, npc.Id);
+
+        var fetched = await _repository.GetAsync(npc.Id);
+        Assert.NotNull(fetched);
+        Assert.True(fetched.HasMalformedStats);
+        Assert.Empty(fetched.Stats);
+
+        // Save it back completely unmodified -- e.g. the GM merely opened and re-saved this NPC's
+        // other fields, never touching its stats at all.
+        await _repository.UpdateAsync(fetched);
+
+        var rawStatsJsonAfterSave = await _database.Connection.ExecuteScalarAsync<string>(
+            "SELECT StatsJson FROM Npcs WHERE Id = ?", npc.Id);
+        Assert.Equal(malformedStatsJson, rawStatsJsonAfterSave);
     }
 
     /// <summary>

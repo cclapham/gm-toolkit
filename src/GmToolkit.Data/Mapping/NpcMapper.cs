@@ -19,24 +19,31 @@ namespace GmToolkit.Data.Mapping;
 /// </remarks>
 internal static class NpcMapper
 {
-    public static Npc ToModel(NpcRow row) => new()
+    public static Npc ToModel(NpcRow row)
     {
-        Id = row.Id,
-        CampaignId = row.CampaignId,
-        Name = row.Name,
-        Role = row.Role,
-        Faction = row.Faction,
-        Location = row.Location,
-        Appearance = row.Appearance,
-        Mannerism = row.Mannerism,
-        Motivation = row.Motivation,
-        Secret = row.Secret,
-        Notes = row.Notes,
-        KnownToPlayers = row.KnownToPlayers,
-        CreatedUtc = row.CreatedUtc,
-        WasGenerated = row.WasGenerated,
-        Stats = DeserializeStats(row.Id, row.Name, row.StatsJson),
-    };
+        var (stats, malformedStatsJson) = DeserializeStats(row.Id, row.Name, row.StatsJson);
+
+        return new()
+        {
+            Id = row.Id,
+            CampaignId = row.CampaignId,
+            Name = row.Name,
+            Role = row.Role,
+            Faction = row.Faction,
+            Location = row.Location,
+            Appearance = row.Appearance,
+            Mannerism = row.Mannerism,
+            Motivation = row.Motivation,
+            Secret = row.Secret,
+            Notes = row.Notes,
+            KnownToPlayers = row.KnownToPlayers,
+            CreatedUtc = row.CreatedUtc,
+            WasGenerated = row.WasGenerated,
+            Stats = stats,
+            HasMalformedStats = malformedStatsJson is not null,
+            MalformedStatsJson = malformedStatsJson,
+        };
+    }
 
     public static NpcRow ToRow(Npc model) => new()
     {
@@ -54,7 +61,11 @@ internal static class NpcMapper
         KnownToPlayers = model.KnownToPlayers,
         CreatedUtc = model.CreatedUtc,
         WasGenerated = model.WasGenerated,
-        StatsJson = JsonSerializer.Serialize(model.Stats),
+        // HasMalformedStats means Stats is just an empty placeholder (see that property's
+        // remarks), not this NPC's real data -- serializing it would permanently overwrite the
+        // original, still-possibly-recoverable bytes the moment this NPC is next saved, even if
+        // nothing about its stats was ever touched. Write the original bytes back verbatim instead.
+        StatsJson = model.HasMalformedStats ? model.MalformedStatsJson! : JsonSerializer.Serialize(model.Stats),
     };
 
     /// <summary>
@@ -67,28 +78,35 @@ internal static class NpcMapper
     /// <see cref="JsonException"/> up through <see cref="ToModel"/> and poisoning the whole
     /// campaign's NPC list.
     /// </summary>
-    private static Dictionary<string, string> DeserializeStats(Guid npcId, string npcName, string? statsJson)
+    /// <returns>
+    /// The parsed stats (empty on failure) and, on failure, the original malformed JSON text so
+    /// <see cref="ToRow"/> can write it back unchanged instead of destroying it -- <c>null</c> on
+    /// success, since there is nothing to preserve.
+    /// </returns>
+    private static (Dictionary<string, string> Stats, string? MalformedStatsJson) DeserializeStats(
+        Guid npcId, string npcName, string? statsJson)
     {
         if (string.IsNullOrEmpty(statsJson))
         {
-            return [];
+            return ([], null);
         }
 
         try
         {
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(statsJson) ?? [];
+            return (JsonSerializer.Deserialize<Dictionary<string, string>>(statsJson) ?? [], null);
         }
         catch (JsonException ex)
         {
-            LogMalformedStats(npcId, npcName, ex);
-            return [];
+            LogMalformedStats(npcId, npcName, statsJson, ex);
+            return ([], statsJson);
         }
     }
 
-    private static void LogMalformedStats(Guid npcId, string npcName, JsonException ex)
+    private static void LogMalformedStats(Guid npcId, string npcName, string originalStatsJson, JsonException ex)
     {
         Trace.WriteLine(
             $"NpcMapper: Npc '{npcName}' ({npcId}) has malformed StatsJson and was loaded with " +
-            $"empty stats instead. Original error: {ex.Message}");
+            $"empty stats instead. Original error: {ex.Message}. Original StatsJson (preserved " +
+            $"verbatim on next save): {originalStatsJson}");
     }
 }

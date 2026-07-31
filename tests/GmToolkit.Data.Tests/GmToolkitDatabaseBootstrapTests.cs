@@ -71,6 +71,68 @@ public class GmToolkitDatabaseBootstrapTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Reaches <see cref="GmToolkitDatabase.CreateAndInitializeAsync"/>'s sidecar move-aside loop
+    /// with a genuinely stale sidecar still present next to a corrupt main file -- the one scenario
+    /// the loop exists for, and the one the <c>chmod 000</c> variant of this test used to exercise
+    /// before <see cref="SQLite.SQLite3.Result.CannotOpen"/> was reclassified as non-corruption
+    /// (see the sibling <see cref="Entirely_inaccessible_main_file_is_left_untouched_and_surfaces_a_friendly_error"/>
+    /// test).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Uses a stale <c>-shm</c> sidecar on its own (no accompanying <c>-journal</c>/<c>-wal</c>),
+    /// not any of the other two suffixes -- confirmed empirically (a throwaway console app driving
+    /// this exact code path) while writing this test that the other two never actually reach the
+    /// loop: a stale <c>-journal</c> sibling is already deleted by SQLite's own open() as a side
+    /// effect of attempting (and failing) to open a corrupt (<c>NOTADB</c>) main file, before this
+    /// method's <c>catch</c> block even runs; a stale <c>-wal</c> sibling survives that failed
+    /// open, but is then deleted as a side effect of this method's own
+    /// <c>await database.DisposeAsync()</c> a few lines into that same <c>catch</c> block (SQLite's
+    /// <c>sqlite3_close</c> cleans up a connection's WAL file on close, even for a connection whose
+    /// open never actually succeeded) -- in both cases, by the time the sidecar loop runs, the file
+    /// is already gone and the loop's <c>File.Exists</c> check is <c>false</c>.
+    /// </para>
+    /// <para>
+    /// A stale <c>-shm</c> sidecar with no accompanying <c>-wal</c>, however, survives both of
+    /// those -- SQLite's WAL-related cleanup on a failed open/close only kicks in when it also sees
+    /// a <c>-wal</c> file for the same connection, so an orphaned <c>-shm</c> with nothing else next
+    /// to it is genuinely still sitting there when the loop runs. This is an admittedly narrow
+    /// window (some prior process would have to have died leaving only a <c>-shm</c> behind, not
+    /// the more common <c>-wal</c>+<c>-shm</c> pair), but it's a real one, not a hypothetical --
+    /// hence this test rather than deleting the loop as dead code.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Corrupt_file_with_a_stale_shm_sidecar_moves_both_aside()
+    {
+        var dbPath = Path.Combine(_rootDirectory, "gmtoolkit.db");
+        var garbage = "this is not a valid sqlite file"u8.ToArray();
+        await File.WriteAllBytesAsync(dbPath, garbage);
+
+        var shmPath = $"{dbPath}-shm";
+        var shmBytes = "stale shm"u8.ToArray();
+        await File.WriteAllBytesAsync(shmPath, shmBytes);
+
+        await using var database = await GmToolkitDatabase.CreateAndInitializeAsync(dbPath);
+
+        // The resulting database is usable: schema exists and we can round-trip a row.
+        var version = await database.Connection.ExecuteScalarAsync<int>("PRAGMA user_version");
+        Assert.Equal(GmToolkitDatabase.SchemaVersion, version);
+
+        // The main corrupt file was moved aside, same as the sidecar-free case above.
+        var corruptMainFiles = Directory.GetFiles(_rootDirectory, "gmtoolkit.db.corrupt-*");
+        Assert.Single(corruptMainFiles);
+        var corruptSuffix = Path.GetFileName(corruptMainFiles[0])["gmtoolkit.db".Length..];
+
+        // The stale -shm sidecar was moved aside too, with the same corrupt-suffix/timestamp, not
+        // deleted and not left behind next to the fresh database.
+        var corruptShmPath = $"{shmPath}{corruptSuffix}";
+        Assert.True(File.Exists(corruptShmPath));
+        Assert.Equal(shmBytes, await File.ReadAllBytesAsync(corruptShmPath));
+        Assert.False(File.Exists(shmPath));
+    }
+
+    /// <summary>
     /// A main database file that's entirely inaccessible (e.g. every permission bit revoked) fails
     /// with <see cref="SQLite.SQLite3.Result.CannotOpen"/> -- a result <see
     /// cref="DatabaseExceptionTranslator.IsCorruption"/> deliberately does <b>not</b> classify as

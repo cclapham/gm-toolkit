@@ -33,15 +33,23 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
     {
         var campaignId = Guid.NewGuid();
         var npcId = Guid.NewGuid();
+        var playerCharacterId = Guid.NewGuid();
 
         // Build a schema-v1 database by hand: the old row shapes, with PRAGMA user_version left
         // at 1 (i.e. exactly what a v0.1.0 install would have on disk today), and no
-        // CharacterSystemId/StatsJson columns at all.
+        // CharacterSystemId/StatsJson columns on Campaigns/Npcs at all. PlayerCharacters is the
+        // one table this migration doesn't touch -- it already had StatsJson before #88 (see
+        // PlayerCharacterRow's single commit, #46) -- so the real production row type is used for
+        // it here rather than a V1-prefixed one, to make sure a PC with pre-existing populated
+        // stats (the one table/column pair this migration's mapper changes actually touched --
+        // see PlayerCharacterMapper's malformed-JSON tolerance) survives the v1->v2 upgrade
+        // untouched, not just Campaigns/Npcs' genuinely new columns.
         var v1Connection = new SQLiteAsyncConnection(_dbPath);
         try
         {
             await v1Connection.CreateTableAsync<V1CampaignRow>();
             await v1Connection.CreateTableAsync<V1NpcRow>();
+            await v1Connection.CreateTableAsync<PlayerCharacterRow>();
 
             await v1Connection.InsertAsync(new V1CampaignRow
             {
@@ -62,6 +70,18 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
                 KnownToPlayers = true,
                 CreatedUtc = new DateTime(2024, 3, 2, 10, 0, 0, DateTimeKind.Utc),
                 WasGenerated = false,
+            });
+
+            await v1Connection.InsertAsync(new PlayerCharacterRow
+            {
+                Id = playerCharacterId,
+                CampaignId = campaignId,
+                CharacterName = "Brannigan Thistlewood",
+                PlayerName = "Alex",
+                Ancestry = "Half-Elf",
+                Class = "Ranger",
+                Level = 4,
+                StatsJson = """{"HP":"50","AC":"16"}""",
             });
 
             await v1Connection.ExecuteAsync("PRAGMA user_version = 1");
@@ -107,6 +127,7 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
         // Pre-existing data is intact through the real repositories.
         var campaignRepository = new CampaignRepository(database);
         var npcRepository = new NpcRepository(database);
+        var playerCharacterRepository = new PlayerCharacterRepository(database);
 
         var fetchedCampaign = await campaignRepository.GetAsync(campaignId);
         Assert.NotNull(fetchedCampaign);
@@ -128,6 +149,17 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
         var rawStatsJson = await database.Connection.ExecuteScalarAsync<string>(
             "SELECT StatsJson FROM Npcs WHERE Id = ?", npcId);
         Assert.Equal("{}", rawStatsJson);
+
+        // PlayerCharacters' pre-existing StatsJson (not touched by this migration -- see the
+        // fixture setup's remarks above) survives the migration intact, through the same
+        // PlayerCharacterMapper this PR changed to add malformed-JSON tolerance.
+        var fetchedPlayerCharacter = await playerCharacterRepository.GetAsync(playerCharacterId);
+        Assert.NotNull(fetchedPlayerCharacter);
+        Assert.Equal("Brannigan Thistlewood", fetchedPlayerCharacter.CharacterName);
+        Assert.Equal("Alex", fetchedPlayerCharacter.PlayerName);
+        Assert.Equal(
+            new Dictionary<string, string> { ["HP"] = "50", ["AC"] = "16" },
+            fetchedPlayerCharacter.Stats);
     }
 
     /// <summary>

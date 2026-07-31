@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="using:GmToolkit.UI.Controls"
+        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="360"
+        x:Class="GmToolkit.UI.Views.StartupErrorWindow"
+        x:Name="Root"
+        Title="GM Toolkit"
+        Width="480" Height="360"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/AppIcon.ico">
+
+    <!-- Shown instead of the normal shell when the composition root (GmToolkit.Desktop/Program.cs)
+         couldn't bootstrap the database at startup; see App.StartupError's remarks for why this
+         has to be a whole separate window rather than routed through the normal
+         DI/ShellViewModel-based flow (there is no DI container in that failure case). Reuses
+         EmptyState (already used for every "nothing here yet" screen) rather than a bespoke
+         layout, so this looks like part of the same app instead of a jarring native message box. -->
+    <Border Padding="32" Background="{DynamicResource SurfaceBrush}">
+        <controls:EmptyState Icon="⚠️"
+                              Title="GM Toolkit couldn't start"
+                              Message="{Binding #Root.Message}"
+                              ActionText="Close"
+                              ActionCommand="{Binding #Root.CloseCommand}"
+                              VerticalAlignment="Center" />
+    </Border>
+</Window>
