@@ -259,7 +259,7 @@
       "type": "number",
       "helpText": "The rank-to-bonus lookup for Class DC Proficiency above: Untrained +0, Trained = Level + 2, Expert = Level + 4, Master = Level + 6, Legendary = Level + 8. Enter the value matching classDcProficiencyRank -- the adjustment-field idiom (SYSTEMS.md) sidesteps branching on which rank applies.",
       "min": 0,
-      "max": 20,
+      "max": 28,
       "precision": 0,
       "default": 2
     },
@@ -284,7 +284,7 @@
       "type": "number",
       "helpText": "The rank-to-bonus lookup for Weapon Proficiency above, same scale as Class DC Proficiency Bonus (Untrained +0, Trained = Level + 2, Expert = Level + 4, Master = Level + 6, Legendary = Level + 8).",
       "min": 0,
-      "max": 20,
+      "max": 28,
       "precision": 0,
       "default": 2
     },
