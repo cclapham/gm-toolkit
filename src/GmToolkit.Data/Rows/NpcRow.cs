@@ -27,4 +27,11 @@ public class NpcRow
     public bool KnownToPlayers { get; set; }
     public DateTime CreatedUtc { get; set; }
     public bool WasGenerated { get; set; }
+
+    /// <summary>
+    /// JSON-serialized Dictionary&lt;string, string&gt; — matches
+    /// <see cref="PlayerCharacterRow.StatsJson"/>'s pattern. Serialization lives in the repository
+    /// (#11). Added in schema v2 (#88).
+    /// </summary>
+    public string StatsJson { get; set; } = "{}";
 }

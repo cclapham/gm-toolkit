@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using GmToolkit.Core.Models;
 using GmToolkit.Data.Rows;
 
@@ -21,6 +23,7 @@ internal static class NpcMapper
         KnownToPlayers = row.KnownToPlayers,
         CreatedUtc = row.CreatedUtc,
         WasGenerated = row.WasGenerated,
+        Stats = DeserializeStats(row.StatsJson),
     };
 
     public static NpcRow ToRow(Npc model) => new()
@@ -39,5 +42,16 @@ internal static class NpcMapper
         KnownToPlayers = model.KnownToPlayers,
         CreatedUtc = model.CreatedUtc,
         WasGenerated = model.WasGenerated,
+        StatsJson = JsonSerializer.Serialize(model.Stats),
     };
+
+    private static Dictionary<string, string> DeserializeStats(string? statsJson)
+    {
+        if (string.IsNullOrEmpty(statsJson))
+        {
+            return [];
+        }
+
+        return JsonSerializer.Deserialize<Dictionary<string, string>>(statsJson) ?? [];
+    }
 }

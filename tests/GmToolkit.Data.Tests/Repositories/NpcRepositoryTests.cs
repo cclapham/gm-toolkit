@@ -57,6 +57,40 @@ public class NpcRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Add_then_get_round_trips_stats()
+    {
+        var npc = new Npc
+        {
+            CampaignId = Guid.NewGuid(),
+            Name = "The Pale Fisherman",
+            Stats = new Dictionary<string, string>
+            {
+                ["HP"] = "45",
+                ["AC"] = "14",
+                ["Special"] = "Never quite dries",
+            },
+        };
+
+        await _repository.AddAsync(npc);
+        var fetched = await _repository.GetAsync(npc.Id);
+
+        Assert.NotNull(fetched);
+        Assert.Equal(npc.Stats, fetched.Stats);
+    }
+
+    [Fact]
+    public async Task Add_then_get_with_no_stats_returns_an_empty_dictionary()
+    {
+        var npc = new Npc { CampaignId = Guid.NewGuid(), Name = "Old Marta" };
+
+        await _repository.AddAsync(npc);
+        var fetched = await _repository.GetAsync(npc.Id);
+
+        Assert.NotNull(fetched);
+        Assert.Empty(fetched.Stats);
+    }
+
+    [Fact]
     public async Task GetByCampaign_returns_only_that_campaigns_npcs()
     {
         var campaignId = Guid.NewGuid();

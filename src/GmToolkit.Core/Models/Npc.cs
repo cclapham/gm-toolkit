@@ -33,6 +33,14 @@ public class Npc
     /// </summary>
     public bool WasGenerated { get; set; }
 
+    /// <summary>
+    /// System-agnostic key/value bag, matching <see cref="PlayerCharacter.Stats"/>'s pattern —
+    /// the GM (or an attached <see cref="Campaign.CharacterSystemId"/> schema) defines the keys.
+    /// Empty for NPCs with no stat block at all, which is the common case for minor/incidental
+    /// NPCs.
+    /// </summary>
+    public Dictionary<string, string> Stats { get; init; } = [];
+
     private static string ValidateName(string value)
     {
         if (string.IsNullOrWhiteSpace(value))

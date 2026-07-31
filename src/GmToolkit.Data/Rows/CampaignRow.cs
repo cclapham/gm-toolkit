@@ -17,6 +17,13 @@ public class CampaignRow
     public string Name { get; set; } = string.Empty;
 
     public string GameSystem { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Nullable — a campaign with no <see cref="Core.Systems.CharacterSystem"/> attached keeps
+    /// today's fully freeform behavior. Added in schema v2 (#88).
+    /// </summary>
+    public string? CharacterSystemId { get; set; }
+
     public string Description { get; set; } = string.Empty;
     public DateTime CreatedUtc { get; set; }
     public DateTime LastOpenedUtc { get; set; }

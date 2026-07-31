@@ -25,10 +25,19 @@ public sealed class GmToolkitDatabase : IAsyncDisposable
     /// Bumped whenever the schema changes, tracked via SQLite's built-in <c>PRAGMA
     /// user_version</c> — sqlite-net-pcl has no migrations tooling of its own. A future schema
     /// change should bump this and add an <c>if (currentVersion &lt; N)</c> step in
-    /// <see cref="InitializeAsync"/> to bring existing databases forward. Nothing to do yet;
-    /// this is the first version.
+    /// <see cref="InitializeAsync"/> to bring existing databases forward.
     /// </summary>
-    public const int SchemaVersion = 1;
+    /// <remarks>
+    /// v2 (#88): added <c>CampaignRow.CharacterSystemId</c> and <c>NpcRow.StatsJson</c>. Both are
+    /// new nullable/defaulted columns, so <see cref="InitializeAsync"/>'s unconditional
+    /// <c>CreateTableAsync</c> calls already add them to an existing table on their own
+    /// (sqlite-net-pcl's <c>CreateTable</c> diffs the existing schema and runs
+    /// <c>ALTER TABLE ... ADD COLUMN</c> for anything missing) — the version-gated step below only
+    /// needs to backfill existing <c>Npcs</c> rows' brand-new <c>StatsJson</c> column, which
+    /// <c>ALTER TABLE ADD COLUMN</c> leaves as SQL <c>NULL</c>, to the same <c>"{}"</c> empty-but-
+    /// valid-JSON default a freshly-inserted row gets.
+    /// </remarks>
+    public const int SchemaVersion = 2;
 
     public SQLiteAsyncConnection Connection { get; }
 
@@ -54,6 +63,17 @@ public sealed class GmToolkitDatabase : IAsyncDisposable
         await Connection.CreateTableAsync<NpcRow>();
 
         var currentVersion = await Connection.ExecuteScalarAsync<int>("PRAGMA user_version");
+
+        if (currentVersion < 2)
+        {
+            // v1 -> v2 (#88): the CreateTableAsync calls above already added the new
+            // Npcs.StatsJson column (via ALTER TABLE ADD COLUMN) to a pre-existing database, but
+            // that leaves it SQL NULL on every pre-existing row. Backfill to "{}" so every Npc row
+            // holds valid JSON, matching the default a newly-inserted row gets, rather than relying
+            // on NpcMapper's null-tolerant read path to paper over it forever.
+            await Connection.ExecuteAsync("UPDATE Npcs SET StatsJson = '{}' WHERE StatsJson IS NULL");
+        }
+
         if (currentVersion < SchemaVersion)
         {
             await Connection.ExecuteAsync($"PRAGMA user_version = {SchemaVersion}");

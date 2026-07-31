@@ -47,6 +47,34 @@ public class CampaignRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Add_then_get_round_trips_character_system_id()
+    {
+        var campaign = new Campaign
+        {
+            Name = "Wandering Souls",
+            CharacterSystemId = "dnd5e-2024",
+        };
+
+        await _repository.AddAsync(campaign);
+        var fetched = await _repository.GetAsync(campaign.Id);
+
+        Assert.NotNull(fetched);
+        Assert.Equal("dnd5e-2024", fetched.CharacterSystemId);
+    }
+
+    [Fact]
+    public async Task Add_then_get_with_no_character_system_attached_keeps_it_null()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+
+        await _repository.AddAsync(campaign);
+        var fetched = await _repository.GetAsync(campaign.Id);
+
+        Assert.NotNull(fetched);
+        Assert.Null(fetched.CharacterSystemId);
+    }
+
+    [Fact]
     public async Task Get_of_nonexistent_id_returns_null()
     {
         var fetched = await _repository.GetAsync(Guid.NewGuid());
