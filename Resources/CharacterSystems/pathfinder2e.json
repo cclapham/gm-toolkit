@@ -1,0 +1,686 @@
+{
+  "formatVersion": 1,
+  "id": "pathfinder2e",
+  "name": "Pathfinder 2e",
+  "version": "1.0.0",
+  "author": "GM Toolkit",
+  "description": "Pathfinder Second Edition: proficiency is a rank (Untrained/Trained/Expert/Master/Legendary), not a flat bonus; Perception is its own standalone stat rather than derived from Wisdom; Class DC, Hero Points, ancestry/heritage, and Bulk-based encumbrance are first-class concepts with no D&D 5e equivalent; and monster stat blocks use Resistances/Weaknesses (each carrying its own numeric value per damage type) plus a separate flat Immunities list, not 5e's resistances/immunities/vulnerabilities trio.",
+  "pcFields": [
+    {
+      "key": "ancestry",
+      "label": "Ancestry",
+      "type": "text",
+      "helpText": "e.g. Human, Elf, Dwarf, Goblin. Distinct from Heritage below -- Ancestry grants Hit Points, a Speed, and boosts/flaws; Heritage refines it further.",
+      "maxLength": 50
+    },
+    {
+      "key": "heritage",
+      "label": "Heritage",
+      "type": "text",
+      "helpText": "The character's heritage within their ancestry (e.g. Skilled Heritage, Rock Dwarf, Unbreakable Goblin). A PF2e-only concept layered on top of Ancestry; 5e has no equivalent.",
+      "maxLength": 50
+    },
+    {
+      "key": "background",
+      "label": "Background",
+      "type": "text",
+      "helpText": "Grants a skill feat and two ability boosts (one of which is free) at character creation.",
+      "maxLength": 100
+    },
+    {
+      "key": "characterClass",
+      "label": "Class",
+      "type": "text",
+      "maxLength": 50
+    },
+    {
+      "key": "level",
+      "label": "Level",
+      "type": "number",
+      "helpText": "Character level (1-20).",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 1
+    },
+    {
+      "key": "strength",
+      "label": "Strength",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "dexterity",
+      "label": "Dexterity",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "constitution",
+      "label": "Constitution",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "intelligence",
+      "label": "Intelligence",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "wisdom",
+      "label": "Wisdom",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "charisma",
+      "label": "Charisma",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "strMod",
+      "label": "Strength Modifier",
+      "type": "derived",
+      "formula": "(strength - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "dexMod",
+      "label": "Dexterity Modifier",
+      "type": "derived",
+      "formula": "(dexterity - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "conMod",
+      "label": "Constitution Modifier",
+      "type": "derived",
+      "formula": "(constitution - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "intMod",
+      "label": "Intelligence Modifier",
+      "type": "derived",
+      "formula": "(intelligence - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "wisMod",
+      "label": "Wisdom Modifier",
+      "type": "derived",
+      "formula": "(wisdom - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "chaMod",
+      "label": "Charisma Modifier",
+      "type": "derived",
+      "formula": "(charisma - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "heroPoints",
+      "label": "Hero Points",
+      "type": "number",
+      "helpText": "Every PC starts a session with 1 Hero Point (normally capped at 3); spend one to reroll a check or to stay alive at 0 HP instead of rolling for death. A few rare class features raise the usual cap, hence the wider range below.",
+      "min": 0,
+      "max": 10,
+      "precision": 0,
+      "default": 1
+    },
+    {
+      "key": "armorClass",
+      "label": "Armor Class (AC)",
+      "type": "number",
+      "min": 1,
+      "max": 60,
+      "precision": 0
+    },
+    {
+      "key": "armorProficiencyRank",
+      "label": "Armor Proficiency",
+      "type": "enum",
+      "helpText": "Proficiency rank in the armor category currently worn (Unarmored, Light, Medium, or Heavy) -- reference only; Armor Class above is entered directly, since AC also folds in the armor's own item bonus and a Dexterity cap that this grammar can't express as arithmetic alone.",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "hitPoints",
+      "label": "Hit Points (HP)",
+      "type": "number",
+      "min": 0,
+      "max": 999,
+      "precision": 0
+    },
+    {
+      "key": "perceptionProficiencyRank",
+      "label": "Perception Proficiency",
+      "type": "enum",
+      "helpText": "Reference only, shown next to Perception below -- see the Perception field's own helpText for why it's entered directly rather than derived from this rank.",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "perception",
+      "label": "Perception",
+      "type": "number",
+      "helpText": "Unlike 5e's Passive Perception (10 + Wisdom modifier + proficiency), PF2e's Perception is its own standalone stat used for both initiative and Perception checks, and what a rank actually adds is Level + a rank-dependent bonus (Trained = level + 2, Expert = level + 4, Master = level + 6, Legendary = level + 8) rather than a fixed passive number -- entered directly here, same as a GURPS skill level or a 5e proficiency-gated bonus (SYSTEMS.md's 'Scope resolution': a formula can never branch on which rank applies).",
+      "min": -5,
+      "max": 40,
+      "precision": 0
+    },
+    {
+      "key": "fortitudeProficiencyRank",
+      "label": "Fortitude Proficiency",
+      "type": "enum",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "fortitudeSave",
+      "label": "Fortitude Save",
+      "type": "number",
+      "min": -5,
+      "max": 40,
+      "precision": 0
+    },
+    {
+      "key": "reflexProficiencyRank",
+      "label": "Reflex Proficiency",
+      "type": "enum",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "reflexSave",
+      "label": "Reflex Save",
+      "type": "number",
+      "min": -5,
+      "max": 40,
+      "precision": 0
+    },
+    {
+      "key": "willProficiencyRank",
+      "label": "Will Proficiency",
+      "type": "enum",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "willSave",
+      "label": "Will Save",
+      "type": "number",
+      "min": -5,
+      "max": 40,
+      "precision": 0
+    },
+    {
+      "key": "classDcProficiencyRank",
+      "label": "Class DC Proficiency",
+      "type": "enum",
+      "helpText": "PF2e-only concept: the DC other creatures must meet to resist many of this class's own abilities. No 5e equivalent (5e uses each individual spell/ability's own save DC formula instead of one shared class-wide DC).",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "classDcKeyAbilityModifier",
+      "label": "Class DC Key Ability Modifier",
+      "type": "number",
+      "helpText": "Copy whichever of the six ability modifiers above is this class's key ability (e.g. Strength for a Fighter, Intelligence for a Wizard). Which ability governs Class DC varies per class -- exactly the 'varies by field value' dispatch a derived formula can't express (SYSTEMS.md's GURPS/D&D lesson) -- so it's copied here as a plain operand rather than selected dynamically.",
+      "min": -5,
+      "max": 10,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "classDcProficiencyBonus",
+      "label": "Class DC Proficiency Bonus",
+      "type": "number",
+      "helpText": "The rank-to-bonus lookup for Class DC Proficiency above: Untrained +0, Trained = Level + 2, Expert = Level + 4, Master = Level + 6, Legendary = Level + 8. Enter the value matching classDcProficiencyRank -- the adjustment-field idiom (SYSTEMS.md) sidesteps branching on which rank applies.",
+      "min": 0,
+      "max": 28,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "classDc",
+      "label": "Class DC",
+      "type": "derived",
+      "helpText": "10 + key ability modifier + proficiency bonus -- PF2e's proficiency-rank system expressed as an ordinary derived formula once the rank-to-bonus lookup lives in classDcProficiencyBonus, per the adjustment-field idiom.",
+      "formula": "10 + classDcKeyAbilityModifier + classDcProficiencyBonus",
+      "precision": 0
+    },
+    {
+      "key": "weaponProficiencyRank",
+      "label": "Weapon Proficiency (current weapon category)",
+      "type": "enum",
+      "helpText": "Proficiency rank in whichever weapon category (Unarmed, Simple, Martial, Advanced) is most relevant right now -- reference only; each Strike's own Attack Bonus in the Strikes list below is entered directly, since a Strike's governing ability (Strength vs. finesse Dexterity) and item bonuses vary per weapon.",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "weaponProficiencyBonus",
+      "label": "Weapon Proficiency Bonus",
+      "type": "number",
+      "helpText": "The rank-to-bonus lookup for Weapon Proficiency above, same scale as Class DC Proficiency Bonus (Untrained +0, Trained = Level + 2, Expert = Level + 4, Master = Level + 6, Legendary = Level + 8).",
+      "min": 0,
+      "max": 28,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "strikeAttackBonus",
+      "label": "Strike Attack Bonus (Strength-based)",
+      "type": "derived",
+      "helpText": "Strength modifier + Weapon Proficiency Bonus -- a quick-reference attack bonus for a typical Strength-based melee Strike, computed from an ability modifier plus the proficiency-rank bonus above (PF2e's actual attack math: ability modifier + rank-to-bonus + level, folded into weaponProficiencyBonus). A Dexterity-based (finesse or ranged) Strike, or one carrying its own item bonus, should use its own entry in the Strikes list below instead, where the final Attack Bonus is entered directly.",
+      "formula": "strMod + weaponProficiencyBonus",
+      "precision": 0
+    },
+    {
+      "key": "bulkCarried",
+      "label": "Bulk Carried",
+      "type": "number",
+      "helpText": "Total Bulk of everything currently carried. PF2e tracks Bulk in whole numbers plus light (negligible) items; enter light Bulk as tenths (e.g. 0.1 per light item) if you want to track it precisely.",
+      "min": 0,
+      "max": 100,
+      "precision": 1,
+      "default": 0
+    },
+    {
+      "key": "encumberedThreshold",
+      "label": "Encumbered At",
+      "type": "derived",
+      "helpText": "5 + Strength modifier -- carrying more Bulk than this makes the character encumbered (clumsy, reduced Speed). PF2e's actual encumbrance formula.",
+      "formula": "5 + strMod",
+      "precision": 0
+    },
+    {
+      "key": "maximumBulk",
+      "label": "Maximum Bulk",
+      "type": "derived",
+      "helpText": "10 + Strength modifier -- the character cannot carry more Bulk than this at all. PF2e's actual maximum-Bulk formula.",
+      "formula": "10 + strMod",
+      "precision": 0
+    },
+    {
+      "key": "speed",
+      "label": "Speed",
+      "type": "text",
+      "helpText": "Movement speed(s), e.g. '25 feet' or '25 feet, climb 15 feet'.",
+      "maxLength": 100
+    },
+    {
+      "key": "senses",
+      "label": "Senses",
+      "type": "text",
+      "helpText": "Special senses (low-light vision, darkvision, scent, etc.)",
+      "maxLength": 200
+    },
+    {
+      "key": "languages",
+      "label": "Languages",
+      "type": "text",
+      "helpText": "Comma-separated list.",
+      "maxLength": 200
+    },
+    {
+      "key": "skills",
+      "label": "Skills",
+      "type": "repeating-group",
+      "helpText": "The seventeen PF2e skills, each with its own proficiency rank. Lore is repeatable per topic (e.g. 'Academia Lore', 'Sailing Lore') -- use loreTopic to record which.",
+      "itemFields": [
+        {
+          "key": "skillName",
+          "label": "Skill",
+          "type": "enum",
+          "options": ["Acrobatics", "Arcana", "Athletics", "Crafting", "Deception", "Diplomacy", "Intimidation", "Lore", "Medicine", "Nature", "Occultism", "Performance", "Religion", "Society", "Stealth", "Survival", "Thievery"]
+        },
+        {
+          "key": "loreTopic",
+          "label": "Lore Topic",
+          "type": "text",
+          "helpText": "Only relevant when Skill is 'Lore', e.g. 'Academia' or 'Sailing'.",
+          "maxLength": 50
+        },
+        {
+          "key": "proficiencyRank",
+          "label": "Proficiency Rank",
+          "type": "enum",
+          "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+        },
+        {
+          "key": "bonus",
+          "label": "Total Bonus",
+          "type": "number",
+          "min": -5,
+          "max": 40,
+          "precision": 0
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 25
+    },
+    {
+      "key": "strikes",
+      "label": "Strikes",
+      "type": "repeating-group",
+      "helpText": "Melee and ranged weapon (and unarmed) Strikes. Attack Bonus and Damage are entered directly, same as 5e's Weapons list -- the governing ability and item bonuses vary per weapon.",
+      "itemFields": [
+        { "key": "name", "label": "Weapon", "type": "text", "maxLength": 100 },
+        { "key": "attackBonus", "label": "Attack Bonus", "type": "number", "min": -5, "max": 40, "precision": 0 },
+        {
+          "key": "proficiencyRank",
+          "label": "Proficiency Rank",
+          "type": "enum",
+          "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+        },
+        { "key": "damage", "label": "Damage", "type": "text", "maxLength": 100 },
+        { "key": "traits", "label": "Traits", "type": "text", "helpText": "e.g. Agile, Finesse, Reach, Versatile P", "maxLength": 200 }
+      ],
+      "minItems": 0,
+      "maxItems": 10
+    }
+  ],
+  "npcFields": [
+    {
+      "key": "level",
+      "label": "Level",
+      "type": "number",
+      "helpText": "PF2e's monster power equivalent to 5e's Challenge Rating, but on a scale directly comparable to PC level (a level-appropriate monster for a party of level N is roughly level N). Ranges from -1 (the weakest monsters) up through the mid-20s.",
+      "min": -1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "strengthModifier",
+      "label": "Strength Modifier",
+      "type": "number",
+      "helpText": "PF2e bestiary stat blocks print ability modifiers directly (e.g. 'Str +4'), never the underlying score -- unlike a PC sheet, there's no separate score field to derive this from.",
+      "min": -5,
+      "max": 15,
+      "precision": 0
+    },
+    {
+      "key": "dexterityModifier",
+      "label": "Dexterity Modifier",
+      "type": "number",
+      "min": -5,
+      "max": 15,
+      "precision": 0
+    },
+    {
+      "key": "constitutionModifier",
+      "label": "Constitution Modifier",
+      "type": "number",
+      "min": -5,
+      "max": 15,
+      "precision": 0
+    },
+    {
+      "key": "intelligenceModifier",
+      "label": "Intelligence Modifier",
+      "type": "number",
+      "min": -5,
+      "max": 15,
+      "precision": 0
+    },
+    {
+      "key": "wisdomModifier",
+      "label": "Wisdom Modifier",
+      "type": "number",
+      "min": -5,
+      "max": 15,
+      "precision": 0
+    },
+    {
+      "key": "charismaModifier",
+      "label": "Charisma Modifier",
+      "type": "number",
+      "min": -5,
+      "max": 15,
+      "precision": 0
+    },
+    {
+      "key": "armorClass",
+      "label": "Armor Class (AC)",
+      "type": "number",
+      "min": 1,
+      "max": 60,
+      "precision": 0
+    },
+    {
+      "key": "hitPoints",
+      "label": "Hit Points (HP)",
+      "type": "number",
+      "min": 1,
+      "max": 999,
+      "precision": 0
+    },
+    {
+      "key": "perceptionProficiencyRank",
+      "label": "Perception Proficiency",
+      "type": "enum",
+      "helpText": "Reference only -- Perception below is entered directly, same reasoning as the PC side (see pcFields).",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "perception",
+      "label": "Perception",
+      "type": "number",
+      "min": -5,
+      "max": 60,
+      "precision": 0
+    },
+    {
+      "key": "fortitudeProficiencyRank",
+      "label": "Fortitude Proficiency",
+      "type": "enum",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "fortitudeSave",
+      "label": "Fortitude Save",
+      "type": "number",
+      "min": -5,
+      "max": 60,
+      "precision": 0
+    },
+    {
+      "key": "reflexProficiencyRank",
+      "label": "Reflex Proficiency",
+      "type": "enum",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "reflexSave",
+      "label": "Reflex Save",
+      "type": "number",
+      "min": -5,
+      "max": 60,
+      "precision": 0
+    },
+    {
+      "key": "willProficiencyRank",
+      "label": "Will Proficiency",
+      "type": "enum",
+      "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+    },
+    {
+      "key": "willSave",
+      "label": "Will Save",
+      "type": "number",
+      "min": -5,
+      "max": 60,
+      "precision": 0
+    },
+    {
+      "key": "skills",
+      "label": "Skills",
+      "type": "repeating-group",
+      "itemFields": [
+        {
+          "key": "skillName",
+          "label": "Skill",
+          "type": "enum",
+          "options": ["Acrobatics", "Arcana", "Athletics", "Crafting", "Deception", "Diplomacy", "Intimidation", "Lore", "Medicine", "Nature", "Occultism", "Performance", "Religion", "Society", "Stealth", "Survival", "Thievery"]
+        },
+        {
+          "key": "loreTopic",
+          "label": "Lore Topic",
+          "type": "text",
+          "maxLength": 50
+        },
+        {
+          "key": "proficiencyRank",
+          "label": "Proficiency Rank",
+          "type": "enum",
+          "options": ["Untrained", "Trained", "Expert", "Master", "Legendary"]
+        },
+        {
+          "key": "bonus",
+          "label": "Total Bonus",
+          "type": "number",
+          "min": -5,
+          "max": 60,
+          "precision": 0
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 25
+    },
+    {
+      "key": "immunities",
+      "label": "Immunities",
+      "type": "text",
+      "helpText": "Comma-separated list of damage types and/or conditions this creature is wholly immune to (e.g. 'poison, paralyzed, unconscious'). Unlike Resistances/Weaknesses below, an immunity has no numeric value -- it's a flat list, same shape as 5e's damage/condition immunities lines.",
+      "maxLength": 300
+    },
+    {
+      "key": "resistances",
+      "label": "Resistances",
+      "type": "repeating-group",
+      "helpText": "PF2e terminology: each Resistance names a damage type and reduces damage of that type by its own numeric value -- distinct from 5e's flat resistances/immunities/vulnerabilities lines, which carry no per-type value.",
+      "itemFields": [
+        {
+          "key": "damageType",
+          "label": "Damage Type",
+          "type": "enum",
+          "options": ["Acid", "All", "Area", "Bludgeoning", "Cold", "Electricity", "Fire", "Force", "Mental", "Negative", "Physical", "Piercing", "Poison", "Positive", "Precision", "Slashing", "Sonic", "Splash"]
+        },
+        {
+          "key": "value",
+          "label": "Value",
+          "type": "number",
+          "min": 1,
+          "max": 999,
+          "precision": 0
+        },
+        {
+          "key": "exceptions",
+          "label": "Exceptions",
+          "type": "text",
+          "helpText": "e.g. 'except silver' on a resistance to physical damage.",
+          "maxLength": 200
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 20
+    },
+    {
+      "key": "weaknesses",
+      "label": "Weaknesses",
+      "type": "repeating-group",
+      "helpText": "PF2e terminology for 5e's 'vulnerability': each Weakness names a damage type and increases damage taken of that type by its own numeric value.",
+      "itemFields": [
+        {
+          "key": "damageType",
+          "label": "Damage Type",
+          "type": "enum",
+          "options": ["Acid", "All", "Area", "Bludgeoning", "Cold", "Electricity", "Fire", "Force", "Mental", "Negative", "Physical", "Piercing", "Poison", "Positive", "Precision", "Slashing", "Sonic", "Splash"]
+        },
+        {
+          "key": "value",
+          "label": "Value",
+          "type": "number",
+          "min": 1,
+          "max": 999,
+          "precision": 0
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 20
+    },
+    {
+      "key": "speed",
+      "label": "Speed",
+      "type": "text",
+      "helpText": "Movement speeds, e.g. '25 feet, fly 50 feet'.",
+      "maxLength": 200
+    },
+    {
+      "key": "senses",
+      "label": "Senses",
+      "type": "text",
+      "helpText": "Special senses, e.g. 'darkvision, scent (imprecise) 30 feet'.",
+      "maxLength": 300
+    },
+    {
+      "key": "languages",
+      "label": "Languages",
+      "type": "text",
+      "helpText": "Comma-separated list, or 'Telepathy 100 feet', etc.",
+      "maxLength": 200
+    },
+    {
+      "key": "traits",
+      "label": "Traits",
+      "type": "repeating-group",
+      "helpText": "Special abilities that aren't actions the creature takes on its turn (auras, passive defenses, etc.).",
+      "itemFields": [
+        { "key": "name", "label": "Name", "type": "text", "maxLength": 100 },
+        { "key": "description", "label": "Description", "type": "free-text-block", "maxLength": 1000 }
+      ],
+      "minItems": 0,
+      "maxItems": 50
+    },
+    {
+      "key": "actions",
+      "label": "Actions",
+      "type": "repeating-group",
+      "helpText": "Everything the creature can do on (or off) its turn, including Reactions -- PF2e explicitly tracks Reactions as their own action-economy category (triggered off-turn, e.g. Attack of Opportunity), distinct from a Single/Two/Three-Action activity. Set actionType to 'Reaction' to record one.",
+      "itemFields": [
+        { "key": "name", "label": "Name", "type": "text", "maxLength": 100 },
+        {
+          "key": "actionType",
+          "label": "Action Type",
+          "type": "enum",
+          "options": ["Single Action", "Two Actions", "Three Actions", "Free Action", "Reaction"]
+        },
+        { "key": "traits", "label": "Traits", "type": "text", "helpText": "e.g. Attack, Concentrate, Manipulate", "maxLength": 200 },
+        { "key": "description", "label": "Description", "type": "free-text-block", "maxLength": 1000 }
+      ],
+      "minItems": 0,
+      "maxItems": 50
+    }
+  ]
+}
