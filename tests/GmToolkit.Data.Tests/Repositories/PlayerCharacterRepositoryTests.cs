@@ -101,4 +101,54 @@ public class PlayerCharacterRepositoryTests : IAsyncLifetime
 
         Assert.Null(await _repository.GetAsync(pc.Id));
     }
+
+    /// <summary>
+    /// A row with malformed <c>StatsJson</c> (e.g. hand-edited directly in the database file) must
+    /// not fail the read for that PC — it should come back with empty stats instead of throwing a
+    /// raw <see cref="System.Text.Json.JsonException"/> up through the repository.
+    /// </summary>
+    [Fact]
+    public async Task Get_with_malformed_StatsJson_returns_the_character_with_empty_stats_instead_of_throwing()
+    {
+        var pc = new PlayerCharacter { CampaignId = Guid.NewGuid(), CharacterName = "Brannigan" };
+        await _repository.AddAsync(pc);
+        await _database.Connection.ExecuteAsync(
+            "UPDATE PlayerCharacters SET StatsJson = ? WHERE Id = ?", "{not valid json", pc.Id);
+
+        var exception = await Record.ExceptionAsync(() => _repository.GetAsync(pc.Id));
+
+        Assert.Null(exception);
+        var fetched = await _repository.GetAsync(pc.Id);
+        Assert.NotNull(fetched);
+        Assert.Empty(fetched.Stats);
+    }
+
+    /// <summary>
+    /// One PC row with malformed <c>StatsJson</c> must not poison the whole campaign's PC list —
+    /// every other PC in that campaign must still come back normally.
+    /// </summary>
+    [Fact]
+    public async Task GetByCampaign_with_one_character_having_malformed_StatsJson_still_returns_every_character()
+    {
+        var campaignId = Guid.NewGuid();
+        var goodPc = new PlayerCharacter
+        {
+            CampaignId = campaignId,
+            CharacterName = "Eleanor",
+            Stats = new Dictionary<string, string> { ["STR"] = "12" },
+        };
+        var badPc = new PlayerCharacter { CampaignId = campaignId, CharacterName = "Brannigan" };
+        await _repository.AddAsync(goodPc);
+        await _repository.AddAsync(badPc);
+        await _database.Connection.ExecuteAsync(
+            "UPDATE PlayerCharacters SET StatsJson = ? WHERE Id = ?", "{not valid json", badPc.Id);
+
+        var result = await _repository.GetByCampaignAsync(campaignId);
+
+        Assert.Equal(2, result.Count);
+        var fetchedGoodPc = Assert.Single(result, pc => pc.Id == goodPc.Id);
+        Assert.Equal(goodPc.Stats, fetchedGoodPc.Stats);
+        var fetchedBadPc = Assert.Single(result, pc => pc.Id == badPc.Id);
+        Assert.Empty(fetchedBadPc.Stats);
+    }
 }

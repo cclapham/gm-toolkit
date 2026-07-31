@@ -131,12 +131,16 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// A migration step failing for a transient reason unrelated to file corruption -- here, the
-    /// database file being (temporarily) read-only, which makes the migration's write fail with
-    /// <see cref="SQLite3.Result.ReadOnly"/> -- must not be treated the same as a genuinely corrupt
-    /// file: the existing, healthy data must survive untouched, and the failure must surface as a
-    /// friendly, actionable error rather than the file being silently moved aside and replaced with
-    /// an empty database.
+    /// A migration failing for a transient reason unrelated to file corruption -- here, the
+    /// database file being (temporarily) read-only, which makes the <c>ALTER TABLE ... ADD
+    /// COLUMN</c> that <see cref="GmToolkitDatabase.InitializeAsync"/>'s <c>CreateTableAsync</c>
+    /// calls emit for a real v1 database fail with <see cref="SQLite3.Result.ReadOnly"/> -- must
+    /// not be treated the same as a genuinely corrupt file: the existing, healthy data must
+    /// survive untouched, and the failure must surface as a friendly,
+    /// <see cref="DataAccessException"/> rather than the file being silently moved aside and
+    /// replaced with an empty database. This is the exact repro for the bug this test guards
+    /// against: a real v1 database on a read-only mount previously returned success with empty
+    /// data and the original renamed to <c>.corrupt-{timestamp}</c>.
     /// </summary>
     [Fact]
     public async Task Migration_failure_from_a_readonly_file_does_not_destroy_the_existing_database()
@@ -148,18 +152,17 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
 
         var campaignId = Guid.NewGuid();
 
-        // Build a database that already has every schema-v2 column (using the real production row
-        // types, so InitializeAsync's CreateTableAsync calls are all no-op reads -- no ALTER TABLE
-        // needed) but whose PRAGMA user_version still reads 1, isolating the failure to exactly the
-        // version-gated migration step in GmToolkitDatabase.MigrateAsync.
+        // Build a real schema-v1 database (the old row shapes, no CharacterSystemId/StatsJson
+        // columns at all) so that InitializeAsync's CreateTableAsync calls actually have to emit
+        // ALTER TABLE ... ADD COLUMN against it, not just no-op reads against an already-current
+        // schema -- that ALTER TABLE is exactly where the read-only failure needs to be caught.
         var setupConnection = new SQLiteAsyncConnection(_dbPath);
         try
         {
-            await setupConnection.CreateTableAsync<CampaignRow>();
-            await setupConnection.CreateTableAsync<PlayerCharacterRow>();
-            await setupConnection.CreateTableAsync<NpcRow>();
+            await setupConnection.CreateTableAsync<V1CampaignRow>();
+            await setupConnection.CreateTableAsync<V1NpcRow>();
 
-            await setupConnection.InsertAsync(new CampaignRow
+            await setupConnection.InsertAsync(new V1CampaignRow
             {
                 Id = campaignId,
                 Name = "Wandering Souls",
@@ -196,14 +199,19 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
         }
 
         // The original data survived, untouched, and the version pragma still reads the
-        // pre-migration value -- the failed migration attempt left no partial changes behind.
+        // pre-migration value -- the failed attempt left no partial changes behind. Verified via
+        // the V1 row shape (not the real CampaignRow) because the ALTER TABLE ... ADD COLUMN that
+        // would add CharacterSystemId never got to succeed against the read-only file either.
         var verifyConnection = new SQLiteAsyncConnection(_dbPath);
         try
         {
             var versionAfterFailure = await verifyConnection.ExecuteScalarAsync<int>("PRAGMA user_version");
             Assert.Equal(1, versionAfterFailure);
 
-            var campaign = await verifyConnection.Table<CampaignRow>().Where(c => c.Id == campaignId).FirstOrDefaultAsync();
+            var columnsAfterFailure = await verifyConnection.GetTableInfoAsync("Campaigns");
+            Assert.DoesNotContain(columnsAfterFailure, c => c.Name == "CharacterSystemId");
+
+            var campaign = await verifyConnection.Table<V1CampaignRow>().Where(c => c.Id == campaignId).FirstOrDefaultAsync();
             Assert.NotNull(campaign);
             Assert.Equal("Wandering Souls", campaign!.Name);
         }

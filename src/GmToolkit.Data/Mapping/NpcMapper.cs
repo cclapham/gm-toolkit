@@ -85,10 +85,9 @@ internal static class NpcMapper
         }
     }
 
-    [Conditional("DEBUG")]
     private static void LogMalformedStats(Guid npcId, string npcName, JsonException ex)
     {
-        Debug.WriteLine(
+        Trace.WriteLine(
             $"NpcMapper: Npc '{npcName}' ({npcId}) has malformed StatsJson and was loaded with " +
             $"empty stats instead. Original error: {ex.Message}");
     }

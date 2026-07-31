@@ -1,3 +1,4 @@
+using GmToolkit.Core.Repositories;
 using GmToolkit.Data.Rows;
 
 namespace GmToolkit.Data.Tests;
@@ -69,18 +70,19 @@ public class GmToolkitDatabaseBootstrapTests : IAsyncLifetime
         Assert.Equal(garbage, corruptBytes);
     }
 
+    /// <summary>
+    /// A main database file that's entirely inaccessible (e.g. every permission bit revoked) fails
+    /// with <see cref="SQLite.SQLite3.Result.CannotOpen"/> -- a result <see
+    /// cref="DatabaseExceptionTranslator.IsCorruption"/> deliberately does <b>not</b> classify as
+    /// file corruption (its own bytes might be perfectly healthy; the app just can't currently read
+    /// them). So, like a transient busy/full/read-only failure, this must not move the file aside
+    /// and replace it with an empty database -- it must surface as a friendly, actionable error and
+    /// leave the file (and any sidecars next to it) exactly as they were, so restoring access to the
+    /// file (e.g. fixing its permissions) is enough to recover it on the next launch.
+    /// </summary>
     [Fact]
-    public async Task Stale_sidecar_files_are_moved_aside_alongside_an_unreadable_main_file()
+    public async Task Entirely_inaccessible_main_file_is_left_untouched_and_surfaces_a_friendly_error()
     {
-        // This test only runs on Unix-like platforms: it needs a way to make SQLite's own file
-        // open fail *before* SQLite gets a chance to run its normal hot-journal-rollback recovery
-        // (which, on its own, already deletes a stale "-journal" sibling as an unrelated side
-        // effect of successfully opening a merely-corrupt-content file — see the sibling test
-        // above, where the main file's bytes are invalid but still readable). Revoking read/write
-        // permission on the main file via chmod reproduces the "otherwise unreadable" case from
-        // this method's doc comment: SQLite's open() fails immediately, before touching the
-        // journal at all, which is exactly the scenario where a stale "-journal"/"-wal"/"-shm"
-        // sibling would genuinely still be sitting there for this fix's recovery code to move.
         if (!OperatingSystem.IsLinux())
         {
             return;
@@ -91,44 +93,27 @@ public class GmToolkitDatabaseBootstrapTests : IAsyncLifetime
         await File.WriteAllBytesAsync(dbPath, garbage);
 
         var journalPath = $"{dbPath}-journal";
-        var walPath = $"{dbPath}-wal";
-        var shmPath = $"{dbPath}-shm";
         var journalBytes = "stale journal"u8.ToArray();
-        var walBytes = "stale wal"u8.ToArray();
-        var shmBytes = "stale shm"u8.ToArray();
         await File.WriteAllBytesAsync(journalPath, journalBytes);
-        await File.WriteAllBytesAsync(walPath, walBytes);
-        await File.WriteAllBytesAsync(shmPath, shmBytes);
 
         File.SetUnixFileMode(dbPath, UnixFileMode.None);
 
-        await using var database = await GmToolkitDatabase.CreateAndInitializeAsync(dbPath);
+        try
+        {
+            var exception = await Record.ExceptionAsync(() => GmToolkitDatabase.CreateAndInitializeAsync(dbPath));
 
-        // The resulting database is usable.
-        var version = await database.Connection.ExecuteScalarAsync<int>("PRAGMA user_version");
-        Assert.Equal(GmToolkitDatabase.SchemaVersion, version);
+            Assert.IsType<DataAccessException>(exception);
 
-        // None of the stale sidecar files were left behind next to the fresh database.
-        Assert.False(File.Exists(journalPath));
-        Assert.False(File.Exists(walPath));
-        Assert.False(File.Exists(shmPath));
-
-        // The main corrupt file was moved aside.
-        var corruptMainFiles = Directory.GetFiles(_rootDirectory, "gmtoolkit.db.corrupt-*");
-        Assert.Single(corruptMainFiles);
-        var corruptSuffix = Path.GetFileName(corruptMainFiles[0])["gmtoolkit.db".Length..];
-
-        // Each sidecar file was moved aside with the same corrupt-suffix/timestamp, not deleted.
-        var corruptJournalPath = $"{journalPath}{corruptSuffix}";
-        var corruptWalPath = $"{walPath}{corruptSuffix}";
-        var corruptShmPath = $"{shmPath}{corruptSuffix}";
-        Assert.True(File.Exists(corruptJournalPath));
-        Assert.True(File.Exists(corruptWalPath));
-        Assert.True(File.Exists(corruptShmPath));
-
-        Assert.Equal(journalBytes, await File.ReadAllBytesAsync(corruptJournalPath));
-        Assert.Equal(walBytes, await File.ReadAllBytesAsync(corruptWalPath));
-        Assert.Equal(shmBytes, await File.ReadAllBytesAsync(corruptShmPath));
+            // Nothing was moved aside -- neither the main file nor its sidecar.
+            var corruptSiblings = Directory.GetFiles(_rootDirectory, "*.corrupt-*");
+            Assert.Empty(corruptSiblings);
+            Assert.True(File.Exists(journalPath));
+            Assert.Equal(journalBytes, await File.ReadAllBytesAsync(journalPath));
+        }
+        finally
+        {
+            File.SetUnixFileMode(dbPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
     }
 
     [Fact]
