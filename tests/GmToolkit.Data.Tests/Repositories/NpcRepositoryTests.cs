@@ -131,4 +131,54 @@ public class NpcRepositoryTests : IAsyncLifetime
 
         Assert.Null(await _repository.GetAsync(npc.Id));
     }
+
+    /// <summary>
+    /// A row with malformed <c>StatsJson</c> (e.g. hand-edited directly in the database file) must
+    /// not fail the read for that NPC — it should come back with empty stats instead of throwing a
+    /// raw <see cref="System.Text.Json.JsonException"/> up through the repository.
+    /// </summary>
+    [Fact]
+    public async Task Get_with_malformed_StatsJson_returns_the_npc_with_empty_stats_instead_of_throwing()
+    {
+        var npc = new Npc { CampaignId = Guid.NewGuid(), Name = "Old Marta" };
+        await _repository.AddAsync(npc);
+        await _database.Connection.ExecuteAsync(
+            "UPDATE Npcs SET StatsJson = ? WHERE Id = ?", "{not valid json", npc.Id);
+
+        var exception = await Record.ExceptionAsync(() => _repository.GetAsync(npc.Id));
+
+        Assert.Null(exception);
+        var fetched = await _repository.GetAsync(npc.Id);
+        Assert.NotNull(fetched);
+        Assert.Empty(fetched.Stats);
+    }
+
+    /// <summary>
+    /// One NPC row with malformed <c>StatsJson</c> must not poison the whole campaign's NPC list —
+    /// every other NPC in that campaign must still come back normally.
+    /// </summary>
+    [Fact]
+    public async Task GetByCampaign_with_one_npc_having_malformed_StatsJson_still_returns_every_npc()
+    {
+        var campaignId = Guid.NewGuid();
+        var goodNpc = new Npc
+        {
+            CampaignId = campaignId,
+            Name = "Dock Foreman",
+            Stats = new Dictionary<string, string> { ["HP"] = "12" },
+        };
+        var badNpc = new Npc { CampaignId = campaignId, Name = "Old Marta" };
+        await _repository.AddAsync(goodNpc);
+        await _repository.AddAsync(badNpc);
+        await _database.Connection.ExecuteAsync(
+            "UPDATE Npcs SET StatsJson = ? WHERE Id = ?", "{not valid json", badNpc.Id);
+
+        var result = await _repository.GetByCampaignAsync(campaignId);
+
+        Assert.Equal(2, result.Count);
+        var fetchedGoodNpc = Assert.Single(result, n => n.Id == goodNpc.Id);
+        Assert.Equal(goodNpc.Stats, fetchedGoodNpc.Stats);
+        var fetchedBadNpc = Assert.Single(result, n => n.Id == badNpc.Id);
+        Assert.Empty(fetchedBadNpc.Stats);
+    }
 }

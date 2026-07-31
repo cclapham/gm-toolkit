@@ -52,7 +52,7 @@ internal static class DatabaseExceptionTranslator
         }
         catch (Exception ex) when (ex is not DataAccessException)
         {
-            throw Translate(ex);
+            throw ToFriendly(ex);
         }
     }
 
@@ -66,9 +66,24 @@ internal static class DatabaseExceptionTranslator
         }
         catch (Exception ex) when (ex is not DataAccessException)
         {
-            throw Translate(ex);
+            throw ToFriendly(ex);
         }
     }
+
+    /// <summary>
+    /// True only for the specific <see cref="SQLiteException.Result"/> values that indicate the
+    /// database file's own bytes are damaged (<see cref="SQLite3.Result.Corrupt"/>/
+    /// <see cref="SQLite3.Result.NonDBFile"/>/<see cref="SQLite3.Result.Format"/>) -- as opposed to
+    /// transient failures (<see cref="SQLite3.Result.Busy"/>/<see cref="SQLite3.Result.Full"/>/
+    /// <see cref="SQLite3.Result.ReadOnly"/>/etc.) or non-SQLite I/O failures, none of which say
+    /// anything about whether the file is actually damaged. Used by
+    /// <see cref="GmToolkitDatabase.CreateAndInitializeAsync"/> to decide whether a failure during
+    /// startup/migration is grounds for destructively moving the existing file aside, or just a
+    /// recoverable/transient condition that should be surfaced as an error without touching a
+    /// possibly-perfectly-healthy database file.
+    /// </summary>
+    internal static bool IsCorruption(Exception ex) =>
+        ex is SQLiteException { Result: SQLite3.Result.Corrupt or SQLite3.Result.NonDBFile or SQLite3.Result.Format };
 
     private static void EnsureDatabaseFileExists(GmToolkitDatabase database)
     {
@@ -81,7 +96,7 @@ internal static class DatabaseExceptionTranslator
         }
     }
 
-    private static DataAccessException Translate(Exception ex) => ex switch
+    internal static DataAccessException ToFriendly(Exception ex) => ex switch
     {
         SQLiteException sqliteEx => new DataAccessException(FriendlyMessage(sqliteEx.Result), sqliteEx),
         UnauthorizedAccessException => new DataAccessException(

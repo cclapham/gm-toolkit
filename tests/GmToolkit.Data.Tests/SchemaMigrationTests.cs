@@ -1,3 +1,4 @@
+using GmToolkit.Core.Repositories;
 using GmToolkit.Data.Repositories;
 using GmToolkit.Data.Rows;
 
@@ -127,6 +128,95 @@ public sealed class SchemaMigrationTests : IAsyncLifetime
         var rawStatsJson = await database.Connection.ExecuteScalarAsync<string>(
             "SELECT StatsJson FROM Npcs WHERE Id = ?", npcId);
         Assert.Equal("{}", rawStatsJson);
+    }
+
+    /// <summary>
+    /// A migration step failing for a transient reason unrelated to file corruption -- here, the
+    /// database file being (temporarily) read-only, which makes the migration's write fail with
+    /// <see cref="SQLite3.Result.ReadOnly"/> -- must not be treated the same as a genuinely corrupt
+    /// file: the existing, healthy data must survive untouched, and the failure must surface as a
+    /// friendly, actionable error rather than the file being silently moved aside and replaced with
+    /// an empty database.
+    /// </summary>
+    [Fact]
+    public async Task Migration_failure_from_a_readonly_file_does_not_destroy_the_existing_database()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        var campaignId = Guid.NewGuid();
+
+        // Build a database that already has every schema-v2 column (using the real production row
+        // types, so InitializeAsync's CreateTableAsync calls are all no-op reads -- no ALTER TABLE
+        // needed) but whose PRAGMA user_version still reads 1, isolating the failure to exactly the
+        // version-gated migration step in GmToolkitDatabase.MigrateAsync.
+        var setupConnection = new SQLiteAsyncConnection(_dbPath);
+        try
+        {
+            await setupConnection.CreateTableAsync<CampaignRow>();
+            await setupConnection.CreateTableAsync<PlayerCharacterRow>();
+            await setupConnection.CreateTableAsync<NpcRow>();
+
+            await setupConnection.InsertAsync(new CampaignRow
+            {
+                Id = campaignId,
+                Name = "Wandering Souls",
+                GameSystem = "D&D 5e",
+            });
+
+            await setupConnection.ExecuteAsync("PRAGMA user_version = 1");
+        }
+        finally
+        {
+            await setupConnection.CloseAsync();
+        }
+
+        File.SetUnixFileMode(_dbPath, UnixFileMode.UserRead | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+
+        try
+        {
+            var exception = await Record.ExceptionAsync(() => GmToolkitDatabase.CreateAndInitializeAsync(_dbPath));
+
+            var dataAccessException = Assert.IsType<DataAccessException>(exception);
+            Assert.Contains("permission", dataAccessException.Message, StringComparison.OrdinalIgnoreCase);
+
+            // No move-aside-and-recreate should have happened -- the original file is not
+            // corrupt, just temporarily unwritable.
+            var directory = Path.GetDirectoryName(_dbPath)!;
+            var corruptSiblings = Directory.GetFiles(directory, $"{Path.GetFileName(_dbPath)}.corrupt-*");
+            Assert.Empty(corruptSiblings);
+        }
+        finally
+        {
+            File.SetUnixFileMode(
+                _dbPath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+        }
+
+        // The original data survived, untouched, and the version pragma still reads the
+        // pre-migration value -- the failed migration attempt left no partial changes behind.
+        var verifyConnection = new SQLiteAsyncConnection(_dbPath);
+        try
+        {
+            var versionAfterFailure = await verifyConnection.ExecuteScalarAsync<int>("PRAGMA user_version");
+            Assert.Equal(1, versionAfterFailure);
+
+            var campaign = await verifyConnection.Table<CampaignRow>().Where(c => c.Id == campaignId).FirstOrDefaultAsync();
+            Assert.NotNull(campaign);
+            Assert.Equal("Wandering Souls", campaign!.Name);
+        }
+        finally
+        {
+            await verifyConnection.CloseAsync();
+        }
+
+        // Now that the file is writable again, retrying the same call succeeds and completes the
+        // migration normally.
+        await using var database = await GmToolkitDatabase.CreateAndInitializeAsync(_dbPath);
+        var versionAfterRetry = await database.Connection.ExecuteScalarAsync<int>("PRAGMA user_version");
+        Assert.Equal(GmToolkitDatabase.SchemaVersion, versionAfterRetry);
     }
 
     [Table("Campaigns")]
