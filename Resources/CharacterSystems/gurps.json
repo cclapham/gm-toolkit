@@ -257,10 +257,10 @@
       "key": "basicLift",
       "label": "Basic Lift",
       "type": "derived",
-      "helpText": "GURPS 4e's actual Basic Lift formula: ST squared, divided by 5, rounded up. Demonstrates the grammar multiplying a field by itself (no exponent syntax needed -- `st * st` is ordinary multiplication), and this profile's only use of `rounding: ceiling` (every derived field elsewhere in the four built-in profiles rounds down).",
+      "helpText": "GURPS 4e's actual Basic Lift formula: ST squared, divided by 5, rounded to nearest. Demonstrates the grammar multiplying a field by itself (no exponent syntax needed -- `st * st` is ordinary multiplication).",
       "formula": "(st * st) / 5",
       "precision": 0,
-      "rounding": "ceiling"
+      "rounding": "round"
     },
     {
       "key": "thrustDamage",
@@ -563,7 +563,7 @@
       "type": "derived",
       "formula": "(st * st) / 5",
       "precision": 0,
-      "rounding": "ceiling"
+      "rounding": "round"
     },
     {
       "key": "thrustDamage",

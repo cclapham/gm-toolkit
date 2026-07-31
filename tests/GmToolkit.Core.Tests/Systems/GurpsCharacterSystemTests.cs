@@ -324,6 +324,6 @@ public class GurpsCharacterSystemTests
         Assert.Equal(6.25m, results["basicSpeed"]); // (12+13)/4 = 6.25
         Assert.Equal(6m, results["basicMove"]); // floor(6.25)
         Assert.Equal(9m, results["dodge"]); // floor(6.25) + 3
-        Assert.Equal(52m, results["basicLift"]); // ceiling(16*16/5) = ceiling(51.2) = 52
+        Assert.Equal(51m, results["basicLift"]); // round(16*16/5) = round(51.2) = 51
     }
 }
