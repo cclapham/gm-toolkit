@@ -35,15 +35,21 @@ public class PlayerCharacter
 
     /// <summary>
     /// <c>true</c> when this PC's persisted stats couldn't be parsed as JSON (hand-edited directly
-    /// in the database file, truncated by some other failure, etc.) — set by
-    /// <c>GmToolkit.Data.Mapping.PlayerCharacterMapper</c> when loading a row whose
-    /// <c>StatsJson</c> fails to deserialize. <see cref="Stats"/> is left empty in that case rather
-    /// than propagating the parse failure and making the whole PC inaccessible (see that mapper's
-    /// remarks, mirroring <see cref="Npc.HasMalformedStats"/>), but saving this PC back must not
-    /// silently discard whatever the original, unparseable bytes actually were — see
-    /// <see cref="MalformedStatsJson"/>.
+    /// in the database file, truncated by some other failure, etc.) — <see cref="Stats"/> is left
+    /// empty in that case rather than propagating the parse failure and making the whole PC
+    /// inaccessible (see <c>GmToolkit.Data.Mapping.PlayerCharacterMapper</c>'s remarks, mirroring
+    /// <see cref="Npc.HasMalformedStats"/>), but saving this PC back must not silently discard
+    /// whatever the original, unparseable bytes actually were — see <see cref="MalformedStatsJson"/>.
     /// </summary>
-    public bool HasMalformedStats { get; internal set; }
+    /// <remarks>
+    /// Deliberately derived rather than a flag set once at load and never cleared: as soon as the
+    /// GM edits <see cref="Stats"/> (even to an empty dictionary on purpose), this must flip back to
+    /// <c>false</c> so <c>ToRow</c> serializes the edited <see cref="Stats"/> instead of silently
+    /// overwriting them with the stale <see cref="MalformedStatsJson"/> bytes on save — a plain
+    /// settable flag that stayed <c>true</c> forever would otherwise discard every subsequent edit
+    /// to a row that was ever malformed.
+    /// </remarks>
+    public bool HasMalformedStats => MalformedStatsJson is not null && Stats.Count == 0;
 
     /// <summary>
     /// The original, unparseable <c>StatsJson</c> bytes this PC was loaded with, when

@@ -40,7 +40,6 @@ internal static class NpcMapper
             CreatedUtc = row.CreatedUtc,
             WasGenerated = row.WasGenerated,
             Stats = stats,
-            HasMalformedStats = malformedStatsJson is not null,
             MalformedStatsJson = malformedStatsJson,
         };
     }
@@ -102,11 +101,22 @@ internal static class NpcMapper
         }
     }
 
+    /// <summary>
+    /// Cap on how much of the offending <c>StatsJson</c> gets logged. The full text is still
+    /// preserved verbatim in <see cref="Npc.MalformedStatsJson"/> for the write-back path -- this
+    /// only bounds what one bad row can dump into the trace log on every load.
+    /// </summary>
+    private const int MaxLoggedStatsJsonLength = 200;
+
     private static void LogMalformedStats(Guid npcId, string npcName, string originalStatsJson, JsonException ex)
     {
         Trace.WriteLine(
             $"NpcMapper: Npc '{npcName}' ({npcId}) has malformed StatsJson and was loaded with " +
             $"empty stats instead. Original error: {ex.Message}. Original StatsJson (preserved " +
-            $"verbatim on next save): {originalStatsJson}");
+            $"verbatim on next save; truncated here to {MaxLoggedStatsJsonLength} chars): " +
+            $"{Truncate(originalStatsJson, MaxLoggedStatsJsonLength)}");
     }
+
+    private static string Truncate(string value, int maxLength) =>
+        value.Length <= maxLength ? value : string.Concat(value.AsSpan(0, maxLength), "...");
 }

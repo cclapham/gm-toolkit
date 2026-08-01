@@ -207,6 +207,44 @@ public class NpcRepositoryTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// An NPC loaded with malformed <c>StatsJson</c> whose stats are then actually edited (not just
+    /// re-saved untouched, unlike the sibling "preserves the original bytes unchanged" test above)
+    /// must persist the GM's new stats, not silently discard them by writing the stale malformed
+    /// bytes back over them. Regression test for the bug where <c>HasMalformedStats</c> was a flag
+    /// set once at load and never cleared, so <c>NpcMapper.ToRow</c> kept preserving the original
+    /// corrupted bytes forever, even after the GM retyped every stat by hand.
+    /// </summary>
+    [Fact]
+    public async Task Update_of_an_npc_with_malformed_StatsJson_after_editing_stats_persists_the_new_stats()
+    {
+        var npc = new Npc { CampaignId = Guid.NewGuid(), Name = "Old Marta" };
+        await _repository.AddAsync(npc);
+        const string malformedStatsJson = "{not valid json";
+        await _database.Connection.ExecuteAsync(
+            "UPDATE Npcs SET StatsJson = ? WHERE Id = ?", malformedStatsJson, npc.Id);
+
+        var fetched = await _repository.GetAsync(npc.Id);
+        Assert.NotNull(fetched);
+        Assert.True(fetched.HasMalformedStats);
+
+        // The GM notices the empty stats, retypes them by hand, and saves.
+        fetched.Stats["HP"] = "45";
+        fetched.Stats["AC"] = "14";
+        Assert.False(fetched.HasMalformedStats);
+        await _repository.UpdateAsync(fetched);
+
+        var reloaded = await _repository.GetAsync(npc.Id);
+        Assert.NotNull(reloaded);
+        Assert.False(reloaded.HasMalformedStats);
+        Assert.Equal("45", reloaded.Stats["HP"]);
+        Assert.Equal("14", reloaded.Stats["AC"]);
+
+        var rawStatsJsonAfterSave = await _database.Connection.ExecuteScalarAsync<string>(
+            "SELECT StatsJson FROM Npcs WHERE Id = ?", npc.Id);
+        Assert.NotEqual(malformedStatsJson, rawStatsJsonAfterSave);
+    }
+
+    /// <summary>
     /// One NPC row with malformed <c>StatsJson</c> must not poison the whole campaign's NPC list —
     /// every other NPC in that campaign must still come back normally.
     /// </summary>
