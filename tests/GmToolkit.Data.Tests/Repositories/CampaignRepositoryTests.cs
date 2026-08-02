@@ -47,6 +47,34 @@ public class CampaignRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Add_then_get_round_trips_character_system_id()
+    {
+        var campaign = new Campaign
+        {
+            Name = "Wandering Souls",
+            CharacterSystemId = "dnd5e-2024",
+        };
+
+        await _repository.AddAsync(campaign);
+        var fetched = await _repository.GetAsync(campaign.Id);
+
+        Assert.NotNull(fetched);
+        Assert.Equal("dnd5e-2024", fetched.CharacterSystemId);
+    }
+
+    [Fact]
+    public async Task Add_then_get_with_no_character_system_attached_keeps_it_null()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+
+        await _repository.AddAsync(campaign);
+        var fetched = await _repository.GetAsync(campaign.Id);
+
+        Assert.NotNull(fetched);
+        Assert.Null(fetched.CharacterSystemId);
+    }
+
+    [Fact]
     public async Task Get_of_nonexistent_id_returns_null()
     {
         var fetched = await _repository.GetAsync(Guid.NewGuid());
@@ -81,6 +109,30 @@ public class CampaignRepositoryTests : IAsyncLifetime
         Assert.NotNull(fetched);
         Assert.Equal("The Rustbelt Job", fetched.Name);
         Assert.Equal("Blades in the Dark", fetched.GameSystem);
+    }
+
+    /// <summary>
+    /// <see cref="Campaign.CharacterSystemId"/> round-trips through <c>UpdateAsync</c>, not just
+    /// <c>AddAsync</c> -- sqlite-net-pcl's update path is a different SQL statement (an
+    /// <c>UPDATE</c>, not an <c>INSERT</c>) from add, and the real GM flow for attaching a
+    /// character system to an already-created freeform campaign (create the campaign, decide on a
+    /// system later, attach it from settings) always goes through this path, not add.
+    /// </summary>
+    [Fact]
+    public async Task Update_changes_CharacterSystemId()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        await _repository.AddAsync(campaign);
+        var fetchedBeforeUpdate = await _repository.GetAsync(campaign.Id);
+        Assert.NotNull(fetchedBeforeUpdate);
+        Assert.Null(fetchedBeforeUpdate.CharacterSystemId);
+
+        campaign.CharacterSystemId = "dnd5e-2024";
+        await _repository.UpdateAsync(campaign);
+
+        var fetchedAfterUpdate = await _repository.GetAsync(campaign.Id);
+        Assert.NotNull(fetchedAfterUpdate);
+        Assert.Equal("dnd5e-2024", fetchedAfterUpdate.CharacterSystemId);
     }
 
     [Fact]

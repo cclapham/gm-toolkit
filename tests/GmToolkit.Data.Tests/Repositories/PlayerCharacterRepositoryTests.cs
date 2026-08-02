@@ -101,4 +101,127 @@ public class PlayerCharacterRepositoryTests : IAsyncLifetime
 
         Assert.Null(await _repository.GetAsync(pc.Id));
     }
+
+    /// <summary>
+    /// A row with malformed <c>StatsJson</c> (e.g. hand-edited directly in the database file) must
+    /// not fail the read for that PC — it should come back with empty stats instead of throwing a
+    /// raw <see cref="System.Text.Json.JsonException"/> up through the repository.
+    /// </summary>
+    [Fact]
+    public async Task Get_with_malformed_StatsJson_returns_the_character_with_empty_stats_instead_of_throwing()
+    {
+        var pc = new PlayerCharacter { CampaignId = Guid.NewGuid(), CharacterName = "Brannigan" };
+        await _repository.AddAsync(pc);
+        await _database.Connection.ExecuteAsync(
+            "UPDATE PlayerCharacters SET StatsJson = ? WHERE Id = ?", "{not valid json", pc.Id);
+
+        var exception = await Record.ExceptionAsync(() => _repository.GetAsync(pc.Id));
+
+        Assert.Null(exception);
+        var fetched = await _repository.GetAsync(pc.Id);
+        Assert.NotNull(fetched);
+        Assert.Empty(fetched.Stats);
+    }
+
+    /// <summary>
+    /// A row with malformed <c>StatsJson</c> must not have that malformed data permanently
+    /// destroyed the moment the app happens to load and save it again -- e.g. a GM opening the
+    /// campaign, glancing at (but not touching) this PC's other fields, and saving. Before this
+    /// fix, <c>PlayerCharacter.Stats</c> came back empty on read (correctly, so the read itself
+    /// doesn't fail — see the sibling test above) but the write path unconditionally re-serialized
+    /// that same empty <c>Stats</c> right back over the original bytes on the very next save,
+    /// silently turning a recoverable "one row needs manual attention" problem into permanent data
+    /// loss. This is specifically a regression risk for PCs -- reading a malformed
+    /// <c>PlayerCharacter.StatsJson</c> used to throw outright, before this same fix made it
+    /// tolerant to match <c>NpcMapper</c>.
+    /// </summary>
+    [Fact]
+    public async Task Update_of_a_character_with_malformed_StatsJson_preserves_the_original_bytes_unchanged()
+    {
+        var pc = new PlayerCharacter { CampaignId = Guid.NewGuid(), CharacterName = "Brannigan" };
+        await _repository.AddAsync(pc);
+        const string malformedStatsJson = "{not valid json";
+        await _database.Connection.ExecuteAsync(
+            "UPDATE PlayerCharacters SET StatsJson = ? WHERE Id = ?", malformedStatsJson, pc.Id);
+
+        var fetched = await _repository.GetAsync(pc.Id);
+        Assert.NotNull(fetched);
+        Assert.True(fetched.HasMalformedStats);
+        Assert.Empty(fetched.Stats);
+
+        // Save it back completely unmodified -- e.g. the GM merely opened and re-saved this PC's
+        // other fields, never touching its stats at all.
+        await _repository.UpdateAsync(fetched);
+
+        var rawStatsJsonAfterSave = await _database.Connection.ExecuteScalarAsync<string>(
+            "SELECT StatsJson FROM PlayerCharacters WHERE Id = ?", pc.Id);
+        Assert.Equal(malformedStatsJson, rawStatsJsonAfterSave);
+    }
+
+    /// <summary>
+    /// A PC loaded with malformed <c>StatsJson</c> whose stats are then actually edited (not just
+    /// re-saved untouched, unlike the sibling "preserves the original bytes unchanged" test above)
+    /// must persist the GM's new stats, not silently discard them by writing the stale malformed
+    /// bytes back over them. Regression test for the bug where <c>HasMalformedStats</c> was a flag
+    /// set once at load and never cleared, so <c>PlayerCharacterMapper.ToRow</c> kept preserving the
+    /// original corrupted bytes forever, even after the GM retyped every stat by hand.
+    /// </summary>
+    [Fact]
+    public async Task Update_of_a_character_with_malformed_StatsJson_after_editing_stats_persists_the_new_stats()
+    {
+        var pc = new PlayerCharacter { CampaignId = Guid.NewGuid(), CharacterName = "Brannigan" };
+        await _repository.AddAsync(pc);
+        const string malformedStatsJson = "{not valid json";
+        await _database.Connection.ExecuteAsync(
+            "UPDATE PlayerCharacters SET StatsJson = ? WHERE Id = ?", malformedStatsJson, pc.Id);
+
+        var fetched = await _repository.GetAsync(pc.Id);
+        Assert.NotNull(fetched);
+        Assert.True(fetched.HasMalformedStats);
+
+        // The GM notices the empty stats, retypes them by hand, and saves.
+        fetched.Stats["HP"] = "45";
+        fetched.Stats["AC"] = "16";
+        Assert.False(fetched.HasMalformedStats);
+        await _repository.UpdateAsync(fetched);
+
+        var reloaded = await _repository.GetAsync(pc.Id);
+        Assert.NotNull(reloaded);
+        Assert.False(reloaded.HasMalformedStats);
+        Assert.Equal("45", reloaded.Stats["HP"]);
+        Assert.Equal("16", reloaded.Stats["AC"]);
+
+        var rawStatsJsonAfterSave = await _database.Connection.ExecuteScalarAsync<string>(
+            "SELECT StatsJson FROM PlayerCharacters WHERE Id = ?", pc.Id);
+        Assert.NotEqual(malformedStatsJson, rawStatsJsonAfterSave);
+    }
+
+    /// <summary>
+    /// One PC row with malformed <c>StatsJson</c> must not poison the whole campaign's PC list —
+    /// every other PC in that campaign must still come back normally.
+    /// </summary>
+    [Fact]
+    public async Task GetByCampaign_with_one_character_having_malformed_StatsJson_still_returns_every_character()
+    {
+        var campaignId = Guid.NewGuid();
+        var goodPc = new PlayerCharacter
+        {
+            CampaignId = campaignId,
+            CharacterName = "Eleanor",
+            Stats = new Dictionary<string, string> { ["STR"] = "12" },
+        };
+        var badPc = new PlayerCharacter { CampaignId = campaignId, CharacterName = "Brannigan" };
+        await _repository.AddAsync(goodPc);
+        await _repository.AddAsync(badPc);
+        await _database.Connection.ExecuteAsync(
+            "UPDATE PlayerCharacters SET StatsJson = ? WHERE Id = ?", "{not valid json", badPc.Id);
+
+        var result = await _repository.GetByCampaignAsync(campaignId);
+
+        Assert.Equal(2, result.Count);
+        var fetchedGoodPc = Assert.Single(result, pc => pc.Id == goodPc.Id);
+        Assert.Equal(goodPc.Stats, fetchedGoodPc.Stats);
+        var fetchedBadPc = Assert.Single(result, pc => pc.Id == badPc.Id);
+        Assert.Empty(fetchedBadPc.Stats);
+    }
 }
