@@ -5,6 +5,7 @@ using System.ComponentModel;
 using GmToolkit.Core.Generator;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
 using GmToolkit.UI.ViewModels;
 
@@ -47,11 +48,11 @@ public sealed class NavigationService : INavigationService
     // cheap to do now, and avoids having to retrofit it later.
     private readonly Dictionary<NavigationDestination, ViewModelBase> _cache = [];
 
-    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, INpcRepository npcRepository, IGeneratorRegistry generatorRegistry, INpcGenerator npcGenerator, ActiveCampaignContext activeCampaignContext, IAppSettingsService appSettingsService)
+    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, INpcRepository npcRepository, IGeneratorRegistry generatorRegistry, INpcGenerator npcGenerator, ActiveCampaignContext activeCampaignContext, IAppSettingsService appSettingsService, ICharacterSystemRegistry characterSystemRegistry)
     {
         _factories = new Dictionary<NavigationDestination, Func<ViewModelBase>>
         {
-            [NavigationDestination.Campaigns] = () => new CampaignsViewModel(campaignRepository, activeCampaignContext),
+            [NavigationDestination.Campaigns] = () => new CampaignsViewModel(campaignRepository, activeCampaignContext, characterSystemRegistry),
             [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext),
             [NavigationDestination.Npcs] = () => new NpcsViewModel(npcRepository, activeCampaignContext),
             [NavigationDestination.Generator] = () => new GeneratorViewModel(generatorRegistry, npcGenerator, npcRepository, activeCampaignContext, this),
@@ -73,7 +74,7 @@ public sealed class NavigationService : INavigationService
     /// runtime; both heads resolve the constructor above via DI (see
     /// <c>ServiceCollectionExtensions.AddGmToolkitUi</c>).</summary>
     public NavigationService()
-        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new DesignTimeNpcRepository(), GeneratorRegistry.FromEmbeddedTables(), CreateDesignTimeNpcGenerator(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), new DesignTimeAppSettingsService())
+        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new DesignTimeNpcRepository(), GeneratorRegistry.FromEmbeddedTables(), CreateDesignTimeNpcGenerator(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), new DesignTimeAppSettingsService(), CharacterSystemRegistry.FromEmbeddedSystems())
     {
     }
 

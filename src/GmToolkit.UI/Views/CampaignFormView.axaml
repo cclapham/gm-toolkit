@@ -35,6 +35,28 @@
                 <TextBox Text="{Binding GameSystem, Mode=TwoWay}" PlaceholderText="e.g. D&amp;D 5e, Call of Cthulhu, Blades in the Dark" />
             </StackPanel>
 
+            <!-- Typed character/NPC system attachment (SYSTEMS.md's "Attachment point"),
+                 independent of the free-text "Game system" field above, see Campaign.CharacterSystemId's
+                 own remarks. CharacterSystemOptions always starts with CharacterSystemOption.Freeform
+                 (mapping to a null CharacterSystemId) followed by every ICharacterSystemRegistry.GetAll()
+                 system in alphabetical order; ToString() (see CharacterSystemOption's remarks) is what
+                 the ComboBox renders per item, same idiom as SettingsView.axaml's ThemePreference
+                 dropdown. -->
+            <StackPanel Spacing="{StaticResource SpaceXS}">
+                <TextBlock Classes="caption" Text="Character system" />
+                <ComboBox ItemsSource="{Binding CharacterSystemOptions}"
+                          SelectedItem="{Binding SelectedCharacterSystem, Mode=TwoWay}"
+                          HorizontalAlignment="Stretch" />
+                <!-- Shown only while editing a campaign whose CharacterSystemId no longer resolves
+                     via the registry (its pack was uninstalled), see
+                     CampaignFormViewModel.ResolveCharacterSystemOption's remarks. -->
+                <TextBlock Classes="caption"
+                           Foreground="{DynamicResource DangerBrush}"
+                           Text="{Binding MissingSystemWarning}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding MissingSystemWarning, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
             <StackPanel Spacing="{StaticResource SpaceXS}">
                 <TextBlock Classes="caption" Text="Description" />
                 <TextBox Text="{Binding Description, Mode=TwoWay}"

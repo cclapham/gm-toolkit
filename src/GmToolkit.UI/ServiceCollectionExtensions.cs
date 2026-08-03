@@ -1,4 +1,5 @@
 using GmToolkit.Core.Generator;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Services;
 using GmToolkit.UI.ViewModels;
 
@@ -34,11 +35,20 @@ public static class ServiceCollectionExtensions
     /// wrapper around it -- constructing either per view model instance would just mean re-parsing
     /// the same embedded JSON for no benefit.
     /// </para>
+    /// <para>
+    /// <see cref="ICharacterSystemRegistry"/> is registered here for the identical reason -- built
+    /// entirely from <c>GmToolkit.Core</c>'s embedded <c>Resources/CharacterSystems/*.json</c> packs
+    /// (see <see cref="CharacterSystemRegistry.FromEmbeddedSystems"/>) with zero dependency on
+    /// <c>GmToolkit.Data</c>, and immutable once built, so one app-wide singleton is correct here
+    /// too. Consumed by <see cref="CampaignFormViewModel"/>'s system selector and
+    /// <see cref="CampaignListItemViewModel"/>'s attached-system display.
+    /// </para>
     /// </remarks>
     public static IServiceCollection AddGmToolkitUi(this IServiceCollection services)
     {
         services.AddSingleton<IGeneratorRegistry>(_ => GeneratorRegistry.FromEmbeddedTables());
         services.AddSingleton<INpcGenerator, NpcGenerator>();
+        services.AddSingleton<ICharacterSystemRegistry>(_ => CharacterSystemRegistry.FromEmbeddedSystems());
         services.AddSingleton<INavigationService, NavigationService>();
         // Singleton (issue #32): one app-wide toast stack, not one per screen -- see
         // INotificationService's remarks on why the shell hosts it.
