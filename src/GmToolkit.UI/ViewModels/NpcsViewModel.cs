@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
 
 namespace GmToolkit.UI.ViewModels;
@@ -91,12 +92,15 @@ public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
     /// remarks for why filtering/sorting happens here in memory rather than via the repository.</summary>
     private List<Npc> _allNpcs = [];
 
-    public NpcsViewModel(INpcRepository npcRepository, ActiveCampaignContext activeCampaignContext)
+    /// <param name="characterSystemRegistry">Passed straight through to <see cref="NpcFormViewModel"/>
+    /// (issue #90) -- see <see cref="CharactersViewModel"/>'s identical parameter for why it's
+    /// optional here.</param>
+    public NpcsViewModel(INpcRepository npcRepository, ActiveCampaignContext activeCampaignContext, ICharacterSystemRegistry? characterSystemRegistry = null)
     {
         _npcRepository = npcRepository;
         _activeCampaignContext = activeCampaignContext;
 
-        Form = new NpcFormViewModel(npcRepository);
+        Form = new NpcFormViewModel(npcRepository, characterSystemRegistry);
         Form.Saved += OnFormSavedAsync;
         Form.Cancelled += OnFormCancelled;
         Form.Deleted += OnFormDeletedAsync;
@@ -237,15 +241,15 @@ public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
     [RelayCommand]
     private void ShowCreateForm()
     {
-        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
-        if (campaignId is null)
+        var campaign = _activeCampaignContext.ActiveCampaign;
+        if (campaign is null)
         {
             // This screen is only reachable via a nav item gated on an active campaign existing
             // (see this class's remarks) -- defense-in-depth only, not expected in practice.
             return;
         }
 
-        Form.BeginCreate(campaignId.Value);
+        Form.BeginCreate(campaign.Id, campaign.CharacterSystemId);
         IsFormVisible = true;
     }
 
@@ -259,7 +263,7 @@ public sealed partial class NpcsViewModel : ViewModelBase, IRefreshable
             return;
         }
 
-        Form.BeginEdit(item.Npc);
+        Form.BeginEdit(item.Npc, _activeCampaignContext.ActiveCampaign?.CharacterSystemId);
         IsFormVisible = true;
     }
 

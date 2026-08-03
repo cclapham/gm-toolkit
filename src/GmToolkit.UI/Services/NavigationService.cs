@@ -53,8 +53,8 @@ public sealed class NavigationService : INavigationService
         _factories = new Dictionary<NavigationDestination, Func<ViewModelBase>>
         {
             [NavigationDestination.Campaigns] = () => new CampaignsViewModel(campaignRepository, activeCampaignContext, characterSystemRegistry),
-            [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext),
-            [NavigationDestination.Npcs] = () => new NpcsViewModel(npcRepository, activeCampaignContext),
+            [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext, characterSystemRegistry),
+            [NavigationDestination.Npcs] = () => new NpcsViewModel(npcRepository, activeCampaignContext, characterSystemRegistry),
             [NavigationDestination.Generator] = () => new GeneratorViewModel(generatorRegistry, npcGenerator, npcRepository, activeCampaignContext, this),
             [NavigationDestination.Settings] = () => new SettingsViewModel(appSettingsService),
         };

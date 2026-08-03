@@ -1,0 +1,190 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels.Stats"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="400"
+             x:Class="GmToolkit.UI.Controls.SchemaAwareStatsForm"
+             x:Name="Root">
+
+    <!-- Reusable schema-driven stats form (issues #89/#90); see the code-behind's remarks. Every
+         DataTemplate below is declared WITHOUT an x:Key, which makes it an implicit template
+         Avalonia resolves by matching a bound item's runtime type against DataType; both the
+         top-level Fields ItemsControl and the nested per-row Fields ItemsControl inside the
+         repeating-group template (which sets no ItemTemplate of its own) share this same set. -->
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="vm:NumberStatFieldViewModel">
+            <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,0,12" MinWidth="160">
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextBrush}" Text="{Binding Label}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                           Text="{Binding HelpText}"
+                           IsVisible="{Binding HelpText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                <NumericUpDown Value="{Binding Value, Mode=TwoWay}"
+                               Minimum="{Binding Minimum}"
+                               Maximum="{Binding Maximum}"
+                               Increment="{Binding Increment}"
+                               FormatString="{Binding FormatString}"
+                               ShowButtonSpinner="True"
+                               HorizontalAlignment="Left"
+                               Width="160" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                           Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:TextStatFieldViewModel">
+            <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,0,12" MinWidth="200">
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextBrush}" Text="{Binding Label}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                           Text="{Binding HelpText}"
+                           IsVisible="{Binding HelpText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                <TextBox Text="{Binding Value, Mode=TwoWay}" MaxLength="{Binding MaxLength}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                           Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:FreeTextBlockStatFieldViewModel">
+            <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,0,12" MinWidth="280">
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextBrush}" Text="{Binding Label}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                           Text="{Binding HelpText}"
+                           IsVisible="{Binding HelpText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                <TextBox Text="{Binding Value, Mode=TwoWay}"
+                         MaxLength="{Binding MaxLength}"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         Height="70" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                           Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:BooleanStatFieldViewModel">
+            <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,0,12" MinWidth="160">
+                <CheckBox Content="{Binding Label}" IsChecked="{Binding Value, Mode=TwoWay}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                           Text="{Binding HelpText}"
+                           IsVisible="{Binding HelpText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate DataType="vm:EnumStatFieldViewModel">
+            <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,0,12" MinWidth="200">
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextBrush}" Text="{Binding Label}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                           Text="{Binding HelpText}"
+                           IsVisible="{Binding HelpText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                <ComboBox ItemsSource="{Binding Options}"
+                          SelectedItem="{Binding SelectedValue, Mode=TwoWay}"
+                          PlaceholderText="Not set"
+                          HorizontalAlignment="Left"
+                          Width="220" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                           Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Read-only: never a bindable editable control; see DerivedStatFieldViewModel's remarks
+             on why its value is always the live-recomputed DisplayValue, never user-entered. -->
+        <DataTemplate DataType="vm:DerivedStatFieldViewModel">
+            <StackPanel Spacing="{StaticResource SpaceXS}" Margin="0,0,0,12" MinWidth="160">
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextBrush}"
+                           Text="{Binding Label, StringFormat='{}{0} (computed)'}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                           Text="{Binding HelpText}"
+                           IsVisible="{Binding HelpText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+                <TextBox Text="{Binding DisplayValue}"
+                         IsReadOnly="True"
+                         HorizontalAlignment="Left"
+                         Width="160"
+                         Background="{DynamicResource SurfaceAltBrush}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Variable-length rows, add/remove/reorder all supported (issue #90's own task); see
+             RepeatingGroupStatFieldViewModel's remarks for why the nested "Fields" ItemsControl below
+             (one per row) is safe to leave with no explicit ItemTemplate. -->
+        <DataTemplate DataType="vm:RepeatingGroupStatFieldViewModel">
+            <StackPanel Spacing="{StaticResource SpaceSM}" Margin="0,0,0,12">
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextBrush}" Text="{Binding Label}" />
+                <TextBlock Classes="caption" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
+                           Text="{Binding HelpText}"
+                           IsVisible="{Binding HelpText, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="{StaticResource SpaceSM}" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:RepeatingGroupRowViewModel">
+                            <!-- Padding="8" mirrors SpaceSM (Thickness-typed, so this can't bind a
+                                 StaticResource double directly; see Styles/Spacing.axaml's note). -->
+                            <Border BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="8">
+                                <StackPanel Spacing="{StaticResource SpaceXS}">
+                                    <!-- No ItemTemplate: resolves each cell via the same implicit
+                                         per-field-type templates declared above in this file's
+                                         resources; see the code-behind's remarks. -->
+                                    <ItemsControl ItemsSource="{Binding Fields}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+
+                                    <!-- Move/remove all target the *owning group*, not this row;
+                                         $parent[ItemsControl] walks up to the nearest ItemsControl
+                                         ancestor, which is the outer "Rows" one above (its own
+                                         DataContext is the RepeatingGroupStatFieldViewModel, since
+                                         binding its ItemsSource doesn't change its own DataContext);
+                                         same "commands live on the parent, not the row" idiom as
+                                         CharacterFormView.axaml's freeform stat-row Remove button, one
+                                         level of nesting deeper. -->
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpaceSM}">
+                                        <Button Content="Move up"
+                                                Command="{Binding $parent[ItemsControl].((vm:RepeatingGroupStatFieldViewModel)DataContext).MoveRowUpCommand}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Move down"
+                                                Command="{Binding $parent[ItemsControl].((vm:RepeatingGroupStatFieldViewModel)DataContext).MoveRowDownCommand}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Remove row"
+                                                Foreground="{DynamicResource DangerBrush}"
+                                                Command="{Binding $parent[ItemsControl].((vm:RepeatingGroupStatFieldViewModel)DataContext).RemoveRowCommand}"
+                                                CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Button Content="+ Add row" HorizontalAlignment="Left" Command="{Binding AddRowCommand}" />
+
+                <TextBlock Classes="caption" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                           Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <ItemsControl ItemsSource="{Binding #Root.FormViewModel.Fields}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Spacing="{StaticResource SpaceXS}" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <!-- No ItemTemplate here either; every field renders via the implicit per-type templates
+             declared above. -->
+    </ItemsControl>
+</UserControl>

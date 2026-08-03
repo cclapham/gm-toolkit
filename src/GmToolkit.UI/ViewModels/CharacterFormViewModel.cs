@@ -8,7 +8,9 @@ using CommunityToolkit.Mvvm.Input;
 
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
+using GmToolkit.UI.ViewModels.Stats;
 
 namespace GmToolkit.UI.ViewModels;
 
@@ -57,10 +59,25 @@ namespace GmToolkit.UI.ViewModels;
 /// reachable in edit mode (<see cref="IsEditMode"/>) -- there is nothing to delete yet in create
 /// mode.
 /// </para>
+/// <para>
+/// <b><see cref="StatRows"/> is only used when the active campaign has no
+/// <see cref="Campaign.CharacterSystemId"/> attached (issue #89).</b> <see cref="BeginCreate"/>/
+/// <see cref="BeginEdit"/> take the campaign's <c>characterSystemId</c> and resolve it via
+/// <see cref="ICharacterSystemRegistry.TryGetById"/>: when it resolves to a system whose
+/// <see cref="CharacterSystem.PcFields"/> is non-empty, <see cref="HasSchema"/> is <c>true</c> and
+/// <see cref="SchemaForm"/> (a <see cref="SchemaStatsFormViewModel"/>) takes over entirely --
+/// <c>CharacterFormView.axaml</c> renders <see cref="SchemaForm"/>'s schema-aware controls instead of
+/// the freeform key/value rows in that case. Every other case (no id, an id that resolves to
+/// <see cref="GenericCharacterSystem.Instance"/> or any other system with empty <c>pcFields</c>, or
+/// an id that no longer resolves at all -- see <see cref="SystemMissingWarning"/>) leaves
+/// <see cref="HasSchema"/> <c>false</c> and the freeform editor exactly as it always has been, per
+/// issue #89's "must be pixel-for-pixel unchanged" acceptance criterion.
+/// </para>
 /// </remarks>
 public sealed partial class CharacterFormViewModel : ObservableValidator
 {
     private readonly IPlayerCharacterRepository _playerCharacterRepository;
+    private readonly ICharacterSystemRegistry _characterSystemRegistry;
 
     private PlayerCharacter? _editingCharacter;
     private Guid _campaignId;
@@ -72,13 +89,20 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     private decimal? _originalLevel = 1;
     private string _originalNotes = string.Empty;
     private string _originalStatsSnapshot = string.Empty;
+    private string _originalSchemaStatsSnapshot = string.Empty;
 
     private bool _canSave;
     private bool _canConfirmDelete;
 
-    public CharacterFormViewModel(IPlayerCharacterRepository playerCharacterRepository)
+    /// <param name="characterSystemRegistry">Resolves a campaign's <see cref="Campaign.CharacterSystemId"/>
+    /// to its <see cref="CharacterSystem"/> field set (issue #89) -- optional (defaulting to
+    /// <see cref="CharacterSystemRegistry.FromEmbeddedSystems"/>) purely so every existing caller/test
+    /// that predates issue #89 keeps compiling unchanged; <see cref="CharactersViewModel"/> always
+    /// passes the app's real, shared registry singleton explicitly.</param>
+    public CharacterFormViewModel(IPlayerCharacterRepository playerCharacterRepository, ICharacterSystemRegistry? characterSystemRegistry = null)
     {
         _playerCharacterRepository = playerCharacterRepository;
+        _characterSystemRegistry = characterSystemRegistry ?? CharacterSystemRegistry.FromEmbeddedSystems();
         ErrorsChanged += OnErrorsChanged;
     }
 
@@ -131,8 +155,31 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
 
     /// <summary>Dynamic key/value stat rows (issue #21) -- see this class's remarks. Mutated in
     /// place by <see cref="AddStatRowCommand"/>/<see cref="RemoveStatRowCommand"/> and by
-    /// <see cref="BeginCreate"/>/<see cref="BeginEdit"/>; never reassigned to a new instance.</summary>
+    /// <see cref="BeginCreate"/>/<see cref="BeginEdit"/>; never reassigned to a new instance. Only
+    /// actually shown/used when <see cref="HasSchema"/> is <c>false</c> -- see this class's remarks.</summary>
     public ObservableCollection<StatRowViewModel> StatRows { get; } = [];
+
+    /// <summary>Whether the active campaign's system (issue #89) supplies a non-empty PC field set --
+    /// see this class's remarks. When <c>true</c>, <c>CharacterFormView.axaml</c> renders
+    /// <see cref="SchemaForm"/> instead of <see cref="StatRows"/>.</summary>
+    [ObservableProperty]
+    public partial bool HasSchema { get; set; }
+
+    /// <summary>The schema-driven stats form (issue #89) built from the resolved
+    /// <see cref="CharacterSystem.PcFields"/> plus this character's current <c>Stats</c>, or
+    /// <c>null</c> when <see cref="HasSchema"/> is <c>false</c>.</summary>
+    [ObservableProperty]
+    public partial SchemaStatsFormViewModel? SchemaForm { get; set; }
+
+    /// <summary>Set when the active campaign has a <see cref="Campaign.CharacterSystemId"/> that
+    /// doesn't resolve via <see cref="ICharacterSystemRegistry.TryGetById"/> (its system pack was
+    /// removed since this character/campaign was last edited) -- mirrors
+    /// <see cref="CampaignFormViewModel.MissingSystemWarning"/>'s identical situation one level down.
+    /// The form falls back to the freeform editor in this case (<see cref="HasSchema"/> stays
+    /// <c>false</c>, since there's no field set to render), rather than blocking the GM from editing
+    /// this character's stats at all.</summary>
+    [ObservableProperty]
+    public partial string? SystemMissingWarning { get; set; }
 
     /// <summary>First validation message for <see cref="CharacterName"/>, or <c>null</c> if it's
     /// currently valid -- mirrors <see cref="CampaignFormViewModel.NameError"/>.</summary>
@@ -142,7 +189,9 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     /// <summary>Aggregate validation message covering every row in <see cref="StatRows"/> (empty
     /// key with a value, or a duplicate key), or <c>null</c> if they're all currently valid -- see
     /// this class's remarks. Kept as a single message (not per-row) to match this form's overall
-    /// level of validation granularity elsewhere (<see cref="NameError"/>, <see cref="SaveError"/>).</summary>
+    /// level of validation granularity elsewhere (<see cref="NameError"/>, <see cref="SaveError"/>).
+    /// Only meaningful when <see cref="HasSchema"/> is <c>false</c>; see <see cref="SchemaForm"/>'s
+    /// own <see cref="SchemaStatsFormViewModel.HasErrors"/> for the schema-driven equivalent.</summary>
     [ObservableProperty]
     public partial string? StatsError { get; set; }
 
@@ -213,23 +262,27 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     public event Func<Task>? Deleted;
 
     /// <summary>Resets the form to create a brand-new character in <paramref name="campaignId"/>.</summary>
-    public void BeginCreate(Guid campaignId)
+    /// <param name="characterSystemId">The active campaign's <see cref="Campaign.CharacterSystemId"/>
+    /// (issue #89), or <c>null</c> for a freeform campaign -- defaults to <c>null</c> so every caller
+    /// that predates issue #89 keeps compiling unchanged and gets exactly today's freeform editor.</param>
+    public void BeginCreate(Guid campaignId, string? characterSystemId = null)
     {
         _editingCharacter = null;
         _campaignId = campaignId;
         IsEditMode = false;
-        SetFields(string.Empty, string.Empty, string.Empty, string.Empty, 1, string.Empty, new Dictionary<string, string>());
+        SetFields(string.Empty, string.Empty, string.Empty, string.Empty, 1, string.Empty, new Dictionary<string, string>(), characterSystemId);
     }
 
     /// <summary>Resets the form to edit <paramref name="character"/> in place.</summary>
-    public void BeginEdit(PlayerCharacter character)
+    /// <param name="characterSystemId">See <see cref="BeginCreate"/>.</param>
+    public void BeginEdit(PlayerCharacter character, string? characterSystemId = null)
     {
         ArgumentNullException.ThrowIfNull(character);
 
         _editingCharacter = character;
         _campaignId = character.CampaignId;
         IsEditMode = true;
-        SetFields(character.CharacterName, character.PlayerName, character.Ancestry, character.Class, character.Level, character.Notes, character.Stats);
+        SetFields(character.CharacterName, character.PlayerName, character.Ancestry, character.Class, character.Level, character.Notes, character.Stats, characterSystemId);
     }
 
     [RelayCommand]
@@ -258,14 +311,29 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     private async Task SaveAsync()
     {
         ValidateAllProperties();
-        UpdateStatsValidation();
-        if (HasErrors || StatsError is not null)
+        if (HasSchema)
+        {
+            SchemaForm?.Validate();
+        }
+        else
+        {
+            UpdateStatsValidation();
+        }
+
+        if (HasErrors || (HasSchema ? SchemaForm?.HasErrors == true : StatsError is not null))
         {
             return;
         }
 
         SaveError = null;
-        var stats = BuildStats();
+
+        // Schema-driven save (issue #89) merges into whatever stats already exist (preserving keys
+        // outside this schema -- see SchemaStatsFormViewModel's remarks); the freeform editor instead
+        // rebuilds the whole bag from its own row list, as it always has. Either way this must be
+        // computed before the branch below decides whether _editingCharacter is a fresh instance,
+        // since "existing stats" for a brand-new character is simply empty.
+        var existingStats = _editingCharacter?.Stats ?? new Dictionary<string, string>();
+        var stats = HasSchema && SchemaForm is not null ? SchemaForm.BuildStats(existingStats) : BuildStats();
 
         try
         {
@@ -528,7 +596,9 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
         Class != _originalClass ||
         Level != _originalLevel ||
         Notes != _originalNotes ||
-        ComputeStatsSnapshot() != _originalStatsSnapshot;
+        (HasSchema
+            ? SchemaForm?.ComputeSnapshot() != _originalSchemaStatsSnapshot
+            : ComputeStatsSnapshot() != _originalStatsSnapshot);
 
     /// <summary>Opaque, order-sensitive fingerprint of <see cref="StatRows"/>'s current (trimmed)
     /// contents, used only to detect whether stats have changed since the last
@@ -544,7 +614,7 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
             .Where(row => row.Key.Trim().Length > 0 || row.Value.Trim().Length > 0)
             .Select(row => $"{row.Key.Trim()}␞{row.Value.Trim()}"));
 
-    private void SetFields(string characterName, string playerName, string ancestry, string @class, int level, string notes, IReadOnlyDictionary<string, string> stats)
+    private void SetFields(string characterName, string playerName, string ancestry, string @class, int level, string notes, IReadOnlyDictionary<string, string> stats, string? characterSystemId)
     {
         CharacterName = characterName;
         PlayerName = playerName;
@@ -566,6 +636,8 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
             StatRows.Add(row);
         }
 
+        InitializeSchema(characterSystemId, stats);
+
         IsShowingDiscardConfirmation = false;
         IsShowingDeleteConfirmation = false;
         DeleteConfirmationInput = string.Empty;
@@ -583,6 +655,61 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
         SetBaseline();
     }
 
+    /// <summary>
+    /// Resolves <paramref name="characterSystemId"/> (issue #89) and sets <see cref="HasSchema"/>/
+    /// <see cref="SchemaForm"/>/<see cref="SystemMissingWarning"/> accordingly -- see this class's
+    /// remarks for exactly which cases fall back to the freeform editor. Always tears down a
+    /// previous call's <see cref="SchemaForm"/> subscription first, so switching between
+    /// <see cref="BeginCreate"/>/<see cref="BeginEdit"/> calls (e.g. this form instance being reused
+    /// for a different character, or the same character after an active-campaign switch) never leaves
+    /// a stale <see cref="SchemaStatsFormViewModel.Changed"/> subscription pointing at a discarded
+    /// instance.
+    /// </summary>
+    private void InitializeSchema(string? characterSystemId, IReadOnlyDictionary<string, string> stats)
+    {
+        if (SchemaForm is not null)
+        {
+            SchemaForm.Changed -= OnSchemaFormChanged;
+        }
+
+        SchemaForm = null;
+        SystemMissingWarning = null;
+
+        if (characterSystemId is null)
+        {
+            HasSchema = false;
+            return;
+        }
+
+        if (!_characterSystemRegistry.TryGetById(characterSystemId, out var system))
+        {
+            // The campaign's system pack was removed since this campaign/character was last edited --
+            // fall back to the freeform editor (there's no field set left to render) rather than
+            // blocking the GM from editing this character's stats at all. Mirrors
+            // CampaignFormViewModel.ResolveCharacterSystemOption's identical situation.
+            HasSchema = false;
+            SystemMissingWarning =
+                $"This campaign's system (\"{characterSystemId}\") isn't currently installed, so its stat form " +
+                "can't be shown. Falling back to the plain key/value editor below -- nothing is lost.";
+            return;
+        }
+
+        if (system.PcFields.Count == 0)
+        {
+            // Either the generic (freeform) system itself, or some other system that happens to
+            // define no PC fields -- both mean "nothing to render," same as no system attached.
+            HasSchema = false;
+            return;
+        }
+
+        HasSchema = true;
+        var form = new SchemaStatsFormViewModel(system.PcFields, stats);
+        form.Changed += OnSchemaFormChanged;
+        SchemaForm = form;
+    }
+
+    private void OnSchemaFormChanged() => RefreshValidationState();
+
     private void SetBaseline()
     {
         _originalCharacterName = CharacterName;
@@ -592,6 +719,7 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
         _originalLevel = Level;
         _originalNotes = Notes;
         _originalStatsSnapshot = ComputeStatsSnapshot();
+        _originalSchemaStatsSnapshot = SchemaForm?.ComputeSnapshot() ?? string.Empty;
     }
 
     private void RefreshValidationState()
@@ -601,7 +729,7 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
             .Select(result => result.ErrorMessage)
             .FirstOrDefault();
 
-        CanSave = !HasErrors && StatsError is null;
+        CanSave = !HasErrors && (HasSchema ? SchemaForm?.HasErrors != true : StatsError is null);
     }
 
     private void UpdateCanConfirmDelete() =>

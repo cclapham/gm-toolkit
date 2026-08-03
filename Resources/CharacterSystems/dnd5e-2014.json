@@ -1,0 +1,665 @@
+{
+  "formatVersion": 1,
+  "id": "dnd5e-2014",
+  "name": "D&D 5e (2014)",
+  "version": "1.0.0",
+  "author": "GM Toolkit",
+  "description": "D&D 5th Edition (2014 Player's Handbook and Monster Manual, i.e. the rules before the 2024 revision): race grants an ability score increase directly, backgrounds grant skill/tool proficiencies rather than feats, weapons have no mastery property, and Proficiency Bonus/Initiative aren't printed as their own explicit lines on monster stat blocks the way the 2024 Monster Manual prints them.",
+  "pcFields": [
+    {
+      "key": "strength",
+      "label": "Strength",
+      "type": "number",
+      "helpText": "Physical power and athletic prowess. Record the six ability scores after any racial and other increases directly here.",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "dexterity",
+      "label": "Dexterity",
+      "type": "number",
+      "helpText": "Agility, reflexes, and balance.",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "constitution",
+      "label": "Constitution",
+      "type": "number",
+      "helpText": "Health, stamina, and vital force.",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "intelligence",
+      "label": "Intelligence",
+      "type": "number",
+      "helpText": "Reason and memory.",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "wisdom",
+      "label": "Wisdom",
+      "type": "number",
+      "helpText": "Awareness and insight.",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "charisma",
+      "label": "Charisma",
+      "type": "number",
+      "helpText": "Force of personality and presence.",
+      "min": 1,
+      "max": 30,
+      "precision": 0,
+      "default": 10
+    },
+    {
+      "key": "strMod",
+      "label": "Strength Modifier",
+      "type": "derived",
+      "formula": "(strength - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "dexMod",
+      "label": "Dexterity Modifier",
+      "type": "derived",
+      "formula": "(dexterity - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "conMod",
+      "label": "Constitution Modifier",
+      "type": "derived",
+      "formula": "(constitution - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "intMod",
+      "label": "Intelligence Modifier",
+      "type": "derived",
+      "formula": "(intelligence - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "wisMod",
+      "label": "Wisdom Modifier",
+      "type": "derived",
+      "formula": "(wisdom - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "chaMod",
+      "label": "Charisma Modifier",
+      "type": "derived",
+      "formula": "(charisma - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "level",
+      "label": "Level",
+      "type": "number",
+      "helpText": "Character level (1-20).",
+      "min": 1,
+      "max": 20,
+      "precision": 0,
+      "default": 1
+    },
+    {
+      "key": "proficiencyBonus",
+      "label": "Proficiency Bonus",
+      "type": "derived",
+      "helpText": "Added to attack rolls, ability checks, and saving throws you're proficient in. Same formula as the 2024 rules; unchanged by the revision.",
+      "formula": "(level - 1) / 4 + 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "class",
+      "label": "Class",
+      "type": "text",
+      "maxLength": 50
+    },
+    {
+      "key": "race",
+      "label": "Race",
+      "type": "text",
+      "helpText": "2014 PHB terminology. Most races grant an ability score increase directly (e.g. +2 to one ability, +1 to another) -- the app doesn't referee that character-creation math, it only stores the resulting six ability scores above, already plain number fields regardless of why a given score ended up where it is.",
+      "maxLength": 50
+    },
+    {
+      "key": "background",
+      "label": "Background",
+      "type": "text",
+      "helpText": "2014 PHB backgrounds grant two skill proficiencies plus tool/language proficiencies and a background feature -- not an ability score increase or a feat, unlike the 2024 revision. Record the resulting skill proficiencies in the Skills group below.",
+      "maxLength": 100
+    },
+    {
+      "key": "alignment",
+      "label": "Alignment",
+      "type": "enum",
+      "options": ["Lawful Good", "Neutral Good", "Chaotic Good", "Lawful Neutral", "True Neutral", "Chaotic Neutral", "Lawful Evil", "Neutral Evil", "Chaotic Evil"]
+    },
+    {
+      "key": "armorClass",
+      "label": "Armor Class (AC)",
+      "type": "number",
+      "helpText": "How hard you are to hit.",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "hitPoints",
+      "label": "Hit Points (HP)",
+      "type": "number",
+      "helpText": "Current hit points.",
+      "min": 0,
+      "max": 999,
+      "precision": 0
+    },
+    {
+      "key": "hitDice",
+      "label": "Hit Dice",
+      "type": "text",
+      "helpText": "Remaining hit dice for recovery (e.g. '8d8').",
+      "maxLength": 20
+    },
+    {
+      "key": "speed",
+      "label": "Speed",
+      "type": "text",
+      "helpText": "Movement speed (e.g. '30 ft.' or '30 ft., fly 60 ft.').",
+      "maxLength": 100
+    },
+    {
+      "key": "initiativeProficiencyBonus",
+      "label": "Initiative Proficiency Bonus",
+      "type": "number",
+      "helpText": "Proficiency bonus adjustment to initiative (e.g., from the Alert feat). Defaults to 0. Enter a copy of Proficiency Bonus (doubled for expertise) if a feat or feature grants it; the Initiative formula below adds this as a plain operand rather than branching on a proficiency flag.",
+      "min": 0,
+      "max": 12,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "initiative",
+      "label": "Initiative",
+      "type": "derived",
+      "helpText": "Dexterity modifier plus Initiative Proficiency Bonus (0 unless a feat or feature grants proficiency, e.g. the Alert feat).",
+      "formula": "dexMod + initiativeProficiencyBonus",
+      "precision": 0
+    },
+    {
+      "key": "perceptionProficiencyBonus",
+      "label": "Perception Proficiency Bonus",
+      "type": "number",
+      "min": 0,
+      "max": 12,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "passivePerception",
+      "label": "Passive Perception",
+      "type": "derived",
+      "formula": "10 + wisMod + perceptionProficiencyBonus",
+      "precision": 0
+    },
+    {
+      "key": "strSave",
+      "label": "Strength Save",
+      "type": "text",
+      "helpText": "Proficiency checkbox or modifier",
+      "maxLength": 20
+    },
+    {
+      "key": "dexSave",
+      "label": "Dexterity Save",
+      "type": "text",
+      "helpText": "Proficiency checkbox or modifier",
+      "maxLength": 20
+    },
+    {
+      "key": "conSave",
+      "label": "Constitution Save",
+      "type": "text",
+      "helpText": "Proficiency checkbox or modifier",
+      "maxLength": 20
+    },
+    {
+      "key": "intSave",
+      "label": "Intelligence Save",
+      "type": "text",
+      "helpText": "Proficiency checkbox or modifier",
+      "maxLength": 20
+    },
+    {
+      "key": "wisSave",
+      "label": "Wisdom Save",
+      "type": "text",
+      "helpText": "Proficiency checkbox or modifier",
+      "maxLength": 20
+    },
+    {
+      "key": "chaSave",
+      "label": "Charisma Save",
+      "type": "text",
+      "helpText": "Proficiency checkbox or modifier",
+      "maxLength": 20
+    },
+    {
+      "key": "skills",
+      "label": "Skills",
+      "type": "repeating-group",
+      "helpText": "Skill proficiencies and bonuses. The eighteen skills are unchanged by the 2024 revision.",
+      "itemFields": [
+        {
+          "key": "skillName",
+          "label": "Skill",
+          "type": "enum",
+          "options": ["Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History", "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception", "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival"]
+        },
+        {
+          "key": "skillBonus",
+          "label": "Bonus",
+          "type": "number",
+          "min": -20,
+          "max": 20,
+          "precision": 0
+        },
+        {
+          "key": "isProficient",
+          "label": "Proficient",
+          "type": "boolean"
+        },
+        {
+          "key": "hasExpertise",
+          "label": "Expertise",
+          "type": "boolean"
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 18
+    },
+    {
+      "key": "weapons",
+      "label": "Weapons",
+      "type": "repeating-group",
+      "helpText": "The 2014 rules have no weapon mastery system -- that's a 2024-only addition.",
+      "itemFields": [
+        { "key": "name", "label": "Weapon", "type": "text", "maxLength": 100 },
+        { "key": "attackBonus", "label": "Attack Bonus", "type": "number", "min": -10, "max": 20, "precision": 0 },
+        { "key": "damage", "label": "Damage", "type": "text", "maxLength": 100 },
+        { "key": "properties", "label": "Properties", "type": "text", "helpText": "e.g. Finesse, Light, Thrown (Range 20/60)", "maxLength": 200 }
+      ],
+      "minItems": 0,
+      "maxItems": 10
+    },
+    {
+      "key": "senses",
+      "label": "Senses",
+      "type": "text",
+      "helpText": "Special senses (darkvision, truesight, etc.)",
+      "maxLength": 200
+    },
+    {
+      "key": "languages",
+      "label": "Languages",
+      "type": "text",
+      "helpText": "Comma-separated list",
+      "maxLength": 200
+    }
+  ],
+  "npcFields": [
+    {
+      "key": "strength",
+      "label": "Strength",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "dexterity",
+      "label": "Dexterity",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "constitution",
+      "label": "Constitution",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "intelligence",
+      "label": "Intelligence",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "wisdom",
+      "label": "Wisdom",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "charisma",
+      "label": "Charisma",
+      "type": "number",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "strMod",
+      "label": "Strength Modifier",
+      "type": "derived",
+      "formula": "(strength - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "dexMod",
+      "label": "Dexterity Modifier",
+      "type": "derived",
+      "formula": "(dexterity - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "conMod",
+      "label": "Constitution Modifier",
+      "type": "derived",
+      "formula": "(constitution - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "intMod",
+      "label": "Intelligence Modifier",
+      "type": "derived",
+      "formula": "(intelligence - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "wisMod",
+      "label": "Wisdom Modifier",
+      "type": "derived",
+      "formula": "(wisdom - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "chaMod",
+      "label": "Charisma Modifier",
+      "type": "derived",
+      "formula": "(charisma - 10) / 2",
+      "precision": 0,
+      "rounding": "floor"
+    },
+    {
+      "key": "proficiencyBonus",
+      "label": "Proficiency Bonus",
+      "type": "number",
+      "helpText": "The 2014 Monster Manual doesn't print Proficiency Bonus explicitly -- the GM infers it from Challenge Rating via the DMG's CR table (unlike the 2024 Monster Manual, which prints it on every stat block). Enter the inferred value here.",
+      "min": 2,
+      "max": 9,
+      "precision": 0,
+      "default": 2
+    },
+    {
+      "key": "armorClass",
+      "label": "Armor Class (AC)",
+      "type": "number",
+      "helpText": "How hard this creature is to hit",
+      "min": 1,
+      "max": 30,
+      "precision": 0
+    },
+    {
+      "key": "hitPoints",
+      "label": "Hit Points (HP)",
+      "type": "number",
+      "min": 0,
+      "max": 999,
+      "precision": 0
+    },
+    {
+      "key": "challengeRating",
+      "label": "Challenge Rating (CR)",
+      "type": "text",
+      "helpText": "CR value (e.g. '5' or '1/8')",
+      "maxLength": 10
+    },
+    {
+      "key": "speed",
+      "label": "Speed",
+      "type": "text",
+      "helpText": "Movement speeds (e.g. '30 ft., fly 60 ft.')",
+      "maxLength": 200
+    },
+    {
+      "key": "initiativeBonusAdjustment",
+      "label": "Initiative Bonus Adjustment",
+      "type": "number",
+      "helpText": "The 2014 Monster Manual has no explicit Initiative line on its stat blocks (unlike the 2024 revision) -- Initiative is simply the Dexterity modifier. Leave at 0 for an ordinary Dexterity-based Initiative, or set a value for a rare feature that adjusts it.",
+      "min": -10,
+      "max": 10,
+      "precision": 0,
+      "default": 0
+    },
+    {
+      "key": "initiative",
+      "label": "Initiative",
+      "type": "derived",
+      "formula": "dexMod + initiativeBonusAdjustment",
+      "precision": 0
+    },
+    {
+      "key": "strSave",
+      "label": "Strength Save",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "dexSave",
+      "label": "Dexterity Save",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "conSave",
+      "label": "Constitution Save",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "intSave",
+      "label": "Intelligence Save",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "wisSave",
+      "label": "Wisdom Save",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "chaSave",
+      "label": "Charisma Save",
+      "type": "text",
+      "maxLength": 20
+    },
+    {
+      "key": "skills",
+      "label": "Skills",
+      "type": "repeating-group",
+      "itemFields": [
+        {
+          "key": "skillName",
+          "label": "Skill",
+          "type": "enum",
+          "options": ["Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History", "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception", "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival"]
+        },
+        {
+          "key": "skillBonus",
+          "label": "Bonus",
+          "type": "number",
+          "min": -20,
+          "max": 20,
+          "precision": 0
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 18
+    },
+    {
+      "key": "damageResistances",
+      "label": "Damage Resistances",
+      "type": "text",
+      "helpText": "Comma-separated list (e.g. 'fire, cold')",
+      "maxLength": 200
+    },
+    {
+      "key": "damageImmunities",
+      "label": "Damage Immunities",
+      "type": "text",
+      "helpText": "Comma-separated list",
+      "maxLength": 200
+    },
+    {
+      "key": "damageVulnerabilities",
+      "label": "Damage Vulnerabilities",
+      "type": "text",
+      "helpText": "Comma-separated list",
+      "maxLength": 200
+    },
+    {
+      "key": "conditionImmunities",
+      "label": "Condition Immunities",
+      "type": "text",
+      "helpText": "Comma-separated list (e.g. 'charmed, poisoned')",
+      "maxLength": 200
+    },
+    {
+      "key": "senses",
+      "label": "Senses",
+      "type": "text",
+      "helpText": "Special senses and passive perception (e.g. 'darkvision 60 ft., passive Perception 14')",
+      "maxLength": 300
+    },
+    {
+      "key": "languages",
+      "label": "Languages",
+      "type": "text",
+      "helpText": "Comma-separated list or 'understands X but can't speak'",
+      "maxLength": 200
+    },
+    {
+      "key": "traits",
+      "label": "Traits",
+      "type": "repeating-group",
+      "helpText": "Special abilities and traits",
+      "itemFields": [
+        {
+          "key": "traitName",
+          "label": "Trait Name",
+          "type": "text",
+          "maxLength": 100
+        },
+        {
+          "key": "traitDescription",
+          "label": "Description",
+          "type": "free-text-block",
+          "maxLength": 1000
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 50
+    },
+    {
+      "key": "actions",
+      "label": "Actions",
+      "type": "repeating-group",
+      "helpText": "Actions the creature can take in combat",
+      "itemFields": [
+        {
+          "key": "actionName",
+          "label": "Action Name",
+          "type": "text",
+          "maxLength": 100
+        },
+        {
+          "key": "actionDescription",
+          "label": "Description",
+          "type": "free-text-block",
+          "maxLength": 1000
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 50
+    },
+    {
+      "key": "legendaryActions",
+      "label": "Legendary Actions",
+      "type": "repeating-group",
+      "helpText": "Actions available to legendary creatures. The 2014 Monster Manual's per-monster legendary action counts vary (commonly 3); record any deviation in the description.",
+      "itemFields": [
+        {
+          "key": "legendaryActionName",
+          "label": "Action Name",
+          "type": "text",
+          "maxLength": 100
+        },
+        {
+          "key": "legendaryActionDescription",
+          "label": "Description",
+          "type": "free-text-block",
+          "maxLength": 1000
+        },
+        {
+          "key": "legendaryActionCost",
+          "label": "Cost (actions)",
+          "type": "number",
+          "min": 1,
+          "max": 5,
+          "precision": 0,
+          "default": 1
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 20
+    }
+  ]
+}

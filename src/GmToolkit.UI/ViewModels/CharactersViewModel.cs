@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
 
 namespace GmToolkit.UI.ViewModels;
@@ -52,12 +53,16 @@ public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
     private readonly IPlayerCharacterRepository _playerCharacterRepository;
     private readonly ActiveCampaignContext _activeCampaignContext;
 
-    public CharactersViewModel(IPlayerCharacterRepository playerCharacterRepository, ActiveCampaignContext activeCampaignContext)
+    /// <param name="characterSystemRegistry">Passed straight through to
+    /// <see cref="CharacterFormViewModel"/> (issue #89) -- optional here purely to keep every
+    /// pre-#89 test/caller of this constructor compiling; the app's real composition root
+    /// (<c>NavigationService</c>) always passes the shared registry singleton explicitly.</param>
+    public CharactersViewModel(IPlayerCharacterRepository playerCharacterRepository, ActiveCampaignContext activeCampaignContext, ICharacterSystemRegistry? characterSystemRegistry = null)
     {
         _playerCharacterRepository = playerCharacterRepository;
         _activeCampaignContext = activeCampaignContext;
 
-        Form = new CharacterFormViewModel(playerCharacterRepository);
+        Form = new CharacterFormViewModel(playerCharacterRepository, characterSystemRegistry);
         Form.Saved += OnFormSavedAsync;
         Form.Cancelled += OnFormCancelled;
         Form.Deleted += OnFormDeletedAsync;
@@ -116,15 +121,15 @@ public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
     [RelayCommand]
     private void ShowCreateForm()
     {
-        var campaignId = _activeCampaignContext.ActiveCampaign?.Id;
-        if (campaignId is null)
+        var campaign = _activeCampaignContext.ActiveCampaign;
+        if (campaign is null)
         {
             // This screen is only reachable via a nav item gated on an active campaign existing
             // (see this class's remarks) -- defense-in-depth only, not expected in practice.
             return;
         }
 
-        Form.BeginCreate(campaignId.Value);
+        Form.BeginCreate(campaign.Id, campaign.CharacterSystemId);
         IsFormVisible = true;
     }
 
@@ -138,7 +143,7 @@ public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
             return;
         }
 
-        Form.BeginEdit(item.PlayerCharacter);
+        Form.BeginEdit(item.PlayerCharacter, _activeCampaignContext.ActiveCampaign?.CharacterSystemId);
         IsFormVisible = true;
     }
 

@@ -8,7 +8,9 @@ using CommunityToolkit.Mvvm.Input;
 
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
+using GmToolkit.UI.ViewModels.Stats;
 
 namespace GmToolkit.UI.ViewModels;
 
@@ -46,10 +48,22 @@ namespace GmToolkit.UI.ViewModels;
 /// as <see cref="NpcsViewModel.RebuildFilterOptions"/>'s <c>DistinctNonBlank</c>, but with no
 /// "All"-equivalent sentinel since there's no such thing as "no suggestion" to prepend.
 /// </para>
+/// <para>
+/// <b><see cref="HasSchema"/>/<see cref="SchemaForm"/> add a schema-driven stat block (issue #90),
+/// shown only when the active campaign's system resolves to a non-empty
+/// <see cref="CharacterSystem.NpcFields"/> set.</b> Unlike <see cref="CharacterFormViewModel"/>'s
+/// freeform <c>StatRows</c> fallback, this form has never had *any* general-purpose stats editor for
+/// <see cref="Npc.Stats"/> -- issue #90's own acceptance criterion is "falls back to today's behavior
+/// (no stats section at all)," so <see cref="HasSchema"/> <c>false</c> simply means no stats section
+/// renders at all, not a freeform one. Mirrors <see cref="CharacterFormViewModel"/>'s
+/// <see cref="ICharacterSystemRegistry.TryGetById"/> resolution and <see cref="SystemMissingWarning"/>
+/// handling one-for-one otherwise.
+/// </para>
 /// </remarks>
 public sealed partial class NpcFormViewModel : ObservableValidator
 {
     private readonly INpcRepository _npcRepository;
+    private readonly ICharacterSystemRegistry _characterSystemRegistry;
 
     private Npc? _editingNpc;
     private Guid _campaignId;
@@ -64,13 +78,18 @@ public sealed partial class NpcFormViewModel : ObservableValidator
     private string _originalSecret = string.Empty;
     private string _originalNotes = string.Empty;
     private bool _originalKnownToPlayers;
+    private string _originalSchemaStatsSnapshot = string.Empty;
 
     private bool _canSave;
     private bool _canConfirmDelete;
 
-    public NpcFormViewModel(INpcRepository npcRepository)
+    /// <param name="characterSystemRegistry">See <see cref="CharacterFormViewModel"/>'s identical
+    /// parameter -- same optional-with-embedded-default reasoning, for the same backward-compatibility
+    /// reason.</param>
+    public NpcFormViewModel(INpcRepository npcRepository, ICharacterSystemRegistry? characterSystemRegistry = null)
     {
         _npcRepository = npcRepository;
+        _characterSystemRegistry = characterSystemRegistry ?? CharacterSystemRegistry.FromEmbeddedSystems();
         ErrorsChanged += OnErrorsChanged;
     }
 
@@ -139,6 +158,24 @@ public sealed partial class NpcFormViewModel : ObservableValidator
     /// <see cref="BeginEdit"/> via <see cref="LoadSuggestionsAsync"/>.</summary>
     [ObservableProperty]
     public partial ObservableCollection<string> LocationSuggestions { get; set; } = [];
+
+    /// <summary>Whether the active campaign's system (issue #90) supplies a non-empty NPC field set --
+    /// see this class's remarks. When <c>true</c>, <c>NpcFormView.axaml</c> renders
+    /// <see cref="SchemaForm"/>'s stat block; when <c>false</c>, no stats section shows at all.</summary>
+    [ObservableProperty]
+    public partial bool HasSchema { get; set; }
+
+    /// <summary>The schema-driven stats form (issue #90) built from the resolved
+    /// <see cref="CharacterSystem.NpcFields"/> plus this NPC's current <c>Stats</c>, or <c>null</c>
+    /// when <see cref="HasSchema"/> is <c>false</c>.</summary>
+    [ObservableProperty]
+    public partial SchemaStatsFormViewModel? SchemaForm { get; set; }
+
+    /// <summary>Mirrors <see cref="CharacterFormViewModel.SystemMissingWarning"/> -- set when the
+    /// active campaign's <see cref="Campaign.CharacterSystemId"/> no longer resolves via
+    /// <see cref="ICharacterSystemRegistry.TryGetById"/>.</summary>
+    [ObservableProperty]
+    public partial string? SystemMissingWarning { get; set; }
 
     /// <summary>First validation message for <see cref="Name"/>, or <c>null</c> if it's currently
     /// valid -- mirrors <see cref="CharacterFormViewModel.NameError"/>.</summary>
@@ -210,24 +247,29 @@ public sealed partial class NpcFormViewModel : ObservableValidator
     public event Func<Task>? Deleted;
 
     /// <summary>Resets the form to create a brand-new NPC in <paramref name="campaignId"/>.</summary>
-    public void BeginCreate(Guid campaignId)
+    /// <param name="characterSystemId">The active campaign's <see cref="Campaign.CharacterSystemId"/>
+    /// (issue #90), or <c>null</c> for a freeform campaign -- defaults to <c>null</c> so every caller
+    /// that predates issue #90 keeps compiling unchanged and gets exactly today's no-stats-section
+    /// behavior.</param>
+    public void BeginCreate(Guid campaignId, string? characterSystemId = null)
     {
         _editingNpc = null;
         _campaignId = campaignId;
         IsEditMode = false;
-        SetFields(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, knownToPlayers: false);
+        SetFields(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, knownToPlayers: false, new Dictionary<string, string>(), characterSystemId);
         _ = LoadSuggestionsAsync(campaignId);
     }
 
     /// <summary>Resets the form to edit <paramref name="npc"/> in place.</summary>
-    public void BeginEdit(Npc npc)
+    /// <param name="characterSystemId">See <see cref="BeginCreate"/>.</param>
+    public void BeginEdit(Npc npc, string? characterSystemId = null)
     {
         ArgumentNullException.ThrowIfNull(npc);
 
         _editingNpc = npc;
         _campaignId = npc.CampaignId;
         IsEditMode = true;
-        SetFields(npc.Name, npc.Role, npc.Faction, npc.Location, npc.Appearance, npc.Mannerism, npc.Motivation, npc.Secret, npc.Notes, npc.KnownToPlayers);
+        SetFields(npc.Name, npc.Role, npc.Faction, npc.Location, npc.Appearance, npc.Mannerism, npc.Motivation, npc.Secret, npc.Notes, npc.KnownToPlayers, npc.Stats, characterSystemId);
         _ = LoadSuggestionsAsync(npc.CampaignId);
     }
 
@@ -235,12 +277,26 @@ public sealed partial class NpcFormViewModel : ObservableValidator
     private async Task SaveAsync()
     {
         ValidateAllProperties();
-        if (HasErrors)
+        if (HasSchema)
+        {
+            SchemaForm?.Validate();
+        }
+
+        if (HasErrors || (HasSchema && SchemaForm?.HasErrors == true))
         {
             return;
         }
 
         SaveError = null;
+
+        // Only ever touches Npc.Stats at all when a schema is attached (issue #90) -- with no
+        // schema, this form still has no general-purpose stats editor of any kind (see this class's
+        // remarks), so an existing NPC's Stats must round-trip through a save completely untouched,
+        // exactly as it always has. SchemaForm.BuildStats always returns a fresh Dictionary instance
+        // (never _editingNpc.Stats itself), so there's no risk of clearing-while-aliased below.
+        var stats = HasSchema && SchemaForm is not null
+            ? SchemaForm.BuildStats(_editingNpc?.Stats ?? new Dictionary<string, string>())
+            : null;
 
         try
         {
@@ -260,6 +316,11 @@ public sealed partial class NpcFormViewModel : ObservableValidator
                     Notes = Notes,
                     KnownToPlayers = KnownToPlayers,
                 };
+                if (stats is not null)
+                {
+                    ApplyStats(npc, stats);
+                }
+
                 await _npcRepository.AddAsync(npc);
                 _editingNpc = npc;
             }
@@ -275,6 +336,11 @@ public sealed partial class NpcFormViewModel : ObservableValidator
                 _editingNpc.Secret = Secret;
                 _editingNpc.Notes = Notes;
                 _editingNpc.KnownToPlayers = KnownToPlayers;
+                if (stats is not null)
+                {
+                    ApplyStats(_editingNpc, stats);
+                }
+
                 await _npcRepository.UpdateAsync(_editingNpc);
             }
 
@@ -462,6 +528,15 @@ public sealed partial class NpcFormViewModel : ObservableValidator
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase);
 
+    private static void ApplyStats(Npc npc, Dictionary<string, string> stats)
+    {
+        npc.Stats.Clear();
+        foreach (var stat in stats)
+        {
+            npc.Stats[stat.Key] = stat.Value;
+        }
+    }
+
     private void OnErrorsChanged(object? sender, DataErrorsChangedEventArgs e) => RefreshValidationState();
 
     private bool IsDirty() =>
@@ -474,9 +549,10 @@ public sealed partial class NpcFormViewModel : ObservableValidator
         Motivation != _originalMotivation ||
         Secret != _originalSecret ||
         Notes != _originalNotes ||
-        KnownToPlayers != _originalKnownToPlayers;
+        KnownToPlayers != _originalKnownToPlayers ||
+        (HasSchema && SchemaForm?.ComputeSnapshot() != _originalSchemaStatsSnapshot);
 
-    private void SetFields(string name, string role, string faction, string location, string appearance, string mannerism, string motivation, string secret, string notes, bool knownToPlayers)
+    private void SetFields(string name, string role, string faction, string location, string appearance, string mannerism, string motivation, string secret, string notes, bool knownToPlayers, IReadOnlyDictionary<string, string> stats, string? characterSystemId)
     {
         Name = name;
         Role = role;
@@ -488,6 +564,8 @@ public sealed partial class NpcFormViewModel : ObservableValidator
         Secret = secret;
         Notes = notes;
         KnownToPlayers = knownToPlayers;
+
+        InitializeSchema(characterSystemId, stats);
 
         IsShowingDiscardConfirmation = false;
         IsShowingDeleteConfirmation = false;
@@ -508,6 +586,49 @@ public sealed partial class NpcFormViewModel : ObservableValidator
         SetBaseline();
     }
 
+    /// <summary>Resolves <paramref name="characterSystemId"/> (issue #90) and sets
+    /// <see cref="HasSchema"/>/<see cref="SchemaForm"/>/<see cref="SystemMissingWarning"/> -- mirrors
+    /// <see cref="CharacterFormViewModel.InitializeSchema"/> one-for-one except that "no schema" here
+    /// means no stats section at all (see this class's remarks), not a freeform fallback.</summary>
+    private void InitializeSchema(string? characterSystemId, IReadOnlyDictionary<string, string> stats)
+    {
+        if (SchemaForm is not null)
+        {
+            SchemaForm.Changed -= OnSchemaFormChanged;
+        }
+
+        SchemaForm = null;
+        SystemMissingWarning = null;
+
+        if (characterSystemId is null)
+        {
+            HasSchema = false;
+            return;
+        }
+
+        if (!_characterSystemRegistry.TryGetById(characterSystemId, out var system))
+        {
+            HasSchema = false;
+            SystemMissingWarning =
+                $"This campaign's system (\"{characterSystemId}\") isn't currently installed, so its stat block " +
+                "can't be shown. No stats section will be available until a different system is attached.";
+            return;
+        }
+
+        if (system.NpcFields.Count == 0)
+        {
+            HasSchema = false;
+            return;
+        }
+
+        HasSchema = true;
+        var form = new SchemaStatsFormViewModel(system.NpcFields, stats);
+        form.Changed += OnSchemaFormChanged;
+        SchemaForm = form;
+    }
+
+    private void OnSchemaFormChanged() => RefreshValidationState();
+
     private void SetBaseline()
     {
         _originalName = Name;
@@ -520,6 +641,7 @@ public sealed partial class NpcFormViewModel : ObservableValidator
         _originalSecret = Secret;
         _originalNotes = Notes;
         _originalKnownToPlayers = KnownToPlayers;
+        _originalSchemaStatsSnapshot = SchemaForm?.ComputeSnapshot() ?? string.Empty;
     }
 
     private void RefreshValidationState()
@@ -529,7 +651,7 @@ public sealed partial class NpcFormViewModel : ObservableValidator
             .Select(result => result.ErrorMessage)
             .FirstOrDefault();
 
-        CanSave = !HasErrors;
+        CanSave = !HasErrors && (!HasSchema || SchemaForm?.HasErrors != true);
     }
 
     private void UpdateCanConfirmDelete() =>

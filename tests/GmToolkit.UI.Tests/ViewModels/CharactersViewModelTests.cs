@@ -329,4 +329,37 @@ public class CharactersViewModelTests
 
         Assert.False(vm.IsLoading);
     }
+
+    [Fact]
+    public void ShowCreateFormCommand_passes_the_active_campaigns_CharacterSystemId_through_to_the_form()
+    {
+        // Issue #89: the active campaign's attached system (if any) drives whether Form.HasSchema
+        // renders the schema-aware stats form or the freeform editor.
+        var campaign = new Campaign { Name = "Wandering Souls", CharacterSystemId = "dnd5e-2014" };
+        var vm = new CharactersViewModel(
+            new FakePlayerCharacterRepository(),
+            ActiveContextFor(campaign, new FakeCampaignRepository(campaign)),
+            GmToolkit.Core.Systems.CharacterSystemRegistry.FromEmbeddedSystems());
+
+        vm.ShowCreateFormCommand.Execute(null);
+
+        Assert.True(vm.Form.HasSchema);
+        Assert.NotNull(vm.Form.SchemaForm);
+    }
+
+    [Fact]
+    public void SelectCommand_passes_the_active_campaigns_CharacterSystemId_through_to_the_form()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls", CharacterSystemId = "dnd5e-2014" };
+        var pc = new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Arannis" };
+        var vm = new CharactersViewModel(
+            new FakePlayerCharacterRepository(pc),
+            ActiveContextFor(campaign, new FakeCampaignRepository(campaign)),
+            GmToolkit.Core.Systems.CharacterSystemRegistry.FromEmbeddedSystems());
+        var item = Assert.Single(vm.Characters);
+
+        vm.SelectCommand.Execute(item);
+
+        Assert.True(vm.Form.HasSchema);
+    }
 }

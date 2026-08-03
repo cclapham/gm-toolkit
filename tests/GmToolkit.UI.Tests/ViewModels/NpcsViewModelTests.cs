@@ -686,4 +686,37 @@ public class NpcsViewModelTests
 
         Assert.False(vm.IsLoading);
     }
+
+    [Fact]
+    public void ShowCreateFormCommand_passes_the_active_campaigns_CharacterSystemId_through_to_the_form()
+    {
+        // Issue #90: the active campaign's attached system (if any) drives whether Form.HasSchema
+        // renders the schema-aware stat block at all.
+        var campaign = new Campaign { Name = "Wandering Souls", CharacterSystemId = "dnd5e-2014" };
+        var vm = new NpcsViewModel(
+            new FakeNpcRepository(),
+            ActiveContextFor(campaign),
+            GmToolkit.Core.Systems.CharacterSystemRegistry.FromEmbeddedSystems());
+
+        vm.ShowCreateFormCommand.Execute(null);
+
+        Assert.True(vm.Form.HasSchema);
+        Assert.NotNull(vm.Form.SchemaForm);
+    }
+
+    [Fact]
+    public void SelectCommand_passes_the_active_campaigns_CharacterSystemId_through_to_the_form()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls", CharacterSystemId = "dnd5e-2014" };
+        var npc = MakeNpc(campaign.Id, "Baelor the Butcher");
+        var vm = new NpcsViewModel(
+            new FakeNpcRepository(npc),
+            ActiveContextFor(campaign),
+            GmToolkit.Core.Systems.CharacterSystemRegistry.FromEmbeddedSystems());
+        var item = Assert.Single(vm.Npcs);
+
+        vm.SelectCommand.Execute(item);
+
+        Assert.True(vm.Form.HasSchema);
+    }
 }

@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
              xmlns:views="using:GmToolkit.UI.Views"
+             xmlns:controls="using:GmToolkit.UI.Controls"
              xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="700"
              x:Class="GmToolkit.UI.Views.CharacterFormView"
@@ -65,10 +66,30 @@
                                                 PlaceholderText="Anything else worth remembering about this character." />
                 </StackPanel>
 
+                <!-- The active campaign's system pack isn't installed (issue #89): the form falls
+                     back to the freeform editor below rather than blocking editing entirely - see
+                     CharacterFormViewModel.SystemMissingWarning's remarks. -->
+                <TextBlock Classes="caption"
+                           Foreground="{DynamicResource DangerBrush}"
+                           Text="{Binding SystemMissingWarning}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding SystemMissingWarning, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Schema-driven stat form (#89): rendered when the active campaign's system
+                     supplies a non-empty PC field set - see CharacterFormViewModel.HasSchema's
+                     remarks. SchemaAwareStatsForm carries no PlayerCharacter-specific knowledge of
+                     its own (also used by NpcFormView.axaml for #90). -->
+                <StackPanel Spacing="{StaticResource SpaceXS}" IsVisible="{Binding HasSchema}">
+                    <TextBlock Classes="caption" Text="Stats" />
+                    <controls:SchemaAwareStatsForm FormViewModel="{Binding SchemaForm}" />
+                </StackPanel>
+
                 <!-- Dynamic stat key/value rows (#21): system-agnostic, so the same form works
                      for D&amp;D's STR/DEX/HP, Call of Cthulhu's SAN/Idea/Luck, or any homebrew
-                     system's own keys - see CharacterFormViewModel's remarks on validation. -->
-                <StackPanel Spacing="{StaticResource SpaceXS}">
+                     system's own keys - see CharacterFormViewModel's remarks on validation. Only
+                     shown when HasSchema is false (issue #89) - pixel-for-pixel unchanged from
+                     before #89 in that case. -->
+                <StackPanel Spacing="{StaticResource SpaceXS}" IsVisible="{Binding !HasSchema}">
                     <TextBlock Classes="caption" Text="Stats" />
                     <ItemsControl ItemsSource="{Binding StatRows}">
                         <ItemsControl.ItemsPanel>

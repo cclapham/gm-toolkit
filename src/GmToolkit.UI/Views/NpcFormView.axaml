@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GmToolkit.UI.ViewModels"
              xmlns:views="using:GmToolkit.UI.Views"
+             xmlns:controls="using:GmToolkit.UI.Controls"
              xmlns:converters="using:Avalonia.Data.Converters"
              mc:Ignorable="d" d:DesignWidth="560" d:DesignHeight="800"
              x:Class="GmToolkit.UI.Views.NpcFormView"
@@ -85,6 +86,23 @@
                          remarks for why it carries no Npc-specific knowledge. -->
                     <views:MarkdownNotesEditor Text="{Binding Notes, Mode=TwoWay}"
                                                 PlaceholderText="Anything else worth remembering about this NPC." />
+                </StackPanel>
+
+                <!-- The active campaign's system pack isn't installed (issue #90): no stats section
+                     is shown at all in that case (this form has never had a general-purpose stats
+                     editor - see NpcFormViewModel's remarks) rather than blocking editing entirely. -->
+                <TextBlock Classes="caption"
+                           Foreground="{DynamicResource DangerBrush}"
+                           Text="{Binding SystemMissingWarning}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding SystemMissingWarning, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+                <!-- Schema-driven stat block (#90): rendered only when the active campaign's system
+                     supplies a non-empty NPC field set - see NpcFormViewModel.HasSchema's remarks.
+                     No stats section at all otherwise, matching this form's behavior before #90. -->
+                <StackPanel Spacing="{StaticResource SpaceXS}" IsVisible="{Binding HasSchema}">
+                    <TextBlock Classes="caption" Text="Stats" />
+                    <controls:SchemaAwareStatsForm FormViewModel="{Binding SchemaForm}" />
                 </StackPanel>
 
                 <TextBlock Classes="caption"

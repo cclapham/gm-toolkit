@@ -80,6 +80,39 @@ public sealed class CharacterSystemAndNpcStatsRoundTripTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Campaign_attached_to_dnd5e_2014_survives_close_and_reopen()
+    {
+        // Covers the D&D 5e (2014) system profile specifically: a campaign selecting it round-trips
+        // its CharacterSystemId, and the id resolves against the real embedded registry (proving the
+        // profile is actually registered, not just a string the repository happens to store blindly).
+        var campaign = new Campaign
+        {
+            Name = "The Sunless Citadel",
+            CharacterSystemId = "dnd5e-2014",
+        };
+
+        await using (var writeDatabase = new GmToolkitDatabase(_dbPath))
+        {
+            await writeDatabase.InitializeAsync();
+
+            var campaignRepository = new CampaignRepository(writeDatabase);
+            await campaignRepository.AddAsync(campaign);
+        }
+
+        await using var readDatabase = new GmToolkitDatabase(_dbPath);
+        await readDatabase.InitializeAsync();
+
+        var fetchedCampaign = await new CampaignRepository(readDatabase).GetAsync(campaign.Id);
+
+        Assert.NotNull(fetchedCampaign);
+        Assert.Equal("dnd5e-2014", fetchedCampaign.CharacterSystemId);
+
+        var registry = GmToolkit.Core.Systems.CharacterSystemRegistry.FromEmbeddedSystems();
+        Assert.True(registry.TryGetById(fetchedCampaign.CharacterSystemId!, out var system));
+        Assert.Equal("D&D 5e (2014)", system!.Name);
+    }
+
+    [Fact]
     public async Task Campaign_with_no_system_attached_keeps_freeform_behavior_after_reopen()
     {
         var campaign = new Campaign { Name = "Freeform Homebrew Campaign" };
