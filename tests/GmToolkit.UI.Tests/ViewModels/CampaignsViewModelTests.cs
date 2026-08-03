@@ -1,5 +1,6 @@
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Services;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Tests.Fakes;
 using GmToolkit.UI.ViewModels;
 
@@ -17,7 +18,7 @@ public class CampaignsViewModelTests
     [Fact]
     public void With_no_campaigns_the_empty_state_is_shown()
     {
-        var vm = new CampaignsViewModel(new FakeCampaignRepository(), new ActiveCampaignContext(new FakeCampaignRepository()));
+        var vm = new CampaignsViewModel(new FakeCampaignRepository(), new ActiveCampaignContext(new FakeCampaignRepository()), CharacterSystemRegistry.FromEmbeddedSystems());
 
         Assert.False(vm.IsLoading);
         Assert.True(vm.IsEmpty);
@@ -30,7 +31,7 @@ public class CampaignsViewModelTests
     {
         var repository = new FakeCampaignRepository(new Campaign { Name = "Wandering Souls" });
 
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
 
         Assert.False(vm.IsEmpty);
         Assert.True(vm.IsListVisible);
@@ -45,7 +46,7 @@ public class CampaignsViewModelTests
         var middle = new Campaign { Name = "The Rustbelt Job", LastOpenedUtc = new DateTime(2024, 3, 1, 0, 0, 0, DateTimeKind.Utc) };
         var repository = new FakeCampaignRepository(older, newest, middle);
 
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
 
         Assert.Equal(["Wandering Souls", "The Rustbelt Job", "Shadows Over Blackmoor"], vm.Campaigns.Select(c => c.Name));
     }
@@ -59,7 +60,7 @@ public class CampaignsViewModelTests
         campaign.Npcs.Add(new Npc { CampaignId = campaign.Id, Name = "The Innkeeper" });
         var repository = new FakeCampaignRepository(campaign);
 
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
 
         Assert.Equal(2, vm.Campaigns[0].PlayerCharacterCount);
         Assert.Equal(1, vm.Campaigns[0].NpcCount);
@@ -68,7 +69,7 @@ public class CampaignsViewModelTests
     [Fact]
     public void ShowCreateFormCommand_switches_to_the_form_in_create_mode()
     {
-        var vm = new CampaignsViewModel(new FakeCampaignRepository(), new ActiveCampaignContext(new FakeCampaignRepository()));
+        var vm = new CampaignsViewModel(new FakeCampaignRepository(), new ActiveCampaignContext(new FakeCampaignRepository()), CharacterSystemRegistry.FromEmbeddedSystems());
 
         vm.ShowCreateFormCommand.Execute(null);
 
@@ -82,7 +83,7 @@ public class CampaignsViewModelTests
     public async Task Saving_the_form_hides_it_and_reloads_the_list()
     {
         var repository = new FakeCampaignRepository();
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         vm.ShowCreateFormCommand.Execute(null);
         vm.Form.Name = "Wandering Souls";
 
@@ -96,7 +97,7 @@ public class CampaignsViewModelTests
     [Fact]
     public void Cancelling_the_form_hides_it_without_changing_the_list()
     {
-        var vm = new CampaignsViewModel(new FakeCampaignRepository(), new ActiveCampaignContext(new FakeCampaignRepository()));
+        var vm = new CampaignsViewModel(new FakeCampaignRepository(), new ActiveCampaignContext(new FakeCampaignRepository()), CharacterSystemRegistry.FromEmbeddedSystems());
         vm.ShowCreateFormCommand.Execute(null);
 
         vm.Form.CancelCommand.Execute(null);
@@ -112,7 +113,7 @@ public class CampaignsViewModelTests
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
         var activeCampaignContext = new ActiveCampaignContext(repository);
-        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext, CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         Assert.False(item.IsActive);
 
@@ -128,7 +129,7 @@ public class CampaignsViewModelTests
         var first = new Campaign { Name = "Wandering Souls" };
         var second = new Campaign { Name = "Shadows Over Blackmoor" };
         var repository = new FakeCampaignRepository(first, second);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
 
         await vm.SelectCommand.ExecuteAsync(vm.Campaigns.Single(c => c.Campaign.Id == first.Id));
 
@@ -141,7 +142,7 @@ public class CampaignsViewModelTests
     {
         var repository = new FakeCampaignRepository { ThrowOnGetAll = new InvalidOperationException("database is locked") };
 
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
 
         Assert.False(vm.IsLoading);
         Assert.True(vm.HasLoadError);
@@ -155,7 +156,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign) { ThrowOnGetAll = new InvalidOperationException("database is locked") };
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         Assert.True(vm.HasLoadError);
 
         repository.ThrowOnGetAll = null;
@@ -175,7 +176,7 @@ public class CampaignsViewModelTests
         campaign.PlayerCharacters.Add(new PlayerCharacter { CampaignId = campaign.Id, CharacterName = "Borin" });
         campaign.Npcs.Add(new Npc { CampaignId = campaign.Id, Name = "The Innkeeper" });
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
 
         Assert.Contains("Wandering Souls", item.DeleteConfirmationPrompt);
@@ -189,7 +190,7 @@ public class CampaignsViewModelTests
         var campaign = new Campaign { Name = "Wandering Souls", GameSystem = "D&D 5e", Description = "A long-running homebrew campaign." };
         var repository = new FakeCampaignRepository(campaign);
         var activeCampaignContext = new ActiveCampaignContext(repository);
-        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext, CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
 
         vm.RequestEditCommand.Execute(item);
@@ -208,7 +209,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls", GameSystem = "D&D 5e" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         vm.RequestEditCommand.Execute(item);
 
@@ -222,11 +223,68 @@ public class CampaignsViewModelTests
     }
 
     [Fact]
+    public async Task Creating_a_campaign_with_a_selected_system_persists_it_and_the_reopened_list_row_shows_it()
+    {
+        // End-to-end acceptance check through the screen view model, not just the form in
+        // isolation: create -> save -> the reloaded list (LoadAsync, triggered by Form.Saved) shows
+        // the attached system's name via CampaignListItemViewModel.CharacterSystemDisplayName.
+        var registry = CharacterSystemRegistry.FromEmbeddedSystems();
+        var repository = new FakeCampaignRepository();
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), registry);
+        vm.ShowCreateFormCommand.Execute(null);
+        vm.Form.Name = "Wandering Souls";
+        vm.Form.SelectedCharacterSystem = vm.Form.CharacterSystemOptions.Single(option => option.Id == "dnd5e-2024");
+
+        await vm.Form.SaveCommand.ExecuteAsync(null);
+
+        var item = Assert.Single(vm.Campaigns);
+        Assert.Equal("dnd5e-2024", item.Campaign.CharacterSystemId);
+        Assert.Equal(registry.GetById("dnd5e-2024").Name, item.CharacterSystemDisplayName);
+
+        var persisted = Assert.Single(await repository.GetAllAsync());
+        Assert.Equal("dnd5e-2024", persisted.CharacterSystemId);
+    }
+
+    [Fact]
+    public async Task Creating_a_campaign_with_Freeform_persists_no_system_attached()
+    {
+        var repository = new FakeCampaignRepository();
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
+        vm.ShowCreateFormCommand.Execute(null);
+        vm.Form.Name = "Wandering Souls";
+
+        await vm.Form.SaveCommand.ExecuteAsync(null);
+
+        var item = Assert.Single(vm.Campaigns);
+        Assert.Null(item.Campaign.CharacterSystemId);
+        Assert.False(item.HasCharacterSystem);
+    }
+
+    [Fact]
+    public async Task Editing_a_campaign_to_change_its_system_persists_the_new_selection()
+    {
+        var registry = CharacterSystemRegistry.FromEmbeddedSystems();
+        var campaign = new Campaign { Name = "Wandering Souls", CharacterSystemId = "dnd5e-2024" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), registry);
+        var item = Assert.Single(vm.Campaigns);
+        vm.RequestEditCommand.Execute(item);
+        Assert.Equal("dnd5e-2024", vm.Form.SelectedCharacterSystem.Id);
+
+        vm.Form.SelectedCharacterSystem = vm.Form.CharacterSystemOptions.Single(option => option.Id == "gurps-4e");
+        await vm.Form.SaveCommand.ExecuteAsync(null);
+
+        var updated = Assert.Single(vm.Campaigns);
+        Assert.Equal("gurps-4e", updated.Campaign.CharacterSystemId);
+        Assert.Equal(registry.GetById("gurps-4e").Name, updated.CharacterSystemDisplayName);
+    }
+
+    [Fact]
     public void RequestDeleteCommand_shows_the_confirmation_panel_for_the_requested_row_and_ConfirmDeleteCommand_is_disabled()
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
 
         vm.RequestDeleteCommand.Execute(item);
@@ -242,7 +300,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         vm.RequestDeleteCommand.Execute(item);
 
@@ -263,7 +321,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         vm.RequestDeleteCommand.Execute(item);
 
@@ -278,7 +336,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         vm.RequestDeleteCommand.Execute(item);
         vm.DeleteConfirmationInput = "Wandering Souls";
@@ -295,7 +353,7 @@ public class CampaignsViewModelTests
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
         var activeCampaignContext = new ActiveCampaignContext(repository);
-        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext, CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         await vm.SelectCommand.ExecuteAsync(item);
         Assert.NotNull(activeCampaignContext.ActiveCampaign);
@@ -314,7 +372,7 @@ public class CampaignsViewModelTests
         var other = new Campaign { Name = "Shadows Over Blackmoor" };
         var repository = new FakeCampaignRepository(active, other);
         var activeCampaignContext = new ActiveCampaignContext(repository);
-        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext, CharacterSystemRegistry.FromEmbeddedSystems());
         await vm.SelectCommand.ExecuteAsync(vm.Campaigns.Single(c => c.Campaign.Id == active.Id));
         var otherItem = vm.Campaigns.Single(c => c.Campaign.Id == other.Id);
 
@@ -331,7 +389,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         vm.RequestDeleteCommand.Execute(item);
         vm.DeleteConfirmationInput = "Wandering Souls";
@@ -349,7 +407,7 @@ public class CampaignsViewModelTests
         var first = new Campaign { Name = "Wandering Souls" };
         var second = new Campaign { Name = "Shadows Over Blackmoor" };
         var repository = new FakeCampaignRepository(first, second);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var firstItem = vm.Campaigns.Single(c => c.Campaign.Id == first.Id);
         var secondItem = vm.Campaigns.Single(c => c.Campaign.Id == second.Id);
         vm.RequestDeleteCommand.Execute(firstItem);
@@ -370,7 +428,7 @@ public class CampaignsViewModelTests
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
         var activeCampaignContext = new ActiveCampaignContext(repository);
-        var vm = new CampaignsViewModel(repository, activeCampaignContext);
+        var vm = new CampaignsViewModel(repository, activeCampaignContext, CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         Assert.False(item.IsExpanded);
 
@@ -386,7 +444,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
         vm.ToggleExpandedCommand.Execute(item);
         Assert.True(item.IsExpanded);
@@ -402,7 +460,7 @@ public class CampaignsViewModelTests
         var first = new Campaign { Name = "Wandering Souls" };
         var second = new Campaign { Name = "Shadows Over Blackmoor" };
         var repository = new FakeCampaignRepository(first, second);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var firstItem = vm.Campaigns.Single(c => c.Campaign.Id == first.Id);
         var secondItem = vm.Campaigns.Single(c => c.Campaign.Id == second.Id);
 
@@ -417,7 +475,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls", Description = string.Empty };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
 
         Assert.Equal("No description", item.DescriptionOrPlaceholder);
@@ -428,7 +486,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls", Description = "A long-running homebrew campaign." };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
 
         Assert.Equal("A long-running homebrew campaign.", item.DescriptionOrPlaceholder);
@@ -440,10 +498,51 @@ public class CampaignsViewModelTests
         var createdUtc = new DateTime(2023, 5, 17, 0, 0, 0, DateTimeKind.Utc);
         var campaign = new Campaign { Name = "Wandering Souls", CreatedUtc = createdUtc };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         var item = Assert.Single(vm.Campaigns);
 
         Assert.Equal(createdUtc, item.CreatedUtc);
+    }
+
+    // -- Campaign system selector UI: attached-system display on the list row --
+
+    [Fact]
+    public void A_Freeform_campaign_has_no_CharacterSystemDisplayName_and_no_badge()
+    {
+        var campaign = new Campaign { Name = "Wandering Souls" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
+        var item = Assert.Single(vm.Campaigns);
+
+        Assert.Null(item.CharacterSystemDisplayName);
+        Assert.False(item.HasCharacterSystem);
+    }
+
+    [Fact]
+    public void A_campaign_with_an_attached_system_shows_its_registry_name()
+    {
+        var registry = CharacterSystemRegistry.FromEmbeddedSystems();
+        var campaign = new Campaign { Name = "Wandering Souls", CharacterSystemId = "dnd5e-2024" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), registry);
+        var item = Assert.Single(vm.Campaigns);
+
+        Assert.True(item.HasCharacterSystem);
+        Assert.Equal(registry.GetById("dnd5e-2024").Name, item.CharacterSystemDisplayName);
+    }
+
+    [Fact]
+    public void A_campaign_whose_attached_system_is_no_longer_installed_falls_back_to_showing_the_raw_id()
+    {
+        // Acceptance criterion: if a campaign's system doesn't exist in the registry, display
+        // gracefully -- TryGetById returns false here rather than GetById throwing.
+        var campaign = new Campaign { Name = "Wandering Souls", CharacterSystemId = "some-removed-system" };
+        var repository = new FakeCampaignRepository(campaign);
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
+        var item = Assert.Single(vm.Campaigns);
+
+        Assert.True(item.HasCharacterSystem);
+        Assert.Contains("some-removed-system", item.CharacterSystemDisplayName);
     }
 
     [Fact]
@@ -454,7 +553,7 @@ public class CampaignsViewModelTests
         // CampaignsViewModel's OnActiveCampaignChanged.
         var repository = new FakeCampaignRepository();
         var activeCampaignContext = new ActiveCampaignContext(repository);
-        _ = new CampaignsViewModel(repository, activeCampaignContext);
+        _ = new CampaignsViewModel(repository, activeCampaignContext, CharacterSystemRegistry.FromEmbeddedSystems());
         var campaign = new Campaign { Name = "Wandering Souls" };
 
         var exception = Record.Exception(() => activeCampaignContext.SelectCampaignAsync(campaign).GetAwaiter().GetResult());
@@ -467,7 +566,7 @@ public class CampaignsViewModelTests
     {
         // Mirrors issue #68's staleness class of bug -- see IRefreshable's remarks.
         var repository = new FakeCampaignRepository();
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         Assert.True(vm.IsEmpty);
 
         await repository.AddAsync(new Campaign { Name = "Wandering Souls" });
@@ -485,7 +584,7 @@ public class CampaignsViewModelTests
     {
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         Assert.False(vm.IsLoading);
 
         var isLoadingValuesSeen = new List<bool>();
@@ -519,7 +618,7 @@ public class CampaignsViewModelTests
         // toggling true at all, only RefreshAsync deliberately suppressing it.
         var campaign = new Campaign { Name = "Wandering Souls" };
         var repository = new FakeCampaignRepository(campaign);
-        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository));
+        var vm = new CampaignsViewModel(repository, new ActiveCampaignContext(repository), CharacterSystemRegistry.FromEmbeddedSystems());
         Assert.False(vm.IsLoading);
 
         repository.GetAllGate = new TaskCompletionSource();

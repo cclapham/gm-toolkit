@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
 
 namespace GmToolkit.UI.ViewModels;
@@ -51,6 +52,7 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
 {
     private readonly ICampaignRepository _campaignRepository;
     private readonly ActiveCampaignContext _activeCampaignContext;
+    private readonly ICharacterSystemRegistry _characterSystemRegistry;
 
     /// <summary>The row currently showing its delete-confirmation panel (issue #19), or
     /// <c>null</c> if none is. Only one row can be mid-delete at a time -- requesting delete on a
@@ -58,12 +60,13 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     /// <see cref="RequestDelete"/>).</summary>
     private CampaignListItemViewModel? _deleteTarget;
 
-    public CampaignsViewModel(ICampaignRepository campaignRepository, ActiveCampaignContext activeCampaignContext)
+    public CampaignsViewModel(ICampaignRepository campaignRepository, ActiveCampaignContext activeCampaignContext, ICharacterSystemRegistry characterSystemRegistry)
     {
         _campaignRepository = campaignRepository;
         _activeCampaignContext = activeCampaignContext;
+        _characterSystemRegistry = characterSystemRegistry;
 
-        Form = new CampaignFormViewModel(campaignRepository);
+        Form = new CampaignFormViewModel(campaignRepository, characterSystemRegistry);
         Form.Saved += OnFormSavedAsync;
         Form.Cancelled += OnFormCancelled;
 
@@ -77,7 +80,7 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     /// constructor. Never used at runtime; both heads resolve the constructor above via
     /// <c>Services.NavigationService</c>.</summary>
     public CampaignsViewModel()
-        : this(new DesignTimeCampaignRepository(), new ActiveCampaignContext(new DesignTimeCampaignRepository()))
+        : this(new DesignTimeCampaignRepository(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), CharacterSystemRegistry.FromEmbeddedSystems())
     {
     }
 
@@ -355,7 +358,7 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
             var sorted = campaigns.OrderByDescending(campaign => campaign.LastOpenedUtc);
 
             Campaigns = new ObservableCollection<CampaignListItemViewModel>(
-                sorted.Select(campaign => new CampaignListItemViewModel(campaign)));
+                sorted.Select(campaign => new CampaignListItemViewModel(campaign, _characterSystemRegistry)));
 
             RefreshActiveSelection();
         }

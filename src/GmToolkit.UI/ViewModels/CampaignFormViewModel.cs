@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -7,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
 
 namespace GmToolkit.UI.ViewModels;
@@ -40,17 +42,35 @@ namespace GmToolkit.UI.ViewModels;
 public sealed partial class CampaignFormViewModel : ObservableValidator
 {
     private readonly ICampaignRepository _campaignRepository;
+    private readonly ICharacterSystemRegistry _characterSystemRegistry;
 
     private Campaign? _editingCampaign;
     private string _originalName = string.Empty;
     private string _originalGameSystem = string.Empty;
     private string _originalDescription = string.Empty;
+    private string? _originalCharacterSystemId;
     private bool _canSave;
 
-    public CampaignFormViewModel(ICampaignRepository campaignRepository)
+    /// <summary>The placeholder option added to <see cref="CharacterSystemOptions"/> for a
+    /// campaign's <see cref="Campaign.CharacterSystemId"/> that no longer resolves via
+    /// <see cref="ICharacterSystemRegistry.TryGetById"/> (its system pack was removed since this
+    /// campaign was created/last edited), or <c>null</c> if none is currently showing. Tracked so
+    /// <see cref="SetFields"/> can remove a stale one before adding a fresh one (or none at all) on
+    /// every <see cref="BeginCreate"/>/<see cref="BeginEdit"/>, rather than letting placeholders for
+    /// campaigns no longer being edited pile up in <see cref="CharacterSystemOptions"/>.</summary>
+    private CharacterSystemOption? _missingSystemOption;
+
+    public CampaignFormViewModel(ICampaignRepository campaignRepository, ICharacterSystemRegistry characterSystemRegistry)
     {
         _campaignRepository = campaignRepository;
+        _characterSystemRegistry = characterSystemRegistry;
         ErrorsChanged += OnErrorsChanged;
+
+        CharacterSystemOptions = new ObservableCollection<CharacterSystemOption>(
+            new[] { CharacterSystemOption.Freeform }.Concat(
+                characterSystemRegistry.GetAll()
+                    .OrderBy(system => system.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(system => new CharacterSystemOption(system.Id, system.Name))));
     }
 
     /// <summary>Design-time-only constructor for the XAML previewer's <c>Design.DataContext</c>
@@ -58,7 +78,7 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
     /// <see cref="ShellViewModel"/> and <see cref="CampaignsViewModel"/>'s own design-time
     /// constructors. Never used at runtime.</summary>
     public CampaignFormViewModel()
-        : this(new DesignTimeCampaignRepository())
+        : this(new DesignTimeCampaignRepository(), CharacterSystemRegistry.FromEmbeddedSystems())
     {
     }
 
@@ -72,6 +92,25 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
 
     [ObservableProperty]
     public partial string Description { get; set; } = string.Empty;
+
+    /// <summary>Every option for the system dropdown (issue "campaign system selector UI"):
+    /// <see cref="CharacterSystemOption.Freeform"/> first, then one entry per
+    /// <see cref="ICharacterSystemRegistry.GetAll"/> system in alphabetical order -- built once in
+    /// the constructor, plus whatever placeholder <see cref="ResolveCharacterSystemOption"/> adds
+    /// for a campaign's currently-uninstalled system (see <see cref="_missingSystemOption"/>).</summary>
+    public ObservableCollection<CharacterSystemOption> CharacterSystemOptions { get; }
+
+    [ObservableProperty]
+    public partial CharacterSystemOption SelectedCharacterSystem { get; set; } = CharacterSystemOption.Freeform;
+
+    /// <summary>Set by <see cref="ResolveCharacterSystemOption"/> when the campaign being edited has
+    /// a <see cref="Campaign.CharacterSystemId"/> that doesn't resolve via
+    /// <see cref="ICharacterSystemRegistry.TryGetById"/> (its system pack was removed since this
+    /// campaign was created/last edited); <c>null</c> otherwise. Surfaced so the view can warn the
+    /// user rather than silently keeping (or silently dropping) an attachment to an id the registry
+    /// no longer knows about.</summary>
+    [ObservableProperty]
+    public partial string? MissingSystemWarning { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FormTitle))]
@@ -125,19 +164,30 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
     {
         _editingCampaign = null;
         IsEditMode = false;
-        SetFields(string.Empty, string.Empty, string.Empty);
+        SetFields(string.Empty, string.Empty, string.Empty, characterSystemId: null);
     }
 
-    /// <summary>Resets the form to edit <paramref name="campaign"/> in place. Wired to
+    /// <summary>
+    /// Resets the form to edit <paramref name="campaign"/> in place. Wired to
     /// <see cref="CampaignsViewModel"/>'s per-row "Edit" trigger (issue #71); built per #18's
-    /// explicit "shared view/view model for create and edit" requirement.</summary>
+    /// explicit "shared view/view model for create and edit" requirement.
+    /// </summary>
+    /// <remarks>
+    /// If <paramref name="campaign"/>'s <see cref="Campaign.CharacterSystemId"/> doesn't resolve via
+    /// <see cref="ICharacterSystemRegistry.TryGetById"/> (e.g. its system pack was uninstalled since
+    /// this campaign was last edited), <see cref="SelectedCharacterSystem"/> is set to a placeholder
+    /// option (not silently reset to <see cref="CharacterSystemOption.Freeform"/>, which would drop
+    /// the attachment out from under the user the moment they open -- and possibly cancel out of --
+    /// this form) and <see cref="MissingSystemWarning"/> explains why. See
+    /// <see cref="ResolveCharacterSystemOption"/>.
+    /// </remarks>
     public void BeginEdit(Campaign campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
 
         _editingCampaign = campaign;
         IsEditMode = true;
-        SetFields(campaign.Name, campaign.GameSystem, campaign.Description);
+        SetFields(campaign.Name, campaign.GameSystem, campaign.Description, campaign.CharacterSystemId);
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
@@ -155,7 +205,13 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
         {
             if (_editingCampaign is null)
             {
-                var campaign = new Campaign { Name = Name, GameSystem = GameSystem, Description = Description };
+                var campaign = new Campaign
+                {
+                    Name = Name,
+                    GameSystem = GameSystem,
+                    Description = Description,
+                    CharacterSystemId = SelectedCharacterSystem.Id,
+                };
                 await _campaignRepository.AddAsync(campaign);
                 _editingCampaign = campaign;
             }
@@ -164,6 +220,7 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
                 _editingCampaign.Name = Name;
                 _editingCampaign.GameSystem = GameSystem;
                 _editingCampaign.Description = Description;
+                _editingCampaign.CharacterSystemId = SelectedCharacterSystem.Id;
                 await _campaignRepository.UpdateAsync(_editingCampaign);
             }
 
@@ -253,16 +310,21 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
     }
 
     private bool IsDirty() =>
-        Name != _originalName || GameSystem != _originalGameSystem || Description != _originalDescription;
+        Name != _originalName
+        || GameSystem != _originalGameSystem
+        || Description != _originalDescription
+        || SelectedCharacterSystem.Id != _originalCharacterSystemId;
 
-    private void SetFields(string name, string gameSystem, string description)
+    private void SetFields(string name, string gameSystem, string description, string? characterSystemId)
     {
         Name = name;
         GameSystem = gameSystem;
         Description = description;
+        SelectedCharacterSystem = ResolveCharacterSystemOption(characterSystemId);
         _originalName = name;
         _originalGameSystem = gameSystem;
         _originalDescription = description;
+        _originalCharacterSystemId = characterSystemId;
 
         IsShowingDiscardConfirmation = false;
         SaveError = null;
@@ -277,6 +339,47 @@ public sealed partial class CampaignFormViewModel : ObservableValidator
         // stale, e.g. default-false) values. Recompute explicitly here so the very first
         // validation pass after a fresh BeginCreate/BeginEdit is always reflected.
         RefreshValidationState();
+    }
+
+    /// <summary>
+    /// Maps <paramref name="characterSystemId"/> to a <see cref="CharacterSystemOption"/> already in
+    /// (or, for an unresolvable id, freshly added to) <see cref="CharacterSystemOptions"/>. Always
+    /// clears a previous call's leftover placeholder first (see <see cref="_missingSystemOption"/>),
+    /// so switching from editing one campaign with a missing system straight to another never leaves
+    /// the first one's placeholder behind in the shared <see cref="CharacterSystemOptions"/> list.
+    /// </summary>
+    private CharacterSystemOption ResolveCharacterSystemOption(string? characterSystemId)
+    {
+        if (_missingSystemOption is not null)
+        {
+            CharacterSystemOptions.Remove(_missingSystemOption);
+            _missingSystemOption = null;
+        }
+
+        MissingSystemWarning = null;
+
+        if (characterSystemId is null)
+        {
+            return CharacterSystemOption.Freeform;
+        }
+
+        var existing = CharacterSystemOptions.FirstOrDefault(option => option.Id == characterSystemId);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        // The attached system's pack is no longer installed. Add a placeholder so the dropdown has
+        // a real SelectedItem to point to (an unmatched SelectedItem renders as a blank ComboBox in
+        // Avalonia, which would look like nothing is attached at all) rather than silently
+        // reassigning the campaign to Freeform out from under the user -- see BeginEdit's remarks.
+        var placeholder = new CharacterSystemOption(characterSystemId, $"{characterSystemId} (not installed)");
+        CharacterSystemOptions.Add(placeholder);
+        _missingSystemOption = placeholder;
+        MissingSystemWarning =
+            $"This campaign's system (\"{characterSystemId}\") isn't currently installed. Its data stays " +
+            "attached as-is unless you pick a different system below and save.";
+        return placeholder;
     }
 
     private void OnErrorsChanged(object? sender, DataErrorsChangedEventArgs e) => RefreshValidationState();

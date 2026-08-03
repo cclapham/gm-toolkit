@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using GmToolkit.Core.Models;
+using GmToolkit.Core.Systems;
 
 namespace GmToolkit.UI.ViewModels;
 
@@ -10,7 +11,11 @@ namespace GmToolkit.UI.ViewModels;
 /// so the view has a place to bind view-only state (<see cref="IsActive"/>) without adding
 /// presentation concerns to the Core domain model.
 /// </summary>
-public sealed partial class CampaignListItemViewModel(Campaign campaign) : ObservableObject
+/// <param name="characterSystemRegistry">Looked up (via <see cref="ICharacterSystemRegistry.TryGetById"/>,
+/// never the throwing <see cref="ICharacterSystemRegistry.GetById"/>) purely to resolve
+/// <see cref="Campaign.CharacterSystemId"/> to a display name for <see cref="CharacterSystemDisplayName"/>
+/// -- see that property's remarks for why the non-throwing lookup matters here specifically.</param>
+public sealed partial class CampaignListItemViewModel(Campaign campaign, ICharacterSystemRegistry characterSystemRegistry) : ObservableObject
 {
     /// <summary>The underlying domain model -- exposed so <see cref="CampaignsViewModel"/> can
     /// pass it to <see cref="GmToolkit.Core.Services.ActiveCampaignContext.SelectCampaignAsync"/>
@@ -20,6 +25,28 @@ public sealed partial class CampaignListItemViewModel(Campaign campaign) : Obser
     public string Name => Campaign.Name;
 
     public string GameSystem => Campaign.GameSystem;
+
+    /// <summary>
+    /// Display label for the typed system attached via <see cref="Campaign.CharacterSystemId"/> (see
+    /// SYSTEMS.md's "Attachment point"), shown as a badge next to the campaign's name -- <c>null</c>
+    /// (Freeform, no system attached) shows no badge at all rather than an empty one. Uses
+    /// <see cref="ICharacterSystemRegistry.TryGetById"/>, not the throwing
+    /// <see cref="ICharacterSystemRegistry.GetById"/>: an id that no longer resolves (its system
+    /// pack was uninstalled since this campaign attached it) is an ordinary, expected state for a
+    /// read-only list row to handle gracefully, not a bug to throw over -- it falls back to showing
+    /// the raw id with a "not installed" note so the attachment isn't silently hidden.
+    /// </summary>
+    public string? CharacterSystemDisplayName =>
+        Campaign.CharacterSystemId is null
+            ? null
+            : characterSystemRegistry.TryGetById(Campaign.CharacterSystemId, out var system)
+                ? system.Name
+                : $"{Campaign.CharacterSystemId} (not installed)";
+
+    /// <summary>Whether <see cref="CharacterSystemDisplayName"/> has anything to show -- drives the
+    /// badge's <c>IsVisible</c> binding in <c>CampaignsView.axaml</c> rather than relying on an
+    /// empty-string/whitespace converter.</summary>
+    public bool HasCharacterSystem => CharacterSystemDisplayName is not null;
 
     public DateTime LastOpenedUtc => Campaign.LastOpenedUtc;
 

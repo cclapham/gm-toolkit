@@ -4,6 +4,7 @@ using GmToolkit.Core.Generator;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
+using GmToolkit.Core.Systems;
 using GmToolkit.UI.Services;
 using GmToolkit.UI.Tests.Fakes;
 using GmToolkit.UI.ViewModels;
@@ -34,7 +35,8 @@ public class NavigationServiceTests
             registry,
             npcGenerator,
             activeCampaignContext,
-            new FakeAppSettingsService());
+            new FakeAppSettingsService(),
+            CharacterSystemRegistry.FromEmbeddedSystems());
 
         return (navigationService, npcRepository);
     }

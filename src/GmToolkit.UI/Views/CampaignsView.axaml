@@ -162,7 +162,22 @@
                                                 Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).SelectCommand}"
                                                 CommandParameter="{Binding}">
                                             <StackPanel Spacing="{StaticResource SpaceXS}">
-                                                <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding Name}" TextWrapping="Wrap" />
+                                                <!-- Campaign name plus, when a typed system is attached (see
+                                                     CampaignListItemViewModel.CharacterSystemDisplayName's remarks),
+                                                     a small badge naming it, hidden entirely for a Freeform
+                                                     campaign (null CharacterSystemId) rather than showing an empty
+                                                     badge. -->
+                                                <WrapPanel VerticalAlignment="Center">
+                                                    <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding Name}" TextWrapping="Wrap" Margin="0,0,8,0" />
+                                                    <Border Background="{DynamicResource SurfaceAltBrush}"
+                                                            BorderBrush="{DynamicResource BorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="4"
+                                                            Padding="6,2"
+                                                            IsVisible="{Binding HasCharacterSystem}">
+                                                        <TextBlock Classes="caption" Text="{Binding CharacterSystemDisplayName}" />
+                                                    </Border>
+                                                </WrapPanel>
                                                 <TextBlock Classes="caption" Text="{Binding GameSystem}" TextWrapping="Wrap" />
                                                 <WrapPanel>
                                                     <TextBlock Classes="caption" Text="{Binding CountsLabel}" Margin="0,0,16,0" />
