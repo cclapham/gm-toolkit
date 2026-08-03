@@ -1,3 +1,4 @@
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Data.Mapping;
@@ -48,6 +49,84 @@ public class CampaignRepository(GmToolkitDatabase database) : ICampaignRepositor
             await database.Connection.ExecuteAsync("DELETE FROM PlayerCharacters WHERE CampaignId = ?", id);
             await database.Connection.ExecuteAsync("DELETE FROM Npcs WHERE CampaignId = ?", id);
             await database.Connection.ExecuteAsync("DELETE FROM Campaigns WHERE Id = ?", id);
+        });
+
+    public Task<CampaignExportDto?> ExportCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
+        DatabaseExceptionTranslator.RunAsync(database, async () =>
+        {
+            var row = await database.Connection.FindAsync<CampaignRow>(campaignId);
+            if (row is null)
+            {
+                return null;
+            }
+
+            var campaign = await ToModelAsync(row);
+            return CampaignExportMapper.ToDto(campaign);
+        });
+
+    /// <remarks>
+    /// All-or-nothing (see <see cref="ICampaignRepository.ImportCampaignAsync"/>'s remarks):
+    /// <paramref name="dto"/> is fully validated, and any existing campaign of the same name is
+    /// resolved, before the transaction that actually writes anything opens. Deleting an existing
+    /// campaign (when <paramref name="overwrite"/> is <c>true</c>) and inserting the new one happen
+    /// inside the same <see cref="SQLite.SQLiteAsyncConnection.RunInTransactionAsync"/> call, so a
+    /// failure partway through can never leave the database with neither the old nor the new
+    /// campaign.
+    /// </remarks>
+    public Task<CampaignImportResult> ImportCampaignAsync(CampaignExportDto dto, bool overwrite, CancellationToken cancellationToken = default) =>
+        DatabaseExceptionTranslator.RunAsync(database, async () =>
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            var validation = ImportValidator.ValidateCampaign(dto);
+            if (!validation.IsValid)
+            {
+                return CampaignImportResult.Failure(validation);
+            }
+
+            var existing = await database.Connection.Table<CampaignRow>()
+                .Where(c => c.Name == dto.Name)
+                .FirstOrDefaultAsync();
+
+            if (existing is not null && !overwrite)
+            {
+                return CampaignImportResult.Failure(
+                    $"A campaign named '{dto.Name}' already exists. Re-import with overwrite to replace it.");
+            }
+
+            var campaign = CampaignExportMapper.ToModel(dto);
+            var playerCharacters = dto.PlayerCharacters
+                .Select(pc => PlayerCharacterExportMapper.ToModel(pc, campaign.Id))
+                .ToList();
+            var npcs = dto.Npcs
+                .Select(npc => NpcExportMapper.ToModel(npc, campaign.Id))
+                .ToList();
+
+            await database.Connection.RunInTransactionAsync(connection =>
+            {
+                if (existing is not null)
+                {
+                    // Explicit cascade, matching DeleteAsync -- see its remarks.
+                    connection.Execute("DELETE FROM PlayerCharacters WHERE CampaignId = ?", existing.Id);
+                    connection.Execute("DELETE FROM Npcs WHERE CampaignId = ?", existing.Id);
+                    connection.Execute("DELETE FROM Campaigns WHERE Id = ?", existing.Id);
+                }
+
+                connection.Insert(CampaignMapper.ToRow(campaign));
+                foreach (var playerCharacter in playerCharacters)
+                {
+                    connection.Insert(PlayerCharacterMapper.ToRow(playerCharacter));
+                }
+
+                foreach (var npc in npcs)
+                {
+                    connection.Insert(NpcMapper.ToRow(npc));
+                }
+            });
+
+            campaign.PlayerCharacters.AddRange(playerCharacters);
+            campaign.Npcs.AddRange(npcs);
+            return CampaignImportResult.Success(campaign);
         });
 
     private async Task<Campaign> ToModelAsync(CampaignRow row)

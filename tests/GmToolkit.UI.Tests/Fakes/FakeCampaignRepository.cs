@@ -1,3 +1,4 @@
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 
@@ -66,4 +67,10 @@ internal sealed class FakeCampaignRepository(params Campaign[] campaigns) : ICam
         _campaigns.RemoveAll(c => c.Id == id);
         return Task.CompletedTask;
     }
+
+    public Task<CampaignExportDto?> ExportCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Not exercised by the current UI test suite.");
+
+    public Task<CampaignImportResult> ImportCampaignAsync(CampaignExportDto dto, bool overwrite, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Not exercised by the current UI test suite.");
 }

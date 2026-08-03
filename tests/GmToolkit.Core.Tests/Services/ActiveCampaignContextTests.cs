@@ -1,3 +1,4 @@
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
@@ -146,5 +147,11 @@ public class ActiveCampaignContextTests
             _campaigns.RemoveAll(c => c.Id == id);
             return Task.CompletedTask;
         }
+
+        public Task<CampaignExportDto?> ExportCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Not needed by ActiveCampaignContext.");
+
+        public Task<CampaignImportResult> ImportCampaignAsync(CampaignExportDto dto, bool overwrite, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Not needed by ActiveCampaignContext.");
     }
 }

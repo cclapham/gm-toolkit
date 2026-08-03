@@ -1,3 +1,4 @@
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Data.Repositories;
 
@@ -271,5 +272,82 @@ public class NpcRepositoryTests : IAsyncLifetime
         Assert.Equal(goodNpc.Stats, fetchedGoodNpc.Stats);
         var fetchedBadNpc = Assert.Single(result, n => n.Id == badNpc.Id);
         Assert.Empty(fetchedBadNpc.Stats);
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_creates_every_valid_new_npc()
+    {
+        var campaignId = Guid.NewGuid();
+        var dtos = new List<NpcExportDto>
+        {
+            new() { Name = "Old Marta", Role = "Innkeeper", Stats = new Dictionary<string, string> { ["HP"] = "12" } },
+            new() { Name = "Dock Foreman" },
+        };
+
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: false);
+
+        Assert.True(result.AllSucceeded);
+        Assert.Equal(2, result.Imported.Count);
+        var fetched = await _repository.GetByCampaignAsync(campaignId);
+        Assert.Equal(2, fetched.Count);
+        Assert.Contains(fetched, n => n.Name == "Old Marta" && n.Stats["HP"] == "12");
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_skips_an_invalid_entry_but_still_imports_the_rest()
+    {
+        var campaignId = Guid.NewGuid();
+        var dtos = new List<NpcExportDto>
+        {
+            new() { Name = string.Empty },
+            new() { Name = "Dock Foreman" },
+        };
+
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: false);
+
+        Assert.False(result.AllSucceeded);
+        Assert.Single(result.Imported);
+        Assert.Equal("Dock Foreman", result.Imported[0].Name);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(0, error.Index);
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_without_overwrite_skips_a_name_conflict_and_leaves_the_existing_npc_untouched()
+    {
+        var campaignId = Guid.NewGuid();
+        var existing = new Npc { CampaignId = campaignId, Name = "Old Marta", Role = "Innkeeper" };
+        await _repository.AddAsync(existing);
+
+        var dtos = new List<NpcExportDto> { new() { Name = "Old Marta", Role = "Cult Leader" } };
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: false);
+
+        Assert.Empty(result.Imported);
+        Assert.Single(result.Errors);
+
+        var fetched = await _repository.GetAsync(existing.Id);
+        Assert.NotNull(fetched);
+        Assert.Equal("Innkeeper", fetched.Role);
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_with_overwrite_replaces_the_existing_npc_in_place()
+    {
+        var campaignId = Guid.NewGuid();
+        var existing = new Npc { CampaignId = campaignId, Name = "Old Marta", Role = "Innkeeper" };
+        await _repository.AddAsync(existing);
+
+        var dtos = new List<NpcExportDto> { new() { Name = "Old Marta", Role = "Cult Leader" } };
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: true);
+
+        Assert.True(result.AllSucceeded);
+        var imported = Assert.Single(result.Imported);
+        // Overwrite replaces the row in place -- same id, not a duplicate.
+        Assert.Equal(existing.Id, imported.Id);
+        Assert.Equal("Cult Leader", imported.Role);
+
+        var all = await _repository.GetByCampaignAsync(campaignId);
+        Assert.Single(all);
+        Assert.Equal("Cult Leader", all[0].Role);
     }
 }

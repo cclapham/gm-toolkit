@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 
@@ -29,4 +30,10 @@ internal sealed class DesignTimeCampaignRepository : ICampaignRepository
     public Task UpdateAsync(Campaign campaign, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<CampaignExportDto?> ExportCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<CampaignExportDto?>(null);
+
+    public Task<CampaignImportResult> ImportCampaignAsync(CampaignExportDto dto, bool overwrite, CancellationToken cancellationToken = default) =>
+        Task.FromResult(CampaignImportResult.Failure("Not available in the design-time previewer."));
 }

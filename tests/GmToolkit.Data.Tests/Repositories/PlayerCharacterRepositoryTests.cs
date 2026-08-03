@@ -1,3 +1,4 @@
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Data.Repositories;
 
@@ -223,5 +224,82 @@ public class PlayerCharacterRepositoryTests : IAsyncLifetime
         Assert.Equal(goodPc.Stats, fetchedGoodPc.Stats);
         var fetchedBadPc = Assert.Single(result, pc => pc.Id == badPc.Id);
         Assert.Empty(fetchedBadPc.Stats);
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_creates_every_valid_new_character()
+    {
+        var campaignId = Guid.NewGuid();
+        var dtos = new List<PlayerCharacterExportDto>
+        {
+            new() { CharacterName = "Brannigan", Level = 4, Stats = new Dictionary<string, string> { ["STR"] = "14" } },
+            new() { CharacterName = "Eleanor", Level = 2 },
+        };
+
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: false);
+
+        Assert.True(result.AllSucceeded);
+        Assert.Equal(2, result.Imported.Count);
+        var fetched = await _repository.GetByCampaignAsync(campaignId);
+        Assert.Equal(2, fetched.Count);
+        Assert.Contains(fetched, pc => pc.CharacterName == "Brannigan" && pc.Stats["STR"] == "14");
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_skips_an_invalid_entry_but_still_imports_the_rest()
+    {
+        var campaignId = Guid.NewGuid();
+        var dtos = new List<PlayerCharacterExportDto>
+        {
+            new() { CharacterName = string.Empty },
+            new() { CharacterName = "Eleanor" },
+        };
+
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: false);
+
+        Assert.False(result.AllSucceeded);
+        Assert.Single(result.Imported);
+        Assert.Equal("Eleanor", result.Imported[0].CharacterName);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(0, error.Index);
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_without_overwrite_skips_a_name_conflict_and_leaves_the_existing_character_untouched()
+    {
+        var campaignId = Guid.NewGuid();
+        var existing = new PlayerCharacter { CampaignId = campaignId, CharacterName = "Brannigan", Level = 1 };
+        await _repository.AddAsync(existing);
+
+        var dtos = new List<PlayerCharacterExportDto> { new() { CharacterName = "Brannigan", Level = 99 } };
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: false);
+
+        Assert.Empty(result.Imported);
+        Assert.Single(result.Errors);
+
+        var fetched = await _repository.GetAsync(existing.Id);
+        Assert.NotNull(fetched);
+        Assert.Equal(1, fetched.Level);
+    }
+
+    [Fact]
+    public async Task ImportCharactersAsync_with_overwrite_replaces_the_existing_character_in_place()
+    {
+        var campaignId = Guid.NewGuid();
+        var existing = new PlayerCharacter { CampaignId = campaignId, CharacterName = "Brannigan", Level = 1 };
+        await _repository.AddAsync(existing);
+
+        var dtos = new List<PlayerCharacterExportDto> { new() { CharacterName = "Brannigan", Level = 99 } };
+        var result = await _repository.ImportCharactersAsync(campaignId, dtos, overwrite: true);
+
+        Assert.True(result.AllSucceeded);
+        var imported = Assert.Single(result.Imported);
+        // Overwrite replaces the row in place -- same id, not a duplicate.
+        Assert.Equal(existing.Id, imported.Id);
+        Assert.Equal(99, imported.Level);
+
+        var all = await _repository.GetByCampaignAsync(campaignId);
+        Assert.Single(all);
+        Assert.Equal(99, all[0].Level);
     }
 }

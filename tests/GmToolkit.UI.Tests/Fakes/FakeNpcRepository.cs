@@ -1,3 +1,4 @@
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 
@@ -62,4 +63,8 @@ internal sealed class FakeNpcRepository(params Npc[] npcs) : INpcRepository
         _npcs.RemoveAll(n => n.Id == id);
         return Task.CompletedTask;
     }
+
+    public Task<BulkImportResult<Npc>> ImportCharactersAsync(
+        Guid campaignId, IReadOnlyList<NpcExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Not exercised by the current UI test suite.");
 }

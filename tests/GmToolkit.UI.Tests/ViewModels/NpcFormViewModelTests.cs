@@ -1,3 +1,4 @@
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.UI.Tests.Fakes;
@@ -505,5 +506,9 @@ public class NpcFormViewModelTests
         public Task UpdateAsync(Npc npc, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<BulkImportResult<Npc>> ImportCharactersAsync(
+            Guid campaignId, IReadOnlyList<NpcExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Not exercised by this test.");
     }
 }

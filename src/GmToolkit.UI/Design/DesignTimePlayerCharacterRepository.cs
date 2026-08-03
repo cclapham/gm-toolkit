@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 
@@ -28,4 +29,8 @@ internal sealed class DesignTimePlayerCharacterRepository : IPlayerCharacterRepo
     public Task UpdateAsync(PlayerCharacter playerCharacter, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<BulkImportResult<PlayerCharacter>> ImportCharactersAsync(
+        Guid campaignId, IReadOnlyList<PlayerCharacterExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new BulkImportResult<PlayerCharacter>([], []));
 }

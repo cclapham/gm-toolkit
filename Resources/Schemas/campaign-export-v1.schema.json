@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cclapham/gm-toolkit/blob/main/Resources/Schemas/campaign-export-v1.schema.json",
+  "title": "GM Toolkit campaign export (format version 1)",
+  "description": "Documents the shape produced/accepted by GmToolkit.Core.Import.CampaignExportDto (M5 -- see ROADMAP.md and issue #129). This file is documentation only: nothing in GM Toolkit loads or validates against it at runtime today. GmToolkit.Core.Import.ImportValidator is the runtime validator, and its rules are the authoritative ones if the two ever disagree -- keep this file in sync with GmToolkit.Core.Import.CampaignExportDto/PlayerCharacterExportDto/NpcExportDto whenever their shape changes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "name"],
+  "properties": {
+    "formatVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "The only value this build of GM Toolkit produces or accepts. A reader that doesn't recognize a higher formatVersion must refuse to import the file rather than guess at its shape -- mirrors the CharacterSystem pack format's own formatVersion convention (see SYSTEMS.md)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "The campaign's name. Required, non-blank, and at most 200 characters -- matches Campaign.NameMaxLength. Used as the stable identifier for conflict detection on re-import; the campaign's own database id is deliberately never part of this format (see the 'No database ids' note below)."
+    },
+    "gameSystem": {
+      "type": "string",
+      "default": "",
+      "description": "Free text, e.g. 'D&D 5e' -- matches Campaign.GameSystem. Not validated against any fixed list; the app does not model rules systems beyond this label plus the optional characterSystemId below."
+    },
+    "characterSystemId": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The id of a typed CharacterSystem stat schema pack (e.g. 'dnd5e-2024'), or null for a freeform campaign with no schema attached -- matches Campaign.CharacterSystemId. Not a database foreign key: an importer should look this id up in its own installed CharacterSystem registry and treat an unresolvable id as a validation error (or fall back to freeform), never as a hard parse failure."
+    },
+    "description": {
+      "type": "string",
+      "default": "",
+      "description": "Free-text campaign description -- matches Campaign.Description."
+    },
+    "exportedUtc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp of when this export file was produced. Describes the export file itself, not any entity inside it -- this format deliberately carries no createdUtc/lastOpenedUtc for the campaign, or createdUtc for any NPC, since those describe a specific database's copy of the data, not the campaign's own content."
+    },
+    "playerCharacters": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/playerCharacter" },
+      "description": "Every player character in the campaign. Order is not significant; each entry's own characterName is the stable identifier used for per-character conflict detection on import."
+    },
+    "npcs": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/npc" },
+      "description": "Every NPC in the campaign. Order is not significant; each entry's own name is the stable identifier used for per-NPC conflict detection on import."
+    }
+  },
+  "$defs": {
+    "playerCharacter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["characterName"],
+      "properties": {
+        "characterName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Required, non-blank, at most 200 characters -- matches PlayerCharacter.NameMaxLength. The stable identifier for this character across export/import."
+        },
+        "playerName": { "type": "string", "default": "" },
+        "ancestry": { "type": "string", "default": "", "description": "Species/ancestry/race, free text." },
+        "class": { "type": "string", "default": "", "description": "Class/role, free text." },
+        "level": { "type": "integer", "default": 1, "minimum": 0, "description": "A negative level is rejected by GmToolkit.Core.Import.ImportValidator; there is otherwise no fixed upper bound, since level/tier conventions vary by system." },
+        "notes": { "type": "string", "default": "" },
+        "stats": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": { "type": "string" },
+          "description": "System-agnostic key/value bag -- matches PlayerCharacter.Stats. The GM (or an attached characterSystemId schema) defines the keys; every value is stored as a string regardless of its logical type (number, boolean, enum choice, etc.). Passive values a GM looks up mid-session (perception, AC, etc.) are just well-known keys in this same bag, not their own fields."
+        }
+      }
+    },
+    "npc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Required, non-blank, at most 200 characters -- matches Npc.NameMaxLength. The stable identifier for this NPC across export/import."
+        },
+        "role": { "type": "string", "default": "" },
+        "faction": { "type": "string", "default": "" },
+        "location": { "type": "string", "default": "" },
+        "appearance": { "type": "string", "default": "" },
+        "mannerism": { "type": "string", "default": "" },
+        "motivation": { "type": "string", "default": "" },
+        "secret": { "type": "string", "default": "" },
+        "notes": { "type": "string", "default": "" },
+        "knownToPlayers": { "type": "boolean", "default": false },
+        "wasGenerated": { "type": "boolean", "default": false, "description": "True when this NPC originally came out of the generator (see the NPC generator milestone, M3)." },
+        "stats": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": { "type": "string" },
+          "description": "System-agnostic key/value bag -- matches Npc.Stats. Same shape/rules as playerCharacters[].stats above."
+        }
+      }
+    }
+  }
+}

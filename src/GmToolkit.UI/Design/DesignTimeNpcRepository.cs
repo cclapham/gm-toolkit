@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+using GmToolkit.Core.Import;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 
@@ -27,4 +28,8 @@ internal sealed class DesignTimeNpcRepository : INpcRepository
     public Task UpdateAsync(Npc npc, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<BulkImportResult<Npc>> ImportCharactersAsync(
+        Guid campaignId, IReadOnlyList<NpcExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new BulkImportResult<Npc>([], []));
 }
