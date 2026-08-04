@@ -94,7 +94,11 @@
                            Text="Campaigns"
                            VerticalAlignment="Center"
                            Margin="0,0,16,8" />
-                <Button Classes="accent" Content="+ Create Campaign" Command="{Binding ShowCreateFormCommand}" Margin="0,0,0,8" />
+                <Button Classes="accent" Content="+ Create Campaign" Command="{Binding ShowCreateFormCommand}" Margin="0,0,8,8" />
+                <!-- "Import Campaign" (#130): a screen-level action (applies to no single existing
+                     campaign yet), so it sits here beside Create rather than on any one row - see
+                     CampaignsViewModel.ShowImport's remarks. -->
+                <Button Content="Import Campaign" Command="{Binding ShowImportCommand}" Margin="0,0,0,8" />
             </WrapPanel>
 
             <!-- Load-error state: shown instead of the empty state or the list if loading threw,
@@ -190,9 +194,10 @@
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Button>
-                                        <!-- Expand/collapse (issue #72), edit (issue #71) and delete (issue #19) triggers, side
-                                             by side: all siblings of campaignRowSelect above (not nested inside it - see this
-                                             view's Styles block), so none of their clicks also activates the campaign. -->
+                                        <!-- Expand/collapse (issue #72), edit (issue #71), export (#131), export summary to
+                                             PDF (#132) and delete (issue #19) triggers, side by side: all siblings of
+                                             campaignRowSelect above (not nested inside it - see this view's Styles block),
+                                             so none of their clicks also activates the campaign. -->
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                                             <Button Classes="campaignRowExpand"
                                                     Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).ToggleExpandedCommand}"
@@ -202,6 +207,15 @@
                                                     Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).RequestEditCommand}"
                                                     CommandParameter="{Binding}"
                                                     Content="Edit" />
+                                            <Button Classes="campaignRowEdit"
+                                                    Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).ShowExportCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Content="Export" />
+                                            <Button Classes="campaignRowEdit"
+                                                    Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).ExportCampaignSummaryToPdfCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip.Tip="Export campaign summary to PDF"
+                                                    Content="PDF" />
                                             <Button Classes="campaignRowDelete"
                                                     Command="{Binding $parent[UserControl].((vm:CampaignsViewModel)DataContext).RequestDeleteCommand}"
                                                     CommandParameter="{Binding}"
@@ -280,6 +294,15 @@
                  is a mode switch within this one screen rather than a separate Window/destination. -->
             <ContentControl Grid.Row="1" IsVisible="{Binding IsFormVisible}">
                 <views:CampaignFormView DataContext="{Binding Form}" />
+            </ContentControl>
+
+            <!-- In-place import wizard (#130)/export panel (#131), same mode-switch idiom as Form
+                 above - see CampaignImportViewModel's remarks. -->
+            <ContentControl Grid.Row="1" IsVisible="{Binding IsImportVisible}">
+                <views:CampaignImportView DataContext="{Binding Import}" />
+            </ContentControl>
+            <ContentControl Grid.Row="1" IsVisible="{Binding IsExportVisible}">
+                <views:CampaignExportView DataContext="{Binding Export}" />
             </ContentControl>
         </Grid>
     </Border>

@@ -137,9 +137,16 @@
                     <Button Content="Cancel" Command="{Binding CancelCommand}" />
                 </StackPanel>
 
-                <!-- Delete (#21) - only available once there's an existing character to delete.
-                     Kept visually separated from Save/Cancel above so it doesn't read as part of
-                     the same primary action group. -->
+                <!-- Export to PDF (#132) and delete (#21) - both only available once there's an
+                     existing character (nothing to export/delete before the first save). Kept
+                     visually separated from Save/Cancel above so neither reads as part of the same
+                     primary action group. -->
+                <Border IsVisible="{Binding IsExportToPdfAvailable}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="0,12,0,0">
+                    <Button Content="Export to PDF" Command="{Binding ExportToPdfCommand}" IsEnabled="{Binding !IsExportingToPdf}" />
+                </Border>
                 <Border IsVisible="{Binding IsDeleteAvailable}"
                         BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="0,1,0,0"

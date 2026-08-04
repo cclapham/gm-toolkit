@@ -53,6 +53,10 @@ public static class ServiceCollectionExtensions
         // Singleton (issue #32): one app-wide toast stack, not one per screen -- see
         // INotificationService's remarks on why the shell hosts it.
         services.AddSingleton<INotificationService, NotificationService>();
+        // Singleton (issues #130-#132): one app-wide TopLevel reference, set once by
+        // Views/ShellView.axaml.cs -- see ITopLevelProvider's remarks.
+        services.AddSingleton<ITopLevelProvider, TopLevelProvider>();
+        services.AddSingleton<IFileDialogService, FileDialogService>();
         services.AddSingleton<ShellViewModel>();
         return services;
     }

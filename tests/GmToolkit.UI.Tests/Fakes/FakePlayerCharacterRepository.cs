@@ -66,7 +66,54 @@ internal sealed class FakePlayerCharacterRepository(params PlayerCharacter[] pla
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Real (not <see cref="NotSupportedException"/>-throwing) in-memory implementation, matching
+    /// <c>GmToolkit.Data.Repositories.PlayerCharacterRepository.ImportCharactersAsync</c>'s own
+    /// per-entry overwrite-by-name semantics -- see <see cref="FakeCampaignRepository.ImportCampaignAsync"/>'s
+    /// identical remark on why this fake supports it directly rather than throwing.
+    /// </summary>
     public Task<BulkImportResult<PlayerCharacter>> ImportCharactersAsync(
-        Guid campaignId, IReadOnlyList<PlayerCharacterExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Not exercised by the current UI test suite.");
+        Guid campaignId, IReadOnlyList<PlayerCharacterExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default)
+    {
+        var existingByName = _playerCharacters
+            .Where(pc => pc.CampaignId == campaignId)
+            .ToDictionary(pc => pc.CharacterName, StringComparer.Ordinal);
+
+        var imported = new List<PlayerCharacter>();
+        var errors = new List<ImportItemError>();
+
+        for (var index = 0; index < dtos.Count; index++)
+        {
+            var dto = dtos[index];
+            var validation = ImportValidator.ValidatePlayerCharacter(dto);
+            if (!validation.IsValid)
+            {
+                errors.Add(new ImportItemError(index, dto.CharacterName, validation.Errors));
+                continue;
+            }
+
+            if (existingByName.TryGetValue(dto.CharacterName, out var existing))
+            {
+                if (!overwrite)
+                {
+                    errors.Add(new ImportItemError(
+                        index, dto.CharacterName, [$"A player character named '{dto.CharacterName}' already exists in this campaign."]));
+                    continue;
+                }
+
+                _playerCharacters.Remove(existing);
+                var updated = PlayerCharacterExportMapper.ToModel(dto, campaignId, existing.Id);
+                _playerCharacters.Add(updated);
+                imported.Add(updated);
+            }
+            else
+            {
+                var created = PlayerCharacterExportMapper.ToModel(dto, campaignId);
+                _playerCharacters.Add(created);
+                imported.Add(created);
+            }
+        }
+
+        return Task.FromResult(new BulkImportResult<PlayerCharacter>(imported, errors));
+    }
 }

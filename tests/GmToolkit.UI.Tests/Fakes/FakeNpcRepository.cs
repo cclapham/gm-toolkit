@@ -64,7 +64,50 @@ internal sealed class FakeNpcRepository(params Npc[] npcs) : INpcRepository
         return Task.CompletedTask;
     }
 
+    /// <summary>Real (not <see cref="NotSupportedException"/>-throwing) in-memory implementation --
+    /// mirrors <see cref="FakePlayerCharacterRepository.ImportCharactersAsync"/>, matched against
+    /// <see cref="Npc.Name"/> instead of <c>CharacterName</c>.</summary>
     public Task<BulkImportResult<Npc>> ImportCharactersAsync(
-        Guid campaignId, IReadOnlyList<NpcExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Not exercised by the current UI test suite.");
+        Guid campaignId, IReadOnlyList<NpcExportDto> dtos, bool overwrite, CancellationToken cancellationToken = default)
+    {
+        var existingByName = _npcs
+            .Where(npc => npc.CampaignId == campaignId)
+            .ToDictionary(npc => npc.Name, StringComparer.Ordinal);
+
+        var imported = new List<Npc>();
+        var errors = new List<ImportItemError>();
+
+        for (var index = 0; index < dtos.Count; index++)
+        {
+            var dto = dtos[index];
+            var validation = ImportValidator.ValidateNpc(dto);
+            if (!validation.IsValid)
+            {
+                errors.Add(new ImportItemError(index, dto.Name, validation.Errors));
+                continue;
+            }
+
+            if (existingByName.TryGetValue(dto.Name, out var existing))
+            {
+                if (!overwrite)
+                {
+                    errors.Add(new ImportItemError(index, dto.Name, [$"An NPC named '{dto.Name}' already exists in this campaign."]));
+                    continue;
+                }
+
+                _npcs.Remove(existing);
+                var updated = NpcExportMapper.ToModel(dto, campaignId, existing.Id);
+                _npcs.Add(updated);
+                imported.Add(updated);
+            }
+            else
+            {
+                var created = NpcExportMapper.ToModel(dto, campaignId);
+                _npcs.Add(created);
+                imported.Add(created);
+            }
+        }
+
+        return Task.FromResult(new BulkImportResult<Npc>(imported, errors));
+    }
 }

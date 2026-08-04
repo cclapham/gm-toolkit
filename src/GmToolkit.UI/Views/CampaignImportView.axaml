@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:import="using:GmToolkit.Core.Import"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="560"
+             x:Class="GmToolkit.UI.Views.CampaignImportView"
+             x:DataType="vm:CampaignImportViewModel">
+    <Design.DataContext>
+        <vm:CampaignImportViewModel />
+    </Design.DataContext>
+
+    <!-- "Import Campaign" wizard (#130): format picker -> file picker -> preview -> conflict
+         resolution -> import. Embedded in-place inside CampaignsView.axaml rather than shown as a
+         separate Window/destination; see CampaignImportViewModel's remarks. -->
+    <StackPanel Spacing="{StaticResource SpaceMD}" MaxWidth="480" HorizontalAlignment="Left">
+        <TextBlock Classes="title" Foreground="{DynamicResource TextBrush}" Text="Import Campaign" />
+
+        <!-- Step 1: format + file picker. -->
+        <StackPanel IsVisible="{Binding IsPickingFile}" Spacing="{StaticResource SpaceMD}">
+            <StackPanel Spacing="{StaticResource SpaceXS}">
+                <TextBlock Classes="caption" Text="Format" />
+                <!-- Only JSON is functional today; see CampaignImportViewModel's remarks on why
+                     D&amp;D Beyond/CSV import aren't built yet. Fixed, explicitly-declared buttons
+                     (not an ItemsControl over AvailableFormats) mirrors ShellView.axaml's nav rail:
+                     a small, fixed set of choices reads more clearly written out directly than
+                     data-driven. -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="accent" Content="JSON (full fidelity)" IsEnabled="False" />
+                    <Button Content="D&amp;D Beyond" IsEnabled="False" ToolTip.Tip="Not yet supported." />
+                    <Button Content="CSV" IsEnabled="False" ToolTip.Tip="Not yet supported -- only JSON currently round-trips a whole campaign." />
+                </StackPanel>
+            </StackPanel>
+
+            <Button Classes="accent" Content="Choose File..." Command="{Binding PickFileCommand}" HorizontalAlignment="Left" />
+
+            <TextBlock Classes="caption"
+                       Foreground="{DynamicResource DangerBrush}"
+                       Text="{Binding PickFileError}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding PickFileError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+            <ItemsControl ItemsSource="{Binding PickFileErrors}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock Classes="caption" Foreground="{DynamicResource DangerBrush}" Text="{Binding}" TextWrapping="Wrap" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Button Content="Cancel" Command="{Binding CancelCommand}" HorizontalAlignment="Left" />
+        </StackPanel>
+
+        <!-- Step 2: preview + conflict resolution + confirm. -->
+        <StackPanel IsVisible="{Binding IsPreviewStep}" Spacing="{StaticResource SpaceMD}">
+            <StackPanel Spacing="{StaticResource SpaceXS}">
+                <TextBlock Classes="subtitle" Foreground="{DynamicResource TextBrush}" Text="{Binding CampaignName}" />
+                <TextBlock Classes="body" Foreground="{DynamicResource TextBrush}"
+                           Text="{Binding CharacterCount, StringFormat='{}{0} player character(s)'}" />
+                <TextBlock Classes="body" Foreground="{DynamicResource TextBrush}"
+                           Text="{Binding NpcCount, StringFormat='{}{0} NPC(s)'}" />
+            </StackPanel>
+
+            <ItemsControl ItemsSource="{Binding Warnings}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock Classes="caption" Text="{Binding}" TextWrapping="Wrap" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Conflict resolution (#130's "Overwrite existing / Merge / Skip"); only shown when
+                 a campaign of this name already exists; otherwise there's nothing to resolve and
+                 Import below just creates it. -->
+            <StackPanel IsVisible="{Binding HasConflict}" Spacing="{StaticResource SpaceXS}">
+                <TextBlock Classes="caption"
+                           Foreground="{DynamicResource DangerBrush}"
+                           Text="{Binding CampaignName, StringFormat='A campaign named &quot;{0}&quot; already exists. Choose how to resolve this:'}"
+                           TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Overwrite existing"
+                            Classes.accent="{Binding SelectedResolution, Converter={x:Static converters:ObjectConverters.Equal}, ConverterParameter={x:Static import:ImportConflictResolution.Overwrite}}"
+                            Command="{Binding SelectResolutionCommand}"
+                            CommandParameter="{x:Static import:ImportConflictResolution.Overwrite}" />
+                    <Button Content="Merge"
+                            Classes.accent="{Binding SelectedResolution, Converter={x:Static converters:ObjectConverters.Equal}, ConverterParameter={x:Static import:ImportConflictResolution.Merge}}"
+                            Command="{Binding SelectResolutionCommand}"
+                            CommandParameter="{x:Static import:ImportConflictResolution.Merge}" />
+                    <Button Content="Skip"
+                            Classes.accent="{Binding SelectedResolution, Converter={x:Static converters:ObjectConverters.Equal}, ConverterParameter={x:Static import:ImportConflictResolution.Skip}}"
+                            Command="{Binding SelectResolutionCommand}"
+                            CommandParameter="{x:Static import:ImportConflictResolution.Skip}" />
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Classes="caption"
+                       Foreground="{DynamicResource DangerBrush}"
+                       Text="{Binding ImportError}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding ImportError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="accent" Content="Import" Command="{Binding ConfirmImportCommand}" IsEnabled="{Binding !IsBusy}" />
+                <Button Content="Choose a different file" Command="{Binding BackToFilePickerCommand}" />
+                <Button Content="Cancel" Command="{Binding CancelCommand}" />
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

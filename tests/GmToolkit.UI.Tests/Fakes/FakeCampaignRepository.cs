@@ -68,9 +68,46 @@ internal sealed class FakeCampaignRepository(params Campaign[] campaigns) : ICam
         return Task.CompletedTask;
     }
 
-    public Task<CampaignExportDto?> ExportCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Not exercised by the current UI test suite.");
+    /// <summary>
+    /// Real (not <see cref="NotSupportedException"/>-throwing) in-memory implementation, so
+    /// <see cref="GmToolkit.UI.ViewModels.CampaignImportViewModel"/>/<see cref="GmToolkit.UI.ViewModels.CampaignExportViewModel"/>
+    /// (issues #130/#131) can be tested against this fake the same way every other view model in
+    /// this project is -- mirrors <c>GmToolkit.Data.Repositories.CampaignRepository</c>'s own
+    /// name-conflict/overwrite semantics closely enough for those view models' own branching logic,
+    /// without needing a real SQLite file (that coverage already exists in
+    /// <c>GmToolkit.Data.Tests.CampaignExportImportRoundTripTests</c>/<c>CampaignImportOrchestratorTests</c>).
+    /// </summary>
+    public Task<CampaignExportDto?> ExportCampaignAsync(Guid campaignId, CancellationToken cancellationToken = default)
+    {
+        var campaign = _campaigns.FirstOrDefault(c => c.Id == campaignId);
+        return Task.FromResult(campaign is null ? null : CampaignExportMapper.ToDto(campaign));
+    }
 
-    public Task<CampaignImportResult> ImportCampaignAsync(CampaignExportDto dto, bool overwrite, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Not exercised by the current UI test suite.");
+    /// <inheritdoc cref="ExportCampaignAsync"/>
+    public Task<CampaignImportResult> ImportCampaignAsync(CampaignExportDto dto, bool overwrite, CancellationToken cancellationToken = default)
+    {
+        var validation = ImportValidator.ValidateCampaign(dto);
+        if (!validation.IsValid)
+        {
+            return Task.FromResult(CampaignImportResult.Failure(validation));
+        }
+
+        var existing = _campaigns.FirstOrDefault(c => c.Name == dto.Name);
+        if (existing is not null && !overwrite)
+        {
+            return Task.FromResult(CampaignImportResult.Failure($"A campaign named '{dto.Name}' already exists."));
+        }
+
+        if (existing is not null)
+        {
+            _campaigns.Remove(existing);
+        }
+
+        var campaign = CampaignExportMapper.ToModel(dto);
+        campaign.PlayerCharacters.AddRange(dto.PlayerCharacters.Select(pc => PlayerCharacterExportMapper.ToModel(pc, campaign.Id)));
+        campaign.Npcs.AddRange(dto.Npcs.Select(npc => NpcExportMapper.ToModel(npc, campaign.Id)));
+        _campaigns.Add(campaign);
+
+        return Task.FromResult(CampaignImportResult.Success(campaign));
+    }
 }

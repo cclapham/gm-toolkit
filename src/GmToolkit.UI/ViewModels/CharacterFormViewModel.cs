@@ -6,10 +6,13 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using GmToolkit.Core.Export;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
+using GmToolkit.Core.Services;
 using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
+using GmToolkit.UI.Services;
 using GmToolkit.UI.ViewModels.Stats;
 
 namespace GmToolkit.UI.ViewModels;
@@ -77,7 +80,10 @@ namespace GmToolkit.UI.ViewModels;
 public sealed partial class CharacterFormViewModel : ObservableValidator
 {
     private readonly IPlayerCharacterRepository _playerCharacterRepository;
+    private readonly ActiveCampaignContext _activeCampaignContext;
     private readonly ICharacterSystemRegistry _characterSystemRegistry;
+    private readonly IFileDialogService _fileDialogService;
+    private readonly INotificationService _notificationService;
 
     private PlayerCharacter? _editingCharacter;
     private Guid _campaignId;
@@ -98,11 +104,28 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     /// to its <see cref="CharacterSystem"/> field set (issue #89) -- optional (defaulting to
     /// <see cref="CharacterSystemRegistry.FromEmbeddedSystems"/>) purely so every existing caller/test
     /// that predates issue #89 keeps compiling unchanged; <see cref="CharactersViewModel"/> always
-    /// passes the app's real, shared registry singleton explicitly.</param>
-    public CharacterFormViewModel(IPlayerCharacterRepository playerCharacterRepository, ICharacterSystemRegistry? characterSystemRegistry = null)
+    /// passes the app's real, shared registry singleton explicitly. Kept as the second positional
+    /// parameter (rather than appended after the newer #132 parameters below) specifically so every
+    /// existing two-argument <c>new CharacterFormViewModel(repository, registry)</c> call site keeps
+    /// compiling unchanged too.</param>
+    /// <param name="activeCampaignContext">Resolves the character's owning <see cref="Campaign"/>
+    /// for <see cref="ExportToPdfCommand"/> (issue #132) -- optional (defaulting to a fresh, always-empty
+    /// context) for the same "every pre-#132 caller keeps compiling" reason as
+    /// <paramref name="characterSystemRegistry"/>.</param>
+    /// <param name="fileDialogService">See <paramref name="activeCampaignContext"/>.</param>
+    /// <param name="notificationService">See <paramref name="activeCampaignContext"/>.</param>
+    public CharacterFormViewModel(
+        IPlayerCharacterRepository playerCharacterRepository,
+        ICharacterSystemRegistry? characterSystemRegistry = null,
+        ActiveCampaignContext? activeCampaignContext = null,
+        IFileDialogService? fileDialogService = null,
+        INotificationService? notificationService = null)
     {
         _playerCharacterRepository = playerCharacterRepository;
+        _activeCampaignContext = activeCampaignContext ?? new ActiveCampaignContext(new DesignTimeCampaignRepository());
         _characterSystemRegistry = characterSystemRegistry ?? CharacterSystemRegistry.FromEmbeddedSystems();
+        _fileDialogService = fileDialogService ?? new DesignTimeFileDialogService();
+        _notificationService = notificationService ?? new NotificationService();
         ErrorsChanged += OnErrorsChanged;
     }
 
@@ -143,6 +166,7 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     [NotifyPropertyChangedFor(nameof(FormTitle))]
     [NotifyPropertyChangedFor(nameof(SaveButtonLabel))]
     [NotifyPropertyChangedFor(nameof(IsDeleteAvailable))]
+    [NotifyPropertyChangedFor(nameof(IsExportToPdfAvailable))]
     public partial bool IsEditMode { get; set; }
 
     [ObservableProperty]
@@ -223,6 +247,14 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     /// <summary>Whether the "Delete character" trigger should be shown at all -- only in edit mode,
     /// since a not-yet-saved character has nothing to delete.</summary>
     public bool IsDeleteAvailable => IsEditMode;
+
+    /// <summary>Whether the "Export to PDF" trigger (issue #132) should be shown -- mirrors
+    /// <see cref="IsDeleteAvailable"/>: only in edit mode, since a not-yet-saved character has
+    /// nothing to export yet.</summary>
+    public bool IsExportToPdfAvailable => IsEditMode;
+
+    [ObservableProperty]
+    public partial bool IsExportingToPdf { get; set; }
 
     public bool CanSave
     {
@@ -410,6 +442,61 @@ public sealed partial class CharacterFormViewModel : ObservableValidator
     private void CancelDiscard()
     {
         IsShowingDiscardConfirmation = false;
+    }
+
+    /// <summary>
+    /// Renders and saves this character's PDF sheet (issue #132) -- only reachable in edit mode
+    /// (see <see cref="IsExportToPdfAvailable"/>), since a not-yet-saved character has nothing to
+    /// export. Resolves the owning <see cref="Campaign"/> (for the sheet's campaign-name line) and
+    /// its attached <see cref="CharacterSystem"/> (for labeled/ordered stats, if any -- see
+    /// <see cref="GmToolkit.Core.Export.StatBlockBuilder"/>'s remarks) from
+    /// <see cref="_activeCampaignContext"/>: this form is only ever shown for the active campaign's
+    /// own characters (see <see cref="CharactersViewModel"/>'s gating), so that context always has
+    /// what's needed here.
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportToPdfAsync()
+    {
+        if (!IsEditMode || _editingCharacter is null)
+        {
+            return;
+        }
+
+        var campaign = _activeCampaignContext.ActiveCampaign;
+        if (campaign is null)
+        {
+            return;
+        }
+
+        IsExportingToPdf = true;
+
+        try
+        {
+            var system = campaign.CharacterSystemId is { } systemId && _characterSystemRegistry.TryGetById(systemId, out var resolved)
+                ? resolved
+                : null;
+
+            var pdfBytes = PlayerCharacterPdfExporter.Export(_editingCharacter, campaign, system);
+            var fileNameStem = FileNameSanitizer.Sanitize(_editingCharacter.CharacterName);
+            var saved = await _fileDialogService.SaveBinaryFileAsync(
+                "Export Character to PDF", $"{fileNameStem}.pdf", "pdf", pdfBytes);
+
+            if (saved)
+            {
+                _notificationService.Show($"Exported \"{_editingCharacter.CharacterName}\" to PDF.");
+            }
+        }
+        catch (Exception ex)
+        {
+            // A PDF generation failure (issue #132's "friendly error dialog") -- surfaced as a
+            // toast (issue #32's convention), mirroring CampaignsViewModel.ExportCampaignSummaryToPdfAsync's
+            // identical catch.
+            _notificationService.Show($"Couldn't generate this character's PDF: {ex.Message}", ToastSeverity.Error);
+        }
+        finally
+        {
+            IsExportingToPdf = false;
+        }
     }
 
     [RelayCommand]

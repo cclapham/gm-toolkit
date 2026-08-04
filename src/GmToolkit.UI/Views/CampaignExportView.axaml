@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GmToolkit.UI.ViewModels"
+             xmlns:converters="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="260"
+             x:Class="GmToolkit.UI.Views.CampaignExportView"
+             x:DataType="vm:CampaignExportViewModel">
+    <Design.DataContext>
+        <vm:CampaignExportViewModel />
+    </Design.DataContext>
+
+    <!-- "Export Campaign" panel (#131): format picker (both fully functional, unlike Import's
+         format picker; see CampaignExportViewModel's remarks) -> native save dialog. Embedded
+         in-place inside CampaignsView.axaml, same reasoning as CampaignImportView.axaml. -->
+    <StackPanel Spacing="{StaticResource SpaceMD}" MaxWidth="420" HorizontalAlignment="Left">
+        <TextBlock Classes="title" Foreground="{DynamicResource TextBrush}"
+                   Text="{Binding CampaignName, StringFormat='Export &quot;{0}&quot;'}" />
+
+        <StackPanel Spacing="{StaticResource SpaceXS}">
+            <TextBlock Classes="caption" Text="Format" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="JSON (full fidelity)"
+                        Classes.accent="{Binding SelectedFormat, Converter={x:Static converters:ObjectConverters.Equal}, ConverterParameter={x:Static vm:CampaignExportFormat.Json}}"
+                        Command="{Binding SelectFormatCommand}"
+                        CommandParameter="{x:Static vm:CampaignExportFormat.Json}" />
+                <Button Content="CSV (characters only)"
+                        Classes.accent="{Binding SelectedFormat, Converter={x:Static converters:ObjectConverters.Equal}, ConverterParameter={x:Static vm:CampaignExportFormat.Csv}}"
+                        Command="{Binding SelectFormatCommand}"
+                        CommandParameter="{x:Static vm:CampaignExportFormat.Csv}" />
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock Classes="caption"
+                   Foreground="{DynamicResource DangerBrush}"
+                   Text="{Binding ExportError}"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding ExportError, Converter={x:Static converters:StringConverters.IsNotNullOrEmpty}}" />
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="accent" Content="Export..." Command="{Binding ExportCommand}" IsEnabled="{Binding !IsBusy}" />
+            <Button Content="Cancel" Command="{Binding CancelCommand}" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

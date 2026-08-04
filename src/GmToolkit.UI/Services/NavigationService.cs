@@ -48,12 +48,21 @@ public sealed class NavigationService : INavigationService
     // cheap to do now, and avoids having to retrofit it later.
     private readonly Dictionary<NavigationDestination, ViewModelBase> _cache = [];
 
-    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, INpcRepository npcRepository, IGeneratorRegistry generatorRegistry, INpcGenerator npcGenerator, ActiveCampaignContext activeCampaignContext, IAppSettingsService appSettingsService, ICharacterSystemRegistry characterSystemRegistry)
+    /// <param name="fileDialogService">Threaded through to <see cref="CampaignsViewModel"/>/
+    /// <see cref="CharactersViewModel"/> for issues #130-#132's import/export/PDF actions --
+    /// optional (defaulting to a design-time no-op) purely so every pre-#130 test/caller of this
+    /// constructor keeps compiling unchanged, mirroring <paramref name="characterSystemRegistry"/>'s
+    /// own optionality one parameter up.</param>
+    /// <param name="notificationService">See <paramref name="fileDialogService"/>.</param>
+    public NavigationService(ICampaignRepository campaignRepository, IPlayerCharacterRepository playerCharacterRepository, INpcRepository npcRepository, IGeneratorRegistry generatorRegistry, INpcGenerator npcGenerator, ActiveCampaignContext activeCampaignContext, IAppSettingsService appSettingsService, ICharacterSystemRegistry characterSystemRegistry, IFileDialogService? fileDialogService = null, INotificationService? notificationService = null)
     {
+        fileDialogService ??= new DesignTimeFileDialogService();
+        notificationService ??= new NotificationService();
+
         _factories = new Dictionary<NavigationDestination, Func<ViewModelBase>>
         {
-            [NavigationDestination.Campaigns] = () => new CampaignsViewModel(campaignRepository, activeCampaignContext, characterSystemRegistry),
-            [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext, characterSystemRegistry),
+            [NavigationDestination.Campaigns] = () => new CampaignsViewModel(campaignRepository, activeCampaignContext, characterSystemRegistry, playerCharacterRepository, npcRepository, fileDialogService, notificationService),
+            [NavigationDestination.Characters] = () => new CharactersViewModel(playerCharacterRepository, activeCampaignContext, characterSystemRegistry, fileDialogService, notificationService),
             [NavigationDestination.Npcs] = () => new NpcsViewModel(npcRepository, activeCampaignContext, characterSystemRegistry),
             [NavigationDestination.Generator] = () => new GeneratorViewModel(generatorRegistry, npcGenerator, npcRepository, activeCampaignContext, this),
             [NavigationDestination.Settings] = () => new SettingsViewModel(appSettingsService),
@@ -74,7 +83,7 @@ public sealed class NavigationService : INavigationService
     /// runtime; both heads resolve the constructor above via DI (see
     /// <c>ServiceCollectionExtensions.AddGmToolkitUi</c>).</summary>
     public NavigationService()
-        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new DesignTimeNpcRepository(), GeneratorRegistry.FromEmbeddedTables(), CreateDesignTimeNpcGenerator(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), new DesignTimeAppSettingsService(), CharacterSystemRegistry.FromEmbeddedSystems())
+        : this(new DesignTimeCampaignRepository(), new DesignTimePlayerCharacterRepository(), new DesignTimeNpcRepository(), GeneratorRegistry.FromEmbeddedTables(), CreateDesignTimeNpcGenerator(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), new DesignTimeAppSettingsService(), CharacterSystemRegistry.FromEmbeddedSystems(), new DesignTimeFileDialogService(), new NotificationService())
     {
     }
 

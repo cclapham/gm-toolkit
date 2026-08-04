@@ -11,6 +11,7 @@ using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
 using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
+using GmToolkit.UI.Services;
 
 namespace GmToolkit.UI.ViewModels;
 
@@ -57,12 +58,26 @@ public sealed partial class CharactersViewModel : ViewModelBase, IRefreshable
     /// <see cref="CharacterFormViewModel"/> (issue #89) -- optional here purely to keep every
     /// pre-#89 test/caller of this constructor compiling; the app's real composition root
     /// (<c>NavigationService</c>) always passes the shared registry singleton explicitly.</param>
-    public CharactersViewModel(IPlayerCharacterRepository playerCharacterRepository, ActiveCampaignContext activeCampaignContext, ICharacterSystemRegistry? characterSystemRegistry = null)
+    /// <param name="fileDialogService">Passed straight through to <see cref="CharacterFormViewModel"/>
+    /// (issue #132's per-character PDF export) -- optional (defaulting to a design-time no-op) for
+    /// the same "every pre-#132 caller keeps compiling" reason as <paramref name="characterSystemRegistry"/>.</param>
+    /// <param name="notificationService">See <paramref name="fileDialogService"/>.</param>
+    public CharactersViewModel(
+        IPlayerCharacterRepository playerCharacterRepository,
+        ActiveCampaignContext activeCampaignContext,
+        ICharacterSystemRegistry? characterSystemRegistry = null,
+        IFileDialogService? fileDialogService = null,
+        INotificationService? notificationService = null)
     {
         _playerCharacterRepository = playerCharacterRepository;
         _activeCampaignContext = activeCampaignContext;
 
-        Form = new CharacterFormViewModel(playerCharacterRepository, characterSystemRegistry);
+        Form = new CharacterFormViewModel(
+            playerCharacterRepository,
+            characterSystemRegistry,
+            activeCampaignContext,
+            fileDialogService ?? new Design.DesignTimeFileDialogService(),
+            notificationService ?? new NotificationService());
         Form.Saved += OnFormSavedAsync;
         Form.Cancelled += OnFormCancelled;
         Form.Deleted += OnFormDeletedAsync;

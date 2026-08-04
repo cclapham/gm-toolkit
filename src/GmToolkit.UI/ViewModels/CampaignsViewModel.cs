@@ -6,11 +6,13 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using GmToolkit.Core.Export;
 using GmToolkit.Core.Models;
 using GmToolkit.Core.Repositories;
 using GmToolkit.Core.Services;
 using GmToolkit.Core.Systems;
 using GmToolkit.UI.Design;
+using GmToolkit.UI.Services;
 
 namespace GmToolkit.UI.ViewModels;
 
@@ -53,6 +55,8 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     private readonly ICampaignRepository _campaignRepository;
     private readonly ActiveCampaignContext _activeCampaignContext;
     private readonly ICharacterSystemRegistry _characterSystemRegistry;
+    private readonly IFileDialogService _fileDialogService;
+    private readonly INotificationService _notificationService;
 
     /// <summary>The row currently showing its delete-confirmation panel (issue #19), or
     /// <c>null</c> if none is. Only one row can be mid-delete at a time -- requesting delete on a
@@ -60,15 +64,46 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     /// <see cref="RequestDelete"/>).</summary>
     private CampaignListItemViewModel? _deleteTarget;
 
-    public CampaignsViewModel(ICampaignRepository campaignRepository, ActiveCampaignContext activeCampaignContext, ICharacterSystemRegistry characterSystemRegistry)
+    /// <param name="playerCharacterRepository">Needed by <see cref="Import"/>'s orchestrator
+    /// (issue #130) -- optional (defaulting to an always-empty design-time repository) purely so
+    /// every pre-#130 test/caller of this constructor keeps compiling unchanged, mirroring
+    /// <see cref="CharactersViewModel"/>'s identical <c>characterSystemRegistry = null</c>
+    /// convention; <c>NavigationService</c> always passes the app's real repository explicitly.</param>
+    /// <param name="npcRepository">See <paramref name="playerCharacterRepository"/>.</param>
+    /// <param name="fileDialogService">Needed by <see cref="Import"/>/<see cref="Export"/> (issues
+    /// #130/#131) and <see cref="ExportCampaignSummaryToPdfAsync"/> (issue #132) -- see
+    /// <paramref name="playerCharacterRepository"/>.</param>
+    /// <param name="notificationService">See <paramref name="playerCharacterRepository"/>.</param>
+    public CampaignsViewModel(
+        ICampaignRepository campaignRepository,
+        ActiveCampaignContext activeCampaignContext,
+        ICharacterSystemRegistry characterSystemRegistry,
+        IPlayerCharacterRepository? playerCharacterRepository = null,
+        INpcRepository? npcRepository = null,
+        IFileDialogService? fileDialogService = null,
+        INotificationService? notificationService = null)
     {
         _campaignRepository = campaignRepository;
         _activeCampaignContext = activeCampaignContext;
         _characterSystemRegistry = characterSystemRegistry;
+        _fileDialogService = fileDialogService ?? new DesignTimeFileDialogService();
+        _notificationService = notificationService ?? new NotificationService();
+        playerCharacterRepository ??= new DesignTimePlayerCharacterRepository();
+        npcRepository ??= new DesignTimeNpcRepository();
 
         Form = new CampaignFormViewModel(campaignRepository, characterSystemRegistry);
         Form.Saved += OnFormSavedAsync;
         Form.Cancelled += OnFormCancelled;
+
+        // Import (issue #130) / Export (issue #131): shared in-place wizards/panels, same "one
+        // reused instance, reset via Begin() before showing" idiom as Form above.
+        Import = new CampaignImportViewModel(campaignRepository, playerCharacterRepository, npcRepository, characterSystemRegistry, _fileDialogService);
+        Import.Completed += OnImportCompleted;
+        Import.Cancelled += OnImportCancelled;
+
+        Export = new CampaignExportViewModel(campaignRepository, _fileDialogService);
+        Export.Completed += OnExportCompleted;
+        Export.Cancelled += OnExportCancelled;
 
         _activeCampaignContext.ActiveCampaignChanged += OnActiveCampaignChanged;
 
@@ -80,7 +115,10 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     /// constructor. Never used at runtime; both heads resolve the constructor above via
     /// <c>Services.NavigationService</c>.</summary>
     public CampaignsViewModel()
-        : this(new DesignTimeCampaignRepository(), new ActiveCampaignContext(new DesignTimeCampaignRepository()), CharacterSystemRegistry.FromEmbeddedSystems())
+        : this(
+            new DesignTimeCampaignRepository(),
+            new ActiveCampaignContext(new DesignTimeCampaignRepository()),
+            CharacterSystemRegistry.FromEmbeddedSystems())
     {
     }
 
@@ -93,6 +131,20 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
     [NotifyPropertyChangedFor(nameof(IsListVisible))]
     public partial bool IsFormVisible { get; set; }
+
+    /// <summary>Whether <see cref="Import"/>'s in-place wizard (issue #130) is showing -- mirrors
+    /// <see cref="IsFormVisible"/>'s "mode switch within this one screen" idiom exactly.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    [NotifyPropertyChangedFor(nameof(IsListVisible))]
+    public partial bool IsImportVisible { get; set; }
+
+    /// <summary>Whether <see cref="Export"/>'s in-place panel (issue #131) is showing -- mirrors
+    /// <see cref="IsImportVisible"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    [NotifyPropertyChangedFor(nameof(IsListVisible))]
+    public partial bool IsExportVisible { get; set; }
 
     /// <summary>Set if loading the campaign list threw (e.g. the database file is locked or
     /// unreadable); <c>null</c> otherwise. Surfaced instead of leaving <see cref="IsLoading"/>
@@ -111,18 +163,24 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
 
     public bool HasLoadError => LoadError is not null;
 
-    /// <summary>True once loading has finished without error and there are no campaigns and the
-    /// form isn't showing -- drives the empty-state UI (explain what a campaign is, offer
-    /// Create).</summary>
-    public bool IsEmpty => !IsLoading && !HasLoadError && !IsFormVisible && Campaigns.Count == 0;
+    /// <summary>True once loading has finished without error and there are no campaigns and no
+    /// panel (create/edit form, import, export) is showing -- drives the empty-state UI (explain
+    /// what a campaign is, offer Create).</summary>
+    public bool IsEmpty => !IsLoading && !HasLoadError && !IsFormVisible && !IsImportVisible && !IsExportVisible && Campaigns.Count == 0;
 
-    /// <summary>True once loading has finished without error, there's at least one campaign, and
-    /// the form isn't showing -- drives the populated list UI.</summary>
-    public bool IsListVisible => !IsLoading && !HasLoadError && !IsFormVisible && Campaigns.Count > 0;
+    /// <summary>True once loading has finished without error, there's at least one campaign, and no
+    /// panel is showing -- drives the populated list UI.</summary>
+    public bool IsListVisible => !IsLoading && !HasLoadError && !IsFormVisible && !IsImportVisible && !IsExportVisible && Campaigns.Count > 0;
 
     /// <summary>The shared create/edit form (issue #18) -- see this class's remarks for why it's
     /// composed in-place rather than a separate destination/window.</summary>
     public CampaignFormViewModel Form { get; }
+
+    /// <summary>The shared "Import Campaign" wizard (issue #130) -- see <see cref="IsImportVisible"/>.</summary>
+    public CampaignImportViewModel Import { get; }
+
+    /// <summary>The shared "Export Campaign" panel (issue #131) -- see <see cref="IsExportVisible"/>.</summary>
+    public CampaignExportViewModel Export { get; }
 
     /// <summary>What the user has typed into the delete-confirmation row's text field, compared
     /// against <see cref="_deleteTarget"/>'s name in <see cref="CanConfirmDelete"/>. Empty
@@ -170,6 +228,71 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     {
         Form.BeginCreate();
         IsFormVisible = true;
+    }
+
+    /// <summary>Opens <see cref="Import"/>'s wizard (issue #130) -- a screen-level action (there's
+    /// no single campaign it applies to yet, unlike <see cref="ShowExport"/>/<see cref="ExportCampaignSummaryToPdfAsync"/>),
+    /// so it sits alongside <see cref="ShowCreateForm"/> in <c>CampaignsView.axaml</c>'s header.</summary>
+    [RelayCommand]
+    private void ShowImport()
+    {
+        Import.Begin();
+        IsImportVisible = true;
+    }
+
+    /// <summary>Opens <see cref="Export"/>'s panel (issue #131) for <paramref name="item"/>.</summary>
+    [RelayCommand]
+    private void ShowExport(CampaignListItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        Export.Begin(item.Campaign.Id, item.Campaign.Name);
+        IsExportVisible = true;
+    }
+
+    /// <summary>
+    /// Renders and saves <paramref name="item"/>'s campaign summary PDF (issue #132) -- a single
+    /// direct action with a native save dialog, not a panel of its own like <see cref="Import"/>/
+    /// <see cref="Export"/>: there's nothing to preview or choose beyond "where to save it", so a
+    /// whole extra mode-switch screen would be ceremony this action doesn't need (mirrors how
+    /// <see cref="CharacterFormViewModel.ExportToPdfCommand"/> is a single button on that form, not
+    /// its own screen either).
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportCampaignSummaryToPdfAsync(CampaignListItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var campaign = item.Campaign;
+            var system = campaign.CharacterSystemId is { } systemId && _characterSystemRegistry.TryGetById(systemId, out var resolved)
+                ? resolved
+                : null;
+
+            var pdfBytes = CampaignSummaryPdfExporter.Export(campaign, system);
+            var fileNameStem = FileNameSanitizer.Sanitize(campaign.Name);
+            var saved = await _fileDialogService.SaveBinaryFileAsync(
+                "Export Campaign Summary to PDF", $"{fileNameStem}-summary.pdf", "pdf", pdfBytes);
+
+            if (saved)
+            {
+                _notificationService.Show($"Exported \"{campaign.Name}\" summary to PDF.");
+            }
+        }
+        catch (Exception ex)
+        {
+            // A PDF generation failure (issue #132's "friendly error dialog") -- surfaced as a
+            // toast (issue #32's convention) since, unlike Import/Export, this action has no panel
+            // of its own to show an inline error on.
+            _notificationService.Show($"Couldn't generate this campaign's PDF: {ex.Message}", ToastSeverity.Error);
+        }
     }
 
     [RelayCommand]
@@ -398,6 +521,29 @@ public sealed partial class CampaignsViewModel : ViewModelBase, IRefreshable
     {
         IsFormVisible = false;
     }
+
+    /// <summary>Closes <see cref="Import"/>'s wizard and refreshes the list after a successful
+    /// (non-skipped) import (issue #130), and shows the "Imported X characters into [Campaign]"
+    /// success toast that issue's acceptance criteria call for.</summary>
+    private async Task OnImportCompleted(string campaignName, int charactersImported, int npcsImported)
+    {
+        IsImportVisible = false;
+        await LoadAsync();
+
+        var suffix = npcsImported > 0 ? $" and {npcsImported} NPC{(npcsImported == 1 ? string.Empty : "s")}" : string.Empty;
+        _notificationService.Show(
+            $"Imported {charactersImported} character{(charactersImported == 1 ? string.Empty : "s")}{suffix} into \"{campaignName}\".");
+    }
+
+    private void OnImportCancelled() => IsImportVisible = false;
+
+    private void OnExportCompleted(CampaignExportFormat format)
+    {
+        IsExportVisible = false;
+        _notificationService.Show($"Exported \"{Export.CampaignName}\" as {(format == CampaignExportFormat.Json ? "JSON" : "CSV")}.");
+    }
+
+    private void OnExportCancelled() => IsExportVisible = false;
 
     private void OnActiveCampaignChanged()
     {
